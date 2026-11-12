@@ -79,20 +79,9 @@ class Book:
             raise ValueError(f"not an image directory: {path}")
 
         assert default_kind in PAGE_KINDS
-        pages = self._load_dir(path, default_kind, kinds)
 
-        # Assign only after everything succeeded, so a failure keeps old pages.
-        self.pages = pages
-        self.source = str(path)
-
-    @staticmethod
-    def _load_dir(
-        directory: Path,
-        default_kind: str,
-        kinds: dict[str, str] | None,
-    ) -> list[PageImage]:
         images: list[Path] = []
-        for entry in directory.iterdir():
+        for entry in path.iterdir():
             if not entry.is_file():
                 continue
             if entry.name.startswith("."):
@@ -102,7 +91,7 @@ class Book:
             images.append(entry)
 
         if not images:
-            raise ValueError(f"no supported images in {directory}")
+            raise ValueError(f"no supported images in {path}")
 
         images.sort(key=lambda p: _natural_key(p.name))
         overrides = _validate_kinds(kinds, images)
@@ -121,7 +110,10 @@ class Book:
                     kind=overrides.get(image.name, default_kind),
                 )
             )
-        return pages
+
+        # Assign only after everything succeeded, so a failure keeps old pages.
+        self.pages = pages
+        self.source = str(path)
 
 
 # Sort filenames by their numeric parts, so page_2 comes before page_10.
