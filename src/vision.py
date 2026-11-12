@@ -69,6 +69,8 @@ def extract_json(text: str) -> dict:
 
 # Turn a local image file into a data URL.
 def _to_data_url(path: Path) -> str:
-    mime = mimetypes.guess_type(path.name)[0] or "image/jpeg"
+    mime, _ = mimetypes.guess_type(path.name)
+    if not mime or not mime.startswith("image/"):
+        mime = "image/jpeg"
     payload = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{payload}"
