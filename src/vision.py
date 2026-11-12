@@ -69,10 +69,13 @@ class VisionClient:
             "image_url": {"url": _to_data_url(image_path)},
         }
         text_part = {"type": "text", "text": prompt}
-        payload = {
-            "model": self.model,
-            "messages": [{"role": "user", "content": [image_part, text_part]}],
-        }
+        messages = []
+        if json_mode:
+            # The endpoint rejects json_object unless "json" appears
+            # somewhere in the messages.
+            messages.append({"role": "system", "content": "Respond in JSON."})
+        messages.append({"role": "user", "content": [image_part, text_part]})
+        payload = {"model": self.model, "messages": messages}
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
 
