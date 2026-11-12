@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from vision import VisionError, _to_data_url
+from vision import VisionClient, VisionError, _to_data_url, extract_json
 
 SAMPLE_JPG = (
     Path(__file__).resolve().parent.parent
@@ -45,3 +45,81 @@ def test_unknown_suffix_raises(tmp_path):
 
     with pytest.raises(VisionError, match="unsupported image type"):
         _to_data_url(target)
+
+
+def test_extract_plain_json():
+    assert extract_json('{"a": 1}') == {"a": 1}
+
+
+def test_extract_fenced_json():
+    assert extract_json('```json\n{"a": 1}\n```') == {"a": 1}
+
+
+def test_extract_after_prose():
+    assert extract_json('结果如下：\n{"a": 1}\n以上') == {"a": 1}
+
+
+def test_extract_takes_first_object():
+    assert extract_json('{"a": 1}\n{"b": 2}') == {"a": 1}
+
+
+def test_extract_without_json_raises():
+    with pytest.raises(ValueError, match="no JSON object"):
+        extract_json("抱歉，我无法完成")
+
+
+def test_extract_empty_raises():
+    with pytest.raises(ValueError):
+        extract_json("")
+
+
+def test_analyze_builds_payload(monkeypatch):
+    captured = {}
+
+    def fake_post(self, payload):
+        captured.update(payload)
+        return "reply"
+
+    monkeypatch.setattr(VisionClient, "_post", fake_post)
+    client = VisionClient("http://x/v1", "k", "m")
+
+    assert client.analyze("describe", SAMPLE_JPG) == "reply"
+
+    content = captured["messages"][0]["content"]
+    assert captured["model"] == "m"
+    assert content[0]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+    assert content[1]["text"] == "describe"
+    assert captured["response_format"] == {"type": "json_object"}
+
+
+def test_analyze_without_json_mode(monkeypatch):
+    captured = {}
+
+    def fake_post(self, payload):
+        captured.update(payload)
+        return "ok"
+
+    monkeypatch.setattr(VisionClient, "_post", fake_post)
+    client = VisionClient("http://x/v1", "k", "m")
+
+    client.analyze("hi", SAMPLE_JPG, json_mode=False)
+
+    assert "response_format" not in captured
+
+
+def test_analyze_without_config_raises():
+    client = VisionClient("", "", "")
+
+    with pytest.raises(VisionError, match="not configured"):
+        client.analyze("hi", SAMPLE_JPG)
+
+
+def test_analyze_propagates_vision_error(monkeypatch):
+    def fake_post(self, payload):
+        raise VisionError("boom")
+
+    monkeypatch.setattr(VisionClient, "_post", fake_post)
+    client = VisionClient("http://x/v1", "k", "m")
+
+    with pytest.raises(VisionError, match="boom"):
+        client.analyze("hi", SAMPLE_JPG)
