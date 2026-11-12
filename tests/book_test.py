@@ -69,3 +69,23 @@ def test_load_twice_raises_and_keeps_pages():
         book.load(SAMPLE_DIR)
 
     assert book.page_count == 19
+
+
+def test_pages_have_size():
+    book = load()
+
+    assert all(p.width and p.height for p in book.pages)
+    # Check the exact values to catch swapped or misread dimensions.
+    assert (book.pages[0].width, book.pages[0].height) == (680, 800)
+    assert (book.pages[1].width, book.pages[1].height) == (1360, 800)
+
+
+def test_broken_image_has_no_size(tmp_path):
+    (tmp_path / "bad.jpg").write_bytes(b"not an image")
+
+    book = Book("test")
+    book.load(tmp_path)
+
+    assert book.page_count == 1
+    assert book.pages[0].width is None
+    assert book.pages[0].height is None
