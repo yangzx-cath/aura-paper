@@ -1,7 +1,9 @@
 import base64
 from pathlib import Path
 
-from vision import _to_data_url
+import pytest
+
+from vision import VisionError, _to_data_url
 
 SAMPLE_JPG = (
     Path(__file__).resolve().parent.parent
@@ -28,10 +30,18 @@ def test_png_uses_png_mime(tmp_path):
     assert url.startswith("data:image/png;base64,")
 
 
-def test_unknown_suffix_falls_back_to_jpeg(tmp_path):
-    target = tmp_path / "page.xyz"
-    target.write_bytes(b"whatever")
+def test_bmp_uses_bmp_mime(tmp_path):
+    target = tmp_path / "page.bmp"
+    target.write_bytes(b"BM fake")
 
     url = _to_data_url(target)
 
-    assert url.startswith("data:image/jpeg;base64,")
+    assert url.startswith("data:image/bmp;base64,")
+
+
+def test_unknown_suffix_raises(tmp_path):
+    target = tmp_path / "page.xyz"
+    target.write_bytes(b"whatever")
+
+    with pytest.raises(VisionError, match="unsupported image type"):
+        _to_data_url(target)

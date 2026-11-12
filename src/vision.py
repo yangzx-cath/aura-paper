@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import base64
-import mimetypes
 import os
 from pathlib import Path
 
@@ -67,10 +66,19 @@ def extract_json(text: str) -> dict:
     raise NotImplementedError("extract_json")
 
 
-# Turn a local image file into a data URL.
+# Supported image suffixes and their MIME types.
+_MIME_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".bmp": "image/bmp",
+}
+
+
+# Convert a local image file to a data URL.
 def _to_data_url(path: Path) -> str:
-    mime, _ = mimetypes.guess_type(path.name)
-    if not mime or not mime.startswith("image/"):
-        mime = "image/jpeg"
+    mime = _MIME_TYPES.get(path.suffix.lower())
+    if mime is None:
+        raise VisionError(f"unsupported image type: {path.suffix}")
     payload = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{payload}"
