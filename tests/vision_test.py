@@ -85,8 +85,10 @@ def test_analyze_builds_payload(monkeypatch):
 
     assert client.analyze("describe", SAMPLE_JPG) == "reply"
 
-    content = captured["messages"][0]["content"]
+    system, user = captured["messages"]
+    content = user["content"]
     assert captured["model"] == "m"
+    assert "json" in system["content"].lower()
     assert content[0]["image_url"]["url"].startswith("data:image/jpeg;base64,")
     assert content[1]["text"] == "describe"
     assert captured["response_format"] == {"type": "json_object"}
@@ -105,6 +107,7 @@ def test_analyze_without_json_mode(monkeypatch):
     client.analyze("hi", SAMPLE_JPG, json_mode=False)
 
     assert "response_format" not in captured
+    assert captured["messages"][0]["role"] == "user"
 
 
 def test_analyze_without_config_raises():
