@@ -1,3 +1,7 @@
 # Python
 .venv/
 __pycache__/
+.pytest_cache/
+
+# Local secrets
+.env
