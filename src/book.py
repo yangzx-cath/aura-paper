@@ -8,6 +8,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from PIL import Image
+
 
 # Page kinds
 PAGE_KINDS = ("single", "spread")
@@ -111,11 +113,15 @@ class Book:
 
         pages: list[PageImage] = []
         for index, image in enumerate(images):
+            size = _image_size(image)
+            width, height = size if size else (None, None)
             pages.append(
                 PageImage(
                     index=index,
                     filename=image.name,
                     path=str(image),
+                    width=width,
+                    height=height,
                     kind=overrides.get(image.name, default_kind),
                 )
             )
@@ -156,3 +162,13 @@ def _kinds_for_dir(
         raise ValueError(f"unknown page filenames: {sorted(unknown)}")
 
     return overrides
+
+
+# Read an image header and return its (width, height), or None on failure.
+def _image_size(path: Path) -> tuple[int, int] | None:
+    try:
+        with Image.open(path) as image:
+            return image.size
+    except Exception:
+        # A broken file must not break loading the whole book.
+        return None
