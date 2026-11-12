@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # Environment variables:
@@ -27,12 +28,26 @@ class VisionClient:
         model: str,
         timeout: float = 120.0,
     ) -> None:
-        raise NotImplementedError("VisionClient.__init__")
+        self.base_url = base_url
+        self.api_key = api_key
+        self.model = model
+        self.timeout = timeout
+
+    def __repr__(self) -> str:
+        return (
+            f"VisionClient(base_url={self.base_url!r}, "
+            f"model={self.model!r}, timeout={self.timeout})"
+        )
 
     @classmethod
     def from_env(cls) -> VisionClient:
         """Build a client from the VISION_* environment variables."""
-        raise NotImplementedError("VisionClient.from_env")
+        return cls(
+            base_url=os.environ.get("VISION_BASE_URL", ""),
+            api_key=os.environ.get("VISION_API_KEY", ""),
+            model=os.environ.get("VISION_MODEL", ""),
+            timeout=float(os.environ.get("VISION_TIMEOUT", "120")),
+        )
 
     def analyze(
         self,
