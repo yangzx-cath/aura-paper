@@ -3,9 +3,11 @@ Interpret page images into structured content.
 """
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from book import Book, PageImage
-from vision import VisionClient
+from prompts import page_prompt
+from vision import VisionClient, VisionError, extract_json
 
 
 @dataclass
@@ -49,7 +51,31 @@ class BookContent:
 
 def understand_page(page: PageImage, client: VisionClient) -> PageContent:
     """Read one page and return its structured content."""
-    raise NotImplementedError("understand_page")
+    content = PageContent(
+        index=page.index,
+        filename=page.filename,
+        model=client.model,
+    )
+
+    prompt = page_prompt(page.kind)
+    image_path = Path(page.path)
+
+    try:
+        reply = client.analyze(prompt, image_path)
+        fields = extract_json(reply)
+    except (VisionError, ValueError) as exc:
+        content.error = str(exc)
+        return content
+
+    # A field may be missing or explicitly null, so fall back to "".
+    content.page_text = fields.get("page_text", "") or ""
+    content.description = fields.get("description", "") or ""
+    content.mood = fields.get("mood", "") or ""
+
+    if not content.page_text and not content.description:
+        content.error = "model returned no content"
+
+    return content
 
 
 def understand_book(book: Book, client: VisionClient) -> BookContent:
