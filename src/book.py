@@ -2,8 +2,6 @@
 Book input component: load an image directory into a structured Book.
 """
 
-from __future__ import annotations
-
 import re
 from dataclasses import dataclass
 from pathlib import Path
