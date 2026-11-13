@@ -10,7 +10,6 @@ from pathlib import Path
 
 from PIL import Image
 
-
 # Page kinds
 PAGE_KINDS = ("single", "spread")
 
