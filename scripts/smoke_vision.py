@@ -5,7 +5,7 @@ environment or from a local .env file.
 
 Usage:
     export VISION_API_KEY=sk-xxx
-    python scripts/smoke_vision.py [image]
+    python scripts/smoke_vision.py [image] [single|spread]
 """
 
 import os
@@ -15,14 +15,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from prompts import page_prompt  # noqa: E402
 from vision import VisionClient, VisionError  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = ROOT / ".env"
-DEFAULT_IMAGE = ROOT / "data" / "chicken_and_sunflower" / "01.jpg"
+DEFAULT_IMAGE = ROOT / "data" / "chicken_and_sunflower" / "02.jpg"
 DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 DEFAULT_MODEL = "qwen3.8-max"
-PROMPT = "用一句中文描述这张绘本画面。"
 
 
 def load_env(path: Path) -> None:
@@ -40,6 +40,7 @@ def main() -> int:
     load_env(ENV_FILE)
 
     image = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_IMAGE
+    kind = sys.argv[2] if len(sys.argv) > 2 else "single"
     if not image.is_file():
         print(f"image not found: {image}", file=sys.stderr)
         return 2
@@ -51,6 +52,7 @@ def main() -> int:
         timeout=float(os.environ.get("VISION_TIMEOUT", "120")),
     )
     print(f"client: {client}")
+    print(f"kind: {kind}")
 
     if not client.api_key:
         print("VISION_API_KEY is not set", file=sys.stderr)
@@ -58,7 +60,7 @@ def main() -> int:
 
     started = time.perf_counter()
     try:
-        reply = client.analyze(PROMPT, image)
+        reply = client.analyze(page_prompt(kind), image)
     except VisionError as exc:
         print(f"failed: {exc}", file=sys.stderr)
         return 1
