@@ -3,7 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from vision import VisionClient, VisionError, _to_data_url, extract_json
+from aura_paper.vision import (
+    VisionClient,
+    VisionError,
+    _to_data_url,
+    extract_json,
+)
 
 SAMPLE_JPG = (
     Path(__file__).resolve().parent.parent

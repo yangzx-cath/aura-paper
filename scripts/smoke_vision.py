@@ -14,14 +14,14 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-
-from book import PageImage  # noqa: E402
-from prompts import page_prompt  # noqa: E402
-from understand import understand_page  # noqa: E402
-from vision import VisionClient, VisionError  # noqa: E402
-
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from aura_paper.book import PageImage  # noqa: E402
+from aura_paper.prompts import page_prompt  # noqa: E402
+from aura_paper.understand import understand_page  # noqa: E402
+from aura_paper.vision import VisionClient, VisionError  # noqa: E402
+
 ENV_FILE = ROOT / ".env"
 DEFAULT_IMAGE = ROOT / "data" / "chicken_and_sunflower" / "02.jpg"
 DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"

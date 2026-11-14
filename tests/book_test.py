@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from book import Book
+from aura_paper.book import Book
 
 SAMPLE_DIR = (
     Path(__file__).resolve().parent.parent / "data" / "chicken_and_sunflower"

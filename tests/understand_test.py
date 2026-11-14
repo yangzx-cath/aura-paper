@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
 
-from book import Book, PageImage
-from understand import understand_book, understand_page
-from vision import VisionClient, VisionError
+from aura_paper.book import Book, PageImage
+from aura_paper.understand import understand_book, understand_page
+from aura_paper.vision import VisionClient, VisionError
 
 
 class FakeClient(VisionClient):

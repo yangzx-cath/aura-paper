@@ -5,9 +5,9 @@ Interpret page images into structured content.
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from book import Book, PageImage
-from prompts import page_prompt
-from vision import VisionClient, VisionError, extract_json
+from aura_paper.book import Book, PageImage
+from aura_paper.prompts import page_prompt
+from aura_paper.vision import VisionClient, VisionError, extract_json
 
 
 @dataclass
