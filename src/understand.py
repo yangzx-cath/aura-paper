@@ -67,7 +67,7 @@ def understand_page(page: PageImage, client: VisionClient) -> PageContent:
         content.error = str(exc)
         return content
 
-    # A field may be missing or explicitly null, so fall back to "".
+    # Missing or null fields become empty strings.
     content.page_text = fields.get("page_text", "") or ""
     content.description = fields.get("description", "") or ""
     content.mood = fields.get("mood", "") or ""
@@ -80,4 +80,14 @@ def understand_page(page: PageImage, client: VisionClient) -> PageContent:
 
 def understand_book(book: Book, client: VisionClient) -> BookContent:
     """Read every page of a book and collect the results."""
-    raise NotImplementedError("understand_book")
+    content = BookContent(
+        id=book.id,
+        title=book.title,
+        source=book.source,
+    )
+
+    # A bad page only sets PageContent.error, so the loop keeps going.
+    for page in book.pages:
+        content.pages.append(understand_page(page, client))
+
+    return content
