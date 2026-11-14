@@ -1,3 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aura-paper"
+description = "An interactive video adaptation of a paper picture book"
+requires-python = ">=3.11"
+dynamic = ["version"]
+dependencies = ["pillow>=11.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.4"]
+
+[tool.hatch.version]
+path = "aura_paper/__init__.py"
+
 [tool.black]
 line-length = 79
 
