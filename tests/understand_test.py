@@ -77,6 +77,7 @@ def test_success():
 
     assert content.index == 3
     assert content.filename == "03.jpg"
+    assert content.kind == "single"
     assert content.model == "fake-model"
     assert content.page_text == "你好"
     assert content.description == "草地"
@@ -118,8 +119,9 @@ def test_empty_payload_is_an_error():
 def test_spread_page_uses_spread_prompt():
     client = FakeClient(json.dumps({"page_text": "文字"}))
 
-    understand_page(make_page(kind="spread"), client)
+    content = understand_page(make_page(kind="spread"), client)
 
+    assert content.kind == "spread"
     assert "跨页" in client.prompts[0]
 
 
@@ -366,6 +368,7 @@ def test_save_book_writes_the_page_fields(tmp_path):
     assert data["page_count"] == 1
     assert data["pages"][0]["description"] == "草地"
     assert data["pages"][0]["filename"] == "03.jpg"
+    assert data["pages"][0]["kind"] == "single"
 
 
 def test_save_book_overwrites_the_previous_file(tmp_path):

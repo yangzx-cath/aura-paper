@@ -29,6 +29,7 @@ class PageContent:
     page_text: str = ""
     description: str = ""
     mood: str = ""
+    mood_detail: str = ""
     model: str = ""
     error: str = ""
 
@@ -43,6 +44,7 @@ class PageContent:
             "page_text": self.page_text,
             "description": self.description,
             "mood": self.mood,
+            "mood_detail": self.mood_detail,
             "error": self.error,
         }
 
@@ -140,6 +142,7 @@ def _apply_fields(content: PageContent, fields: dict) -> None:
     content.page_text = fields.get("page_text", "") or ""
     content.description = fields.get("description", "") or ""
     content.mood = fields.get("mood", "") or ""
+    content.mood_detail = fields.get("mood_detail", "") or ""
 
 
 # Keep only what the model produced, so page identity stays current.
@@ -148,6 +151,7 @@ def _page_fields(content: PageContent) -> dict:
         "page_text": content.page_text,
         "description": content.description,
         "mood": content.mood,
+        "mood_detail": content.mood_detail,
     }
 
 
