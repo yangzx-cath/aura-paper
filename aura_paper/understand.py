@@ -123,7 +123,12 @@ def _page_fields(content: PageContent) -> dict:
     }
 
 
-def understand_book(book: Book, client: VisionClient) -> BookContent:
+def understand_book(
+    book: Book,
+    client: VisionClient,
+    *,
+    cache: Cache | None = None,
+) -> BookContent:
     """Read every page of a book and collect the results."""
     content = BookContent(
         id=book.id,
@@ -131,8 +136,10 @@ def understand_book(book: Book, client: VisionClient) -> BookContent:
         source=book.source,
     )
 
+    ns = f"understand/{book.id}"
     # A bad page only sets PageContent.error, so the loop keeps going.
     for page in book.pages:
-        content.pages.append(understand_page(page, client))
+        result = understand_page(page, client, cache=cache, ns=ns)
+        content.pages.append(result)
 
     return content
