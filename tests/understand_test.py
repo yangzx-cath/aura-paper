@@ -347,3 +347,19 @@ def test_save_book_writes_the_page_fields(tmp_path):
     assert data["page_count"] == 1
     assert data["pages"][0]["description"] == "草地"
     assert data["pages"][0]["kind"] == "single"
+
+
+def test_book_dict_round_trip():
+    page = PageContent(
+        index=1,
+        filename="02.jpg",
+        kind="spread",
+        page_text="文字",
+        description="草地",
+        mood="温暖",
+        model="m",
+    )
+    book = BookContent(id="demo", title="示例", source="/src")
+    book.pages.append(page)
+
+    assert BookContent.from_dict(book.to_dict()) == book
