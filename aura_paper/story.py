@@ -1,13 +1,12 @@
 """Extract the narrative structure of a whole book."""
 
-import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .cache import Cache, fingerprint
-from .config import out_root
 from .llm import LLMClient, LLMError, extract_json
+from .output import write_json
 from .prompts import story_prompt
 from .understand import BookContent
 
@@ -126,10 +125,4 @@ def save_story(
     root: str | Path | None = None,
 ) -> Path:
     """Write the story to <root>/<book_id>/story.json."""
-    base = Path(root) if root is not None else out_root()
-    path = base / book_id / "story.json"
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(story.to_dict(), ensure_ascii=False, indent=2)
-    path.write_text(payload + "\n", encoding="utf-8")
-    return path
+    return write_json(book_id, "story", story.to_dict(), root)

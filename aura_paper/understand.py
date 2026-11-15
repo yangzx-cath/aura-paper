@@ -2,15 +2,14 @@
 Interpret page images into structured content.
 """
 
-import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .book import Book, PageImage
 from .cache import Cache, file_fingerprint, fingerprint
-from .config import out_root
 from .llm import LLMClient, LLMError, extract_json
+from .output import write_json
 from .prompts import page_prompt
 
 
@@ -178,10 +177,4 @@ def understand_book(
 
 def save_book(content: BookContent, root: str | Path | None = None) -> Path:
     """Write the book content to <root>/<book_id>/book.json."""
-    base = Path(root) if root is not None else out_root()
-    path = base / content.id / "book.json"
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(content.to_dict(), ensure_ascii=False, indent=2)
-    path.write_text(payload + "\n", encoding="utf-8")
-    return path
+    return write_json(content.id, "book", content.to_dict(), root)
