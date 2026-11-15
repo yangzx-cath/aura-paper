@@ -10,8 +10,8 @@ from pathlib import Path
 from .book import Book, PageImage
 from .cache import Cache, file_fingerprint, fingerprint
 from .config import out_root
+from .llm import LLMClient, LLMError, extract_json
 from .prompts import page_prompt
-from .vision import VisionClient, VisionError, extract_json
 
 
 # Return the current UTC time in a sortable, timezone-aware form.
@@ -81,7 +81,7 @@ class BookContent:
 
 def understand_page(
     page: PageImage,
-    client: VisionClient,
+    client: LLMClient,
     *,
     cache: Cache | None = None,
     ns: str = "understand",
@@ -120,14 +120,14 @@ def understand_page(
 # Call the model for one page and fill the result fields.
 def _analyze_page(
     content: PageContent,
-    client: VisionClient,
+    client: LLMClient,
     prompt: str,
     page: PageImage,
 ) -> PageContent:
     try:
         reply = client.analyze(prompt, Path(page.path))
         fields = extract_json(reply)
-    except (VisionError, ValueError) as exc:
+    except (LLMError, ValueError) as exc:
         content.error = str(exc)
         return content
 
@@ -157,7 +157,7 @@ def _page_fields(content: PageContent) -> dict:
 
 def understand_book(
     book: Book,
-    client: VisionClient,
+    client: LLMClient,
     *,
     cache: Cache | None = None,
 ) -> BookContent:

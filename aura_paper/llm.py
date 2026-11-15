@@ -1,4 +1,4 @@
-"""Access the vision model through an OpenAI-compatible endpoint."""
+"""Call an OpenAI-compatible chat completion endpoint."""
 
 from __future__ import annotations
 
@@ -13,12 +13,12 @@ from pathlib import Path
 #   VISION_BASE_URL, VISION_API_KEY, VISION_MODEL, VISION_TIMEOUT
 
 
-class VisionError(Exception):
+class LLMError(Exception):
     """Raised when the endpoint cannot return a usable answer."""
 
 
-class VisionClient:
-    """Client for one OpenAI-compatible vision endpoint."""
+class LLMClient:
+    """Client for one OpenAI-compatible chat completion endpoint."""
 
     base_url: str
     api_key: str
@@ -39,12 +39,12 @@ class VisionClient:
 
     def __repr__(self) -> str:
         return (
-            f"VisionClient(base_url={self.base_url!r}, "
+            f"LLMClient(base_url={self.base_url!r}, "
             f"model={self.model!r}, timeout={self.timeout})"
         )
 
     @classmethod
-    def from_env(cls) -> VisionClient:
+    def from_env(cls) -> LLMClient:
         """Build a client from the VISION_* environment variables."""
         return cls(
             base_url=os.environ.get("VISION_BASE_URL", ""),
@@ -62,7 +62,7 @@ class VisionClient:
     ) -> str:
         """Send one image with a prompt and return the reply text."""
         if not (self.base_url and self.api_key and self.model):
-            raise VisionError(f"vision endpoint is not configured: {self!r}")
+            raise LLMError(f"llm endpoint is not configured: {self!r}")
 
         image_part = {
             "type": "image_url",
@@ -101,17 +101,17 @@ class VisionClient:
                 raw = response.read().decode("utf-8", errors="replace")
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:300]
-            raise VisionError(f"HTTP {exc.code}: {detail}") from exc
+            raise LLMError(f"HTTP {exc.code}: {detail}") from exc
         except urllib.error.URLError as exc:
-            raise VisionError(f"cannot reach {url}: {exc.reason}") from exc
+            raise LLMError(f"cannot reach {url}: {exc.reason}") from exc
         except TimeoutError as exc:
-            raise VisionError(f"timeout after {self.timeout}s") from exc
+            raise LLMError(f"timeout after {self.timeout}s") from exc
 
         try:
             data = json.loads(raw)
             content = data["choices"][0]["message"]["content"]
         except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
-            raise VisionError("malformed response from endpoint") from exc
+            raise LLMError("malformed response from endpoint") from exc
 
         if isinstance(content, list):
             content = "".join(
@@ -135,7 +135,7 @@ _MIME_TYPES = {
 def _to_data_url(path: Path) -> str:
     mime = _MIME_TYPES.get(path.suffix.lower())
     if mime is None:
-        raise VisionError(f"unsupported image type: {path.suffix}")
+        raise LLMError(f"unsupported image type: {path.suffix}")
     payload = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{payload}"
 

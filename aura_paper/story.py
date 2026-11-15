@@ -3,8 +3,8 @@
 from dataclasses import dataclass, field
 
 from .cache import Cache
+from .llm import LLMClient
 from .understand import BookContent
-from .vision import VisionClient
 
 
 @dataclass
@@ -24,7 +24,7 @@ class Story:
 
 def build_story(
     content: BookContent,
-    client: VisionClient,
+    client: LLMClient,
     *,
     cache: Cache | None = None,
 ) -> Story:

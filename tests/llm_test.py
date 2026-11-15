@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from aura_paper.vision import (
-    VisionClient,
-    VisionError,
+from aura_paper.llm import (
+    LLMClient,
+    LLMError,
     _to_data_url,
     extract_json,
 )
@@ -48,7 +48,7 @@ def test_unknown_suffix_raises(tmp_path):
     target = tmp_path / "page.xyz"
     target.write_bytes(b"whatever")
 
-    with pytest.raises(VisionError, match="unsupported image type"):
+    with pytest.raises(LLMError, match="unsupported image type"):
         _to_data_url(target)
 
 
@@ -85,8 +85,8 @@ def test_analyze_builds_payload(monkeypatch):
         captured.update(payload)
         return "reply"
 
-    monkeypatch.setattr(VisionClient, "_post", fake_post)
-    client = VisionClient("http://x/v1", "k", "m")
+    monkeypatch.setattr(LLMClient, "_post", fake_post)
+    client = LLMClient("http://x/v1", "k", "m")
 
     assert client.analyze("describe", SAMPLE_JPG) == "reply"
 
@@ -106,8 +106,8 @@ def test_analyze_without_json_mode(monkeypatch):
         captured.update(payload)
         return "ok"
 
-    monkeypatch.setattr(VisionClient, "_post", fake_post)
-    client = VisionClient("http://x/v1", "k", "m")
+    monkeypatch.setattr(LLMClient, "_post", fake_post)
+    client = LLMClient("http://x/v1", "k", "m")
 
     client.analyze("hi", SAMPLE_JPG, json_mode=False)
 
@@ -116,18 +116,18 @@ def test_analyze_without_json_mode(monkeypatch):
 
 
 def test_analyze_without_config_raises():
-    client = VisionClient("", "", "")
+    client = LLMClient("", "", "")
 
-    with pytest.raises(VisionError, match="not configured"):
+    with pytest.raises(LLMError, match="not configured"):
         client.analyze("hi", SAMPLE_JPG)
 
 
-def test_analyze_propagates_vision_error(monkeypatch):
+def test_analyze_propagates_llm_error(monkeypatch):
     def fake_post(self, payload):
-        raise VisionError("boom")
+        raise LLMError("boom")
 
-    monkeypatch.setattr(VisionClient, "_post", fake_post)
-    client = VisionClient("http://x/v1", "k", "m")
+    monkeypatch.setattr(LLMClient, "_post", fake_post)
+    client = LLMClient("http://x/v1", "k", "m")
 
-    with pytest.raises(VisionError, match="boom"):
+    with pytest.raises(LLMError, match="boom"):
         client.analyze("hi", SAMPLE_JPG)

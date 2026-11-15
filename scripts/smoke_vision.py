@@ -17,13 +17,13 @@ from pathlib import Path
 from aura_paper.book import Book, PageImage
 from aura_paper.cache import Cache
 from aura_paper.config import cache_root, load_env
+from aura_paper.llm import LLMClient
 from aura_paper.understand import (
     BookContent,
     PageContent,
     save_book,
     understand_page,
 )
-from aura_paper.vision import VisionClient
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_BOOK = ROOT / "data" / "chicken_and_sunflower"
@@ -65,7 +65,7 @@ def main() -> int:
     book.load(source)
     _mark_spreads(book)
 
-    client = VisionClient.from_env()
+    client = LLMClient.from_env()
     missing = [
         name
         for name, value in (

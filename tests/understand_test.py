@@ -3,6 +3,7 @@ from pathlib import Path
 
 from aura_paper.book import Book, PageImage
 from aura_paper.cache import Cache
+from aura_paper.llm import LLMClient, LLMError
 from aura_paper.understand import (
     BookContent,
     PageContent,
@@ -10,10 +11,9 @@ from aura_paper.understand import (
     understand_book,
     understand_page,
 )
-from aura_paper.vision import VisionClient, VisionError
 
 
-class FakeClient(VisionClient):
+class FakeClient(LLMClient):
     def __init__(self, reply="", error=None):
         super().__init__("http://example/v1", "test-key", "fake-model")
         self.reply = reply
@@ -85,8 +85,8 @@ def test_success():
     assert content.error == ""
 
 
-def test_vision_error_is_recorded():
-    client = FakeClient(error=VisionError("boom"))
+def test_llm_error_is_recorded():
+    client = FakeClient(error=LLMError("boom"))
 
     content = understand_page(make_page(), client)
 
@@ -140,7 +140,7 @@ def test_book_collects_every_page():
 
 
 def test_book_keeps_going_after_a_failed_page():
-    replies = [VisionError("boom"), json.dumps({"description": "草地"})]
+    replies = [LLMError("boom"), json.dumps({"description": "草地"})]
     pages = [make_page(), make_page()]
 
     content = understand_book(make_book(pages), SequenceClient(replies))
@@ -195,7 +195,7 @@ def test_cache_reuses_stored_page(tmp_path):
 
 def test_cache_does_not_store_failed_page(tmp_path):
     cache = Cache(tmp_path / "cache")
-    client = FakeClient(error=VisionError("boom"))
+    client = FakeClient(error=LLMError("boom"))
 
     understand_page(make_cached_page(tmp_path), client, cache=cache, ns=NS)
 
@@ -205,7 +205,7 @@ def test_cache_does_not_store_failed_page(tmp_path):
 def test_failed_page_is_retried(tmp_path):
     cache = Cache(tmp_path / "cache")
     page = make_cached_page(tmp_path)
-    failing = FakeClient(error=VisionError("boom"))
+    failing = FakeClient(error=LLMError("boom"))
     understand_page(page, failing, cache=cache, ns=NS)
 
     client = FakeClient(json.dumps({"description": "草地"}))
@@ -286,7 +286,7 @@ def test_only_the_failed_page_is_retried(tmp_path):
     cache = Cache(tmp_path / "cache")
     book = make_cached_book(tmp_path)
     replies = [
-        VisionError("boom"),
+        LLMError("boom"),
         json.dumps({"description": "二"}),
         json.dumps({"description": "三"}),
     ]
