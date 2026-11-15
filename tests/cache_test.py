@@ -1,7 +1,10 @@
+import hashlib
 import re
 from pathlib import Path
 
-from aura_paper.cache import fingerprint
+import pytest
+
+from aura_paper.cache import file_fingerprint, fingerprint
 
 
 def test_returns_16_hex_characters():
@@ -58,3 +61,31 @@ def test_handles_chinese_text():
 def test_handles_none_and_no_arguments():
     assert len(fingerprint(None)) == 16
     assert fingerprint() != fingerprint("")
+
+
+def test_file_fingerprint_ignores_the_path(tmp_path):
+    first = tmp_path / "a.jpg"
+    second = tmp_path / "b.jpg"
+    first.write_bytes(b"page")
+    second.write_bytes(b"page")
+    assert file_fingerprint(first) == file_fingerprint(second)
+
+
+def test_file_fingerprint_follows_the_content(tmp_path):
+    first = tmp_path / "a.jpg"
+    second = tmp_path / "b.jpg"
+    first.write_bytes(b"page")
+    second.write_bytes(b"pagf")
+    assert file_fingerprint(first) != file_fingerprint(second)
+
+
+def test_file_fingerprint_reads_every_chunk(tmp_path):
+    data = b"x" * (3 << 20)
+    path = tmp_path / "big.bin"
+    path.write_bytes(data)
+    assert file_fingerprint(path) == hashlib.sha256(data).hexdigest()[:16]
+
+
+def test_file_fingerprint_missing_file_raises(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        file_fingerprint(tmp_path / "absent.jpg")
