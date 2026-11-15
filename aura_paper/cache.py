@@ -1,5 +1,7 @@
 """Reuse model results keyed by a content fingerprint."""
 
+import hashlib
+import json
 from pathlib import Path
 from typing import Any, Callable
 
@@ -38,14 +40,27 @@ class Cache:
         raise NotImplementedError("Cache.stats")
 
 
-def digest(*parts: Any) -> str:
+_SEPARATOR = "\x1f"
+
+
+def fingerprint(*parts: Any) -> str:
     """Return a 16 character fingerprint of the given parts."""
-    raise NotImplementedError("digest")
+    payload = _SEPARATOR.join(_canonical(part) for part in parts)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
-def file_digest(path: str | Path) -> str:
+def _canonical(part: Any) -> str:
+    """Render one input as JSON so type and key order both matter."""
+    if isinstance(part, bytes):
+        return json.dumps({"bytes": part.hex()})
+    if isinstance(part, Path):
+        part = str(part)
+    return json.dumps(part, sort_keys=True, ensure_ascii=False, default=str)
+
+
+def file_fingerprint(path: str | Path) -> str:
     """Return a 16 character fingerprint of a file's contents."""
-    raise NotImplementedError("file_digest")
+    raise NotImplementedError("file_fingerprint")
 
 
 def recall_json(
