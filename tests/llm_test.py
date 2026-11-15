@@ -78,7 +78,7 @@ def test_extract_empty_raises():
         extract_json("")
 
 
-def test_analyze_builds_payload(monkeypatch):
+def test_chat_builds_payload(monkeypatch):
     captured = {}
 
     def fake_post(self, payload):
@@ -88,7 +88,7 @@ def test_analyze_builds_payload(monkeypatch):
     monkeypatch.setattr(LLMClient, "_post", fake_post)
     client = LLMClient("http://x/v1", "k", "m")
 
-    assert client.analyze("describe", SAMPLE_JPG) == "reply"
+    assert client.chat("describe", SAMPLE_JPG) == "reply"
 
     system, user = captured["messages"]
     content = user["content"]
@@ -99,7 +99,7 @@ def test_analyze_builds_payload(monkeypatch):
     assert captured["response_format"] == {"type": "json_object"}
 
 
-def test_analyze_without_json_mode(monkeypatch):
+def test_chat_without_json_mode(monkeypatch):
     captured = {}
 
     def fake_post(self, payload):
@@ -109,20 +109,20 @@ def test_analyze_without_json_mode(monkeypatch):
     monkeypatch.setattr(LLMClient, "_post", fake_post)
     client = LLMClient("http://x/v1", "k", "m")
 
-    client.analyze("hi", SAMPLE_JPG, json_mode=False)
+    client.chat("hi", SAMPLE_JPG, json_mode=False)
 
     assert "response_format" not in captured
     assert captured["messages"][0]["role"] == "user"
 
 
-def test_analyze_without_config_raises():
+def test_chat_without_config_raises():
     client = LLMClient("", "", "")
 
     with pytest.raises(LLMError, match="not configured"):
-        client.analyze("hi", SAMPLE_JPG)
+        client.chat("hi", SAMPLE_JPG)
 
 
-def test_analyze_propagates_llm_error(monkeypatch):
+def test_chat_propagates_llm_error(monkeypatch):
     def fake_post(self, payload):
         raise LLMError("boom")
 
@@ -130,4 +130,4 @@ def test_analyze_propagates_llm_error(monkeypatch):
     client = LLMClient("http://x/v1", "k", "m")
 
     with pytest.raises(LLMError, match="boom"):
-        client.analyze("hi", SAMPLE_JPG)
+        client.chat("hi", SAMPLE_JPG)

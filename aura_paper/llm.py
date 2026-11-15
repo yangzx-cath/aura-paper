@@ -53,14 +53,14 @@ class LLMClient:
             timeout=float(os.environ.get("LLM_TIMEOUT", "120")),
         )
 
-    def analyze(
+    def chat(
         self,
         prompt: str,
         image_path: Path,
         *,
         json_mode: bool = True,
     ) -> str:
-        """Send one image with a prompt and return the reply text."""
+        """Send a prompt with one image and return the reply text."""
         if not (self.base_url and self.api_key and self.model):
             raise LLMError(f"llm endpoint is not configured: {self!r}")
 

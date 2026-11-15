@@ -20,7 +20,7 @@ class FakeClient(LLMClient):
         self.error = error
         self.prompts = []
 
-    def analyze(
+    def chat(
         self,
         prompt: str,
         image_path: Path,
@@ -38,7 +38,7 @@ class SequenceClient(FakeClient):
         super().__init__()
         self.replies = list(replies)
 
-    def analyze(
+    def chat(
         self,
         prompt: str,
         image_path: Path,
