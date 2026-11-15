@@ -25,6 +25,7 @@ class PageContent:
 
     index: int
     filename: str
+    kind: str = "single"
     page_text: str = ""
     description: str = ""
     mood: str = ""
@@ -36,6 +37,7 @@ class PageContent:
         return {
             "index": self.index,
             "filename": self.filename,
+            "kind": self.kind,
             "model": self.model,
             "generated_at": _now(),
             "page_text": self.page_text,
@@ -86,6 +88,7 @@ def understand_page(
     content = PageContent(
         index=page.index,
         filename=page.filename,
+        kind=page.kind,
         model=client.model,
     )
     prompt = page_prompt(page.kind)
