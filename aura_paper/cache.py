@@ -2,6 +2,9 @@
 
 import hashlib
 import json
+import os
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
@@ -11,33 +14,70 @@ class Cache:
 
     root: Path
     enabled: bool
+    _stats: dict[str, int]
 
     def __init__(self, root: str | Path, *, enabled: bool = True) -> None:
-        raise NotImplementedError("Cache.__init__")
+        self.root = Path(root).expanduser().resolve()
+        self.enabled = enabled
+        self._stats = {"hit": 0, "miss": 0}
 
     def path(self, ns: str, name: str, key: str) -> Path:
         """Return the file that would hold this entry."""
-        raise NotImplementedError("Cache.path")
+        return self.root / ns / f"{name}-{key}.json"
 
     def has(self, ns: str, name: str, key: str) -> bool:
         """Return True when the entry exists on disk."""
-        raise NotImplementedError("Cache.has")
+        return self.enabled and self.path(ns, name, key).is_file()
 
     def load_json(self, ns: str, name: str, key: str) -> dict | None:
         """Return the stored entry, or None when it is missing or broken."""
-        raise NotImplementedError("Cache.load_json")
+        if not self.enabled:
+            return None
+
+        try:
+            text = self.path(ns, name, key).read_text(encoding="utf-8")
+            data = json.loads(text)
+        except (OSError, json.JSONDecodeError):
+            self._stats["miss"] += 1
+            return None
+
+        if not isinstance(data, dict):
+            self._stats["miss"] += 1
+            return None
+
+        self._stats["hit"] += 1
+        return data
 
     def save_json(self, ns: str, name: str, key: str, data: dict) -> Path:
         """Write the entry and return its path."""
-        raise NotImplementedError("Cache.save_json")
+        path = self.path(ns, name, key)
+        if not self.enabled:
+            return path
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Write to a temp file first so a crash cannot leave half a JSON.
+        fd, temp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+            os.replace(temp_name, path)
+        finally:
+            Path(temp_name).unlink(missing_ok=True)
+        return path
 
     def clear(self, ns: str | None = None) -> int:
         """Remove a namespace or the whole cache, returning file count."""
-        raise NotImplementedError("Cache.clear")
+        target = self.root if ns is None else self.root / ns
+        if not target.is_dir():
+            return 0
+
+        count = sum(1 for p in target.rglob("*") if p.is_file())
+        shutil.rmtree(target)
+        return count
 
     def stats(self) -> dict[str, int]:
         """Return the running hit and miss counters."""
-        raise NotImplementedError("Cache.stats")
+        return dict(self._stats)
 
 
 _SEPARATOR = "\x1f"
