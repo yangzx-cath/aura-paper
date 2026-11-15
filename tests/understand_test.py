@@ -23,8 +23,8 @@ class FakeClient(LLMClient):
     def chat(
         self,
         prompt: str,
-        image_path: Path,
         *,
+        image_path: Path | None = None,
         json_mode: bool = True,
     ) -> str:
         self.prompts.append(prompt)
@@ -41,8 +41,8 @@ class SequenceClient(FakeClient):
     def chat(
         self,
         prompt: str,
-        image_path: Path,
         *,
+        image_path: Path | None = None,
         json_mode: bool = True,
     ) -> str:
         self.prompts.append(prompt)

@@ -125,7 +125,7 @@ def _analyze_page(
     page: PageImage,
 ) -> PageContent:
     try:
-        reply = client.chat(prompt, Path(page.path))
+        reply = client.chat(prompt, image_path=Path(page.path))
         fields = extract_json(reply)
     except (LLMError, ValueError) as exc:
         content.error = str(exc)

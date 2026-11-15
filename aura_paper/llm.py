@@ -56,25 +56,29 @@ class LLMClient:
     def chat(
         self,
         prompt: str,
-        image_path: Path,
         *,
+        image_path: Path | None = None,
         json_mode: bool = True,
     ) -> str:
-        """Send a prompt with one image and return the reply text."""
+        """Send a prompt, optionally with one image, and return the reply."""
         if not (self.base_url and self.api_key and self.model):
             raise LLMError(f"llm endpoint is not configured: {self!r}")
 
-        image_part = {
-            "type": "image_url",
-            "image_url": {"url": _to_data_url(image_path)},
-        }
-        text_part = {"type": "text", "text": prompt}
+        content: str | list = prompt
+        if image_path is not None:
+            image_part = {
+                "type": "image_url",
+                "image_url": {"url": _to_data_url(image_path)},
+            }
+            text_part = {"type": "text", "text": prompt}
+            content = [image_part, text_part]
+
         messages = []
         if json_mode:
             # The endpoint rejects json_object unless "json" appears
             # somewhere in the messages.
             messages.append({"role": "system", "content": "Respond in JSON."})
-        messages.append({"role": "user", "content": [image_part, text_part]})
+        messages.append({"role": "user", "content": content})
         payload = {"model": self.model, "messages": messages}
         if json_mode:
             payload["response_format"] = {"type": "json_object"}

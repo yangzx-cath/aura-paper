@@ -88,7 +88,7 @@ def test_chat_builds_payload(monkeypatch):
     monkeypatch.setattr(LLMClient, "_post", fake_post)
     client = LLMClient("http://x/v1", "k", "m")
 
-    assert client.chat("describe", SAMPLE_JPG) == "reply"
+    assert client.chat("describe", image_path=SAMPLE_JPG) == "reply"
 
     system, user = captured["messages"]
     content = user["content"]
@@ -109,7 +109,7 @@ def test_chat_without_json_mode(monkeypatch):
     monkeypatch.setattr(LLMClient, "_post", fake_post)
     client = LLMClient("http://x/v1", "k", "m")
 
-    client.chat("hi", SAMPLE_JPG, json_mode=False)
+    client.chat("hi", image_path=SAMPLE_JPG, json_mode=False)
 
     assert "response_format" not in captured
     assert captured["messages"][0]["role"] == "user"
@@ -119,7 +119,7 @@ def test_chat_without_config_raises():
     client = LLMClient("", "", "")
 
     with pytest.raises(LLMError, match="not configured"):
-        client.chat("hi", SAMPLE_JPG)
+        client.chat("hi", image_path=SAMPLE_JPG)
 
 
 def test_chat_propagates_llm_error(monkeypatch):
@@ -130,4 +130,4 @@ def test_chat_propagates_llm_error(monkeypatch):
     client = LLMClient("http://x/v1", "k", "m")
 
     with pytest.raises(LLMError, match="boom"):
-        client.chat("hi", SAMPLE_JPG)
+        client.chat("hi", image_path=SAMPLE_JPG)
