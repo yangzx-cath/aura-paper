@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from aura_paper.cache import file_fingerprint, fingerprint
+from aura_paper.cache import Cache, file_fingerprint, fingerprint
 
 
 def test_returns_16_hex_characters():
@@ -89,3 +89,129 @@ def test_file_fingerprint_reads_every_chunk(tmp_path):
 def test_file_fingerprint_missing_file_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         file_fingerprint(tmp_path / "absent.jpg")
+
+
+NS = "understand/book"
+
+
+def make_cache(tmp_path, **kwargs):
+    return Cache(tmp_path / "cache", **kwargs)
+
+
+def test_path_builds_namespace_and_key(tmp_path):
+    cache = make_cache(tmp_path)
+    path = cache.path(NS, "page_03", "abc")
+    assert path == tmp_path / "cache" / NS / "page_03-abc.json"
+
+
+def test_root_is_resolved(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    cache = Cache("cache")
+    assert cache.root == (tmp_path / "cache").resolve()
+
+
+def test_missing_entry_counts_as_miss(tmp_path):
+    cache = make_cache(tmp_path)
+    assert cache.load_json(NS, "page_03", "abc") is None
+    assert cache.stats() == {"hit": 0, "miss": 1}
+
+
+def test_saved_entry_is_returned(tmp_path):
+    cache = make_cache(tmp_path)
+    cache.save_json(NS, "page_03", "abc", {"mood": "温暖"})
+    assert cache.load_json(NS, "page_03", "abc") == {"mood": "温暖"}
+    assert cache.stats() == {"hit": 1, "miss": 0}
+
+
+def test_save_json_returns_the_path(tmp_path):
+    cache = make_cache(tmp_path)
+    written = cache.save_json(NS, "page_03", "abc", {"a": 1})
+    assert written == cache.path(NS, "page_03", "abc")
+    assert written.is_file()
+
+
+def test_save_keeps_chinese_readable(tmp_path):
+    cache = make_cache(tmp_path)
+    path = cache.save_json(NS, "page_03", "abc", {"mood": "温暖"})
+    assert "温暖" in path.read_text(encoding="utf-8")
+
+
+def test_has_reports_existence(tmp_path):
+    cache = make_cache(tmp_path)
+    assert cache.has(NS, "page_03", "abc") is False
+    cache.save_json(NS, "page_03", "abc", {"a": 1})
+    assert cache.has(NS, "page_03", "abc") is True
+
+
+def test_has_does_not_touch_stats(tmp_path):
+    cache = make_cache(tmp_path)
+    cache.has(NS, "page_03", "abc")
+    assert cache.stats() == {"hit": 0, "miss": 0}
+
+
+def test_broken_file_counts_as_miss(tmp_path):
+    cache = make_cache(tmp_path)
+    path = cache.path(NS, "page_03", "abc")
+    path.parent.mkdir(parents=True)
+    path.write_text("{broken", encoding="utf-8")
+    assert cache.load_json(NS, "page_03", "abc") is None
+    assert cache.stats() == {"hit": 0, "miss": 1}
+
+
+def test_non_dict_file_counts_as_miss(tmp_path):
+    cache = make_cache(tmp_path)
+    path = cache.path(NS, "page_03", "abc")
+    path.parent.mkdir(parents=True)
+    path.write_text("[1, 2]", encoding="utf-8")
+    assert cache.load_json(NS, "page_03", "abc") is None
+    assert cache.stats() == {"hit": 0, "miss": 1}
+
+
+def test_disabled_cache_reads_nothing(tmp_path):
+    cache = make_cache(tmp_path, enabled=False)
+    cache.save_json(NS, "page_03", "abc", {"a": 1})
+    assert cache.load_json(NS, "page_03", "abc") is None
+    assert cache.has(NS, "page_03", "abc") is False
+
+
+def test_disabled_cache_writes_nothing(tmp_path):
+    cache = make_cache(tmp_path, enabled=False)
+    written = cache.save_json(NS, "page_03", "abc", {"a": 1})
+    assert written == cache.path(NS, "page_03", "abc")
+    assert not (tmp_path / "cache").exists()
+
+
+def test_save_leaves_no_temp_file(tmp_path):
+    cache = make_cache(tmp_path)
+    path = cache.save_json(NS, "page_03", "abc", {"a": 1})
+    assert list(path.parent.glob("*.tmp")) == []
+
+
+def test_clear_removes_one_namespace(tmp_path):
+    cache = make_cache(tmp_path)
+    cache.save_json(NS, "page_03", "abc", {"a": 1})
+    cache.save_json("tts/book", "page_03", "def", {"b": 2})
+    assert cache.clear(NS) == 1
+    assert cache.has(NS, "page_03", "abc") is False
+    assert cache.has("tts/book", "page_03", "def") is True
+
+
+def test_clear_removes_everything(tmp_path):
+    cache = make_cache(tmp_path)
+    cache.save_json(NS, "page_03", "abc", {"a": 1})
+    cache.save_json("tts/book", "page_03", "def", {"b": 2})
+    assert cache.clear() == 2
+    assert not (tmp_path / "cache").exists()
+
+
+def test_clear_on_missing_root_returns_zero(tmp_path):
+    cache = make_cache(tmp_path)
+    assert cache.clear() == 0
+
+
+def test_stats_is_a_copy(tmp_path):
+    cache = make_cache(tmp_path)
+    cache.load_json(NS, "page_03", "abc")
+    snapshot = cache.stats()
+    snapshot["miss"] = 99
+    assert cache.stats()["miss"] == 1
