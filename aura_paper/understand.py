@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .book import Book, PageImage
+from .cache import Cache, file_fingerprint, fingerprint
 from .prompts import page_prompt
 from .vision import VisionClient, VisionError, extract_json
 
@@ -49,33 +50,77 @@ class BookContent:
         raise NotImplementedError("BookContent.to_dict")
 
 
-def understand_page(page: PageImage, client: VisionClient) -> PageContent:
+def understand_page(
+    page: PageImage,
+    client: VisionClient,
+    *,
+    cache: Cache | None = None,
+    ns: str = "understand",
+) -> PageContent:
     """Read one page and return its structured content."""
     content = PageContent(
         index=page.index,
         filename=page.filename,
         model=client.model,
     )
-
     prompt = page_prompt(page.kind)
-    image_path = Path(page.path)
 
+    if cache is None:
+        return _analyze_page(content, client, prompt, page)
+
+    name = f"page_{page.index:02d}"
+    key = fingerprint(
+        file_fingerprint(page.path),
+        prompt,
+        client.model,
+    )
+
+    entry = cache.load_json(ns, name, key)
+    if entry is not None:
+        _apply_fields(content, entry)
+        return content
+
+    content = _analyze_page(content, client, prompt, page)
+    # Errors are never cached, so a failed page is retried next run.
+    if not content.error:
+        cache.save_json(ns, name, key, _page_fields(content))
+    return content
+
+
+# Call the model for one page and fill the result fields.
+def _analyze_page(
+    content: PageContent,
+    client: VisionClient,
+    prompt: str,
+    page: PageImage,
+) -> PageContent:
     try:
-        reply = client.analyze(prompt, image_path)
+        reply = client.analyze(prompt, Path(page.path))
         fields = extract_json(reply)
     except (VisionError, ValueError) as exc:
         content.error = str(exc)
         return content
 
-    # Missing or null fields become empty strings.
+    _apply_fields(content, fields)
+    if not content.page_text and not content.description:
+        content.error = "model returned no content"
+    return content
+
+
+# Copy the model fields, turning missing or null values into empty strings.
+def _apply_fields(content: PageContent, fields: dict) -> None:
     content.page_text = fields.get("page_text", "") or ""
     content.description = fields.get("description", "") or ""
     content.mood = fields.get("mood", "") or ""
 
-    if not content.page_text and not content.description:
-        content.error = "model returned no content"
 
-    return content
+# Keep only what the model produced, so page identity stays current.
+def _page_fields(content: PageContent) -> dict:
+    return {
+        "page_text": content.page_text,
+        "description": content.description,
+        "mood": content.mood,
+    }
 
 
 def understand_book(book: Book, client: VisionClient) -> BookContent:
