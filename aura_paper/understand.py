@@ -2,6 +2,8 @@
 Interpret page images into structured content.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,6 +44,21 @@ class PageContent:
             "error": self.error,
         }
 
+    @classmethod
+    def from_dict(cls, data: dict) -> PageContent:
+        """Build a page from its external JSON shape."""
+        return cls(
+            index=int(data.get("index") or 0),
+            filename=str(data.get("filename") or ""),
+            kind=str(data.get("kind") or "single"),
+            page_text=str(data.get("page_text") or ""),
+            description=str(data.get("description") or ""),
+            mood=str(data.get("mood") or ""),
+            mood_detail=str(data.get("mood_detail") or ""),
+            model=str(data.get("model") or ""),
+            error=str(data.get("error") or ""),
+        )
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -75,6 +92,18 @@ class BookContent:
             "failed_count": self.failed_count,
             "pages": [page.to_dict() for page in self.pages],
         }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> BookContent:
+        """Build a book from its external JSON shape."""
+        return cls(
+            id=str(data.get("id") or ""),
+            title=str(data.get("title") or ""),
+            source=str(data.get("source") or ""),
+            pages=[
+                PageContent.from_dict(page) for page in data.get("pages") or []
+            ],
+        )
 
 
 def understand_page(
