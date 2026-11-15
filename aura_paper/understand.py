@@ -2,12 +2,14 @@
 Interpret page images into structured content.
 """
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .book import Book, PageImage
 from .cache import Cache, file_fingerprint, fingerprint
+from .config import out_root
 from .prompts import page_prompt
 from .vision import VisionClient, VisionError, extract_json
 
@@ -166,3 +168,14 @@ def understand_book(
         content.pages.append(result)
 
     return content
+
+
+def save_book(content: BookContent, root: str | Path | None = None) -> Path:
+    """Write the book content to <root>/<book_id>/book.json."""
+    base = Path(root) if root is not None else out_root()
+    path = base / content.id / "book.json"
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(content.to_dict(), ensure_ascii=False, indent=2)
+    path.write_text(payload + "\n", encoding="utf-8")
+    return path
