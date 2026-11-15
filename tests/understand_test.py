@@ -153,10 +153,10 @@ def test_book_with_no_pages():
 NS = "understand/book"
 
 
-def make_cached_page(tmp_path, data=b"image", index=3):
-    path = tmp_path / "03.jpg"
+def make_cached_page(tmp_path, data=b"image", index=3, name="03.jpg"):
+    path = tmp_path / name
     path.write_bytes(data)
-    return PageImage(index=index, filename="03.jpg", path=str(path))
+    return PageImage(index=index, filename=name, path=str(path))
 
 
 def test_cache_stores_successful_page(tmp_path):
@@ -236,6 +236,75 @@ def test_cached_page_takes_filename_from_current_page(tmp_path):
 
     assert content.filename == "renamed.jpg"
     assert content.description == "草地"
+
+
+def make_cached_book(tmp_path, count=3):
+    pages = []
+    for index in range(count):
+        name = f"{index:02d}.jpg"
+        data = f"p{index}".encode()
+        page = make_cached_page(tmp_path, data=data, index=index, name=name)
+        pages.append(page)
+    return make_book(pages)
+
+
+def test_book_caches_each_page(tmp_path):
+    cache = Cache(tmp_path / "cache")
+    book = make_cached_book(tmp_path)
+    client = FakeClient(json.dumps({"description": "草地"}))
+
+    understand_book(book, client, cache=cache)
+
+    root = tmp_path / "cache" / "understand" / book.id
+    assert len(list(root.glob("*.json"))) == 3
+    assert cache.stats() == {"hit": 0, "miss": 3}
+
+
+def test_second_book_run_hits_every_page(tmp_path):
+    cache = Cache(tmp_path / "cache")
+    book = make_cached_book(tmp_path)
+    first = FakeClient(json.dumps({"description": "草地"}))
+    understand_book(book, first, cache=cache)
+
+    second = FakeClient(json.dumps({"description": "更动"}))
+    content = understand_book(book, second, cache=cache)
+
+    assert second.prompts == []
+    assert [p.description for p in content.pages] == ["草地"] * 3
+    assert cache.stats() == {"hit": 3, "miss": 3}
+
+
+def test_only_the_failed_page_is_retried(tmp_path):
+    cache = Cache(tmp_path / "cache")
+    book = make_cached_book(tmp_path)
+    replies = [
+        VisionError("boom"),
+        json.dumps({"description": "二"}),
+        json.dumps({"description": "三"}),
+    ]
+    understand_book(book, SequenceClient(replies), cache=cache)
+
+    retry = SequenceClient([json.dumps({"description": "重试"})])
+    content = understand_book(book, retry, cache=cache)
+
+    assert len(retry.prompts) == 1
+    assert [p.description for p in content.pages] == ["重试", "二", "三"]
+    assert content.failed_count == 0
+
+
+def test_namespaces_are_isolated_per_book(tmp_path):
+    cache = Cache(tmp_path / "cache")
+    first = make_cached_book(tmp_path)
+    client = FakeClient(json.dumps({"description": "一"}))
+    understand_book(first, client, cache=cache)
+
+    other = Book("other")
+    other.pages = first.pages
+    second = FakeClient(json.dumps({"description": "二"}))
+    content = understand_book(other, second, cache=cache)
+
+    assert len(second.prompts) == 3
+    assert [p.description for p in content.pages] == ["二"] * 3
 
 
 def test_disabled_cache_calls_the_model_every_time(tmp_path):
