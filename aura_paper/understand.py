@@ -14,11 +14,6 @@ from .llm import LLMClient, LLMError, extract_json
 from .prompts import page_prompt
 
 
-# Return the current UTC time in a sortable, timezone-aware form.
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
 @dataclass
 class PageContent:
     """Structured content of one page."""
@@ -47,6 +42,10 @@ class PageContent:
             "mood_detail": self.mood_detail,
             "error": self.error,
         }
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 @dataclass

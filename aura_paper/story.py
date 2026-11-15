@@ -1,8 +1,12 @@
 """Extract the narrative structure of a whole book."""
 
+import json
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
 
 from .cache import Cache, fingerprint
+from .config import out_root
 from .llm import LLMClient, LLMError, extract_json
 from .prompts import story_prompt
 from .understand import BookContent
@@ -22,7 +26,20 @@ class Story:
 
     def to_dict(self) -> dict:
         """Return the external JSON shape of this story."""
-        raise NotImplementedError("Story.to_dict")
+        return {
+            "generated_at": _now(),
+            "model": self.model,
+            "characters": self.characters,
+            "setting": self.setting,
+            "style": self.style,
+            "summary": self.summary,
+            "beats": self.beats,
+            "error": self.error,
+        }
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def build_story(
@@ -101,3 +118,18 @@ def _story_fields(story: Story) -> dict:
         "summary": story.summary,
         "beats": story.beats,
     }
+
+
+def save_story(
+    story: Story,
+    book_id: str,
+    root: str | Path | None = None,
+) -> Path:
+    """Write the story to <root>/<book_id>/story.json."""
+    base = Path(root) if root is not None else out_root()
+    path = base / book_id / "story.json"
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(story.to_dict(), ensure_ascii=False, indent=2)
+    path.write_text(payload + "\n", encoding="utf-8")
+    return path
