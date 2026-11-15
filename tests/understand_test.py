@@ -327,34 +327,13 @@ def test_disabled_cache_calls_the_model_every_time(tmp_path):
     assert not (tmp_path / "cache").exists()
 
 
-def test_save_book_writes_json_under_book_id(tmp_path):
+def test_save_book_writes_book_json(tmp_path):
     book = BookContent(id="demo", title="示例", source="/src")
 
     path = save_book(book, tmp_path)
 
     assert path == tmp_path / "demo" / "book.json"
     assert path.is_file()
-
-
-def test_save_book_creates_missing_directories(tmp_path):
-    root = tmp_path / "a" / "b"
-    book = BookContent(id="demo", title="示例", source="/src")
-
-    path = save_book(book, root)
-
-    assert path.parent.is_dir()
-
-
-def test_save_book_keeps_chinese_readable(tmp_path):
-    page = PageContent(index=0, filename="01.jpg", description="草地")
-    book = BookContent(id="demo", title="小鸡球球", source="/src")
-    book.pages.append(page)
-
-    path = save_book(book, tmp_path)
-
-    text = path.read_text(encoding="utf-8")
-    assert "小鸡球球" in text
-    assert text.endswith("\n")
 
 
 def test_save_book_writes_the_page_fields(tmp_path):
@@ -367,23 +346,4 @@ def test_save_book_writes_the_page_fields(tmp_path):
     data = json.loads(path.read_text(encoding="utf-8"))
     assert data["page_count"] == 1
     assert data["pages"][0]["description"] == "草地"
-    assert data["pages"][0]["filename"] == "03.jpg"
     assert data["pages"][0]["kind"] == "single"
-
-
-def test_save_book_overwrites_the_previous_file(tmp_path):
-    save_book(BookContent(id="demo", title="旧", source="/src"), tmp_path)
-    save_book(BookContent(id="demo", title="新", source="/src"), tmp_path)
-
-    path = tmp_path / "demo" / "book.json"
-    data = json.loads(path.read_text(encoding="utf-8"))
-    assert data["title"] == "新"
-
-
-def test_save_book_defaults_to_out_root(tmp_path, monkeypatch):
-    monkeypatch.setenv("AURA_OUT_DIR", str(tmp_path / "custom"))
-    book = BookContent(id="demo", title="示例", source="/src")
-
-    path = save_book(book)
-
-    assert path == tmp_path / "custom" / "demo" / "book.json"

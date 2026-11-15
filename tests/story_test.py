@@ -4,7 +4,7 @@ from pathlib import Path
 from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient, LLMError
 from aura_paper.prompts import story_prompt
-from aura_paper.story import build_story
+from aura_paper.story import build_story, save_story
 from aura_paper.understand import BookContent, PageContent
 
 
@@ -132,3 +132,23 @@ def test_failed_story_is_not_cached(tmp_path):
     build_story(make_content(count=3), FakeClient(reply), cache=cache)
 
     assert not (tmp_path / "cache" / "story").exists()
+
+
+def test_save_story_writes_story_json(tmp_path):
+    story = build_story(make_content(), FakeClient(make_reply()))
+
+    path = save_story(story, "demo", tmp_path)
+
+    assert path == tmp_path / "demo" / "story.json"
+    assert path.is_file()
+
+
+def test_save_story_writes_the_story_fields(tmp_path):
+    story = build_story(make_content(), FakeClient(make_reply()))
+
+    path = save_story(story, "demo", tmp_path)
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["characters"] == ["小鸡球球", "向日葵"]
+    assert data["summary"].startswith("小鸡球球")
+    assert len(data["beats"]) == 3
