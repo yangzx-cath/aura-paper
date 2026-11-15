@@ -8,7 +8,7 @@ from aura_paper import config
 
 @pytest.fixture(autouse=True)
 def isolated_env(monkeypatch):
-    """Give every test a private os.environ."""
+    # A copy keeps load_env writes out of the real environment.
     monkeypatch.setattr(os, "environ", dict(os.environ))
 
 

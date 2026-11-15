@@ -49,8 +49,8 @@ def fingerprint(*parts: Any) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
+# Render one input as text, keeping type and ignoring key order.
 def _canonical(part: Any) -> str:
-    """Render one input as JSON so type and key order both matter."""
     if isinstance(part, bytes):
         return json.dumps({"bytes": part.hex()})
     if isinstance(part, Path):
@@ -58,9 +58,16 @@ def _canonical(part: Any) -> str:
     return json.dumps(part, sort_keys=True, ensure_ascii=False, default=str)
 
 
+_CHUNK_SIZE = 1 << 20
+
+
 def file_fingerprint(path: str | Path) -> str:
     """Return a 16 character fingerprint of a file's contents."""
-    raise NotImplementedError("file_fingerprint")
+    hasher = hashlib.sha256()
+    with Path(path).open("rb") as f:
+        for chunk in iter(lambda: f.read(_CHUNK_SIZE), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()[:16]
 
 
 def recall_json(

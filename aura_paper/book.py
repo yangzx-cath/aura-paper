@@ -113,13 +113,13 @@ class Book:
         self.source = str(path)
 
 
-# Sort filenames by their numeric parts, so page_2 comes before page_10.
+# Build a sort key so page_2 comes before page_10.
 def _natural_key(name: str) -> tuple:
     parts = re.split(r"(\d+)", name.lower())
     return tuple(int(part) if part.isdigit() else part for part in parts)
 
 
-# Validate a kinds map, keyed by filename.
+# Validate per-page kinds and return them keyed by filename.
 def _validate_kinds(
     kinds: dict[str, str] | None,
     images: list[Path],
