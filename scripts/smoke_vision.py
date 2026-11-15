@@ -1,110 +1,107 @@
-"""Manual smoke test for the vision client.
+"""Manual smoke test for the whole understanding pipeline.
 
-Endpoint and model have defaults below; the API key is read from the
-environment or from a local .env file.
+Reads a picture book directory, runs every page through the vision model,
+and writes the result to the output directory. A second run reuses the
+cache and skips the model calls.
 
 Usage:
     export VISION_API_KEY=sk-xxx
-    python scripts/smoke_vision.py [image] [single|spread] [--raw]
+    python scripts/smoke_vision.py [book_dir] [--no-cache]
 """
 
 import argparse
-import os
 import sys
 import time
 from pathlib import Path
 
-from aura_paper.book import PageImage
-from aura_paper.prompts import page_prompt
-from aura_paper.understand import understand_page
-from aura_paper.vision import VisionClient, VisionError
+from aura_paper.book import Book, PageImage
+from aura_paper.cache import Cache
+from aura_paper.config import cache_root, load_env
+from aura_paper.understand import (
+    BookContent,
+    PageContent,
+    save_book,
+    understand_page,
+)
+from aura_paper.vision import VisionClient
 
 ROOT = Path(__file__).resolve().parent.parent
-ENV_FILE = ROOT / ".env"
-DEFAULT_IMAGE = ROOT / "data" / "chicken_and_sunflower" / "02.jpg"
-DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-DEFAULT_MODEL = "qwen3.8-max"
+DEFAULT_BOOK = ROOT / "data" / "chicken_and_sunflower"
 
 
-def load_env(path: Path) -> None:
-    if not path.is_file():
-        return
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+# A landscape scan holds two book pages, so treat it as a spread.
+def _mark_spreads(book: Book) -> None:
+    for page in book.pages:
+        wide = bool(page.width and page.height and page.width > page.height)
+        page.kind = "spread" if wide else "single"
+
+
+# Format one progress line for a page that just finished.
+def _line(page: PageImage, result: PageContent, elapsed: float) -> str:
+    status = result.error or result.mood or "-"
+    return f"{page.filename}  {page.kind:<6} {elapsed:6.1f}s  {status}"
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Smoke test the vision path.")
-    parser.add_argument("image", nargs="?", default=str(DEFAULT_IMAGE))
-    parser.add_argument("kind", nargs="?", default="single")
+    parser = argparse.ArgumentParser(
+        description="Run the understanding pipeline."
+    )
+    parser.add_argument("book", nargs="?", default=str(DEFAULT_BOOK))
     parser.add_argument(
-        "--raw",
+        "--no-cache",
         action="store_true",
-        help="print the raw reply instead of parsed content",
+        help="ignore the cache and do not write it",
     )
     args = parser.parse_args()
 
-    load_env(ENV_FILE)
+    load_env(ROOT / ".env")
 
-    image = Path(args.image)
-    if not image.is_file():
-        print(f"image not found: {image}", file=sys.stderr)
+    source = Path(args.book)
+    if not source.is_dir():
+        print(f"not a book directory: {source}", file=sys.stderr)
         return 2
 
-    client = VisionClient(
-        base_url=os.environ.get("VISION_BASE_URL", DEFAULT_BASE_URL),
-        api_key=os.environ.get("VISION_API_KEY", ""),
-        model=os.environ.get("VISION_MODEL", DEFAULT_MODEL),
-        timeout=float(os.environ.get("VISION_TIMEOUT", "120")),
-    )
-    print(f"client: {client}")
-    print(f"kind: {args.kind}")
+    book = Book(source.name)
+    book.load(source)
+    _mark_spreads(book)
 
-    if not client.api_key:
-        print("VISION_API_KEY is not set", file=sys.stderr)
+    client = VisionClient.from_env()
+    missing = [
+        name
+        for name, value in (
+            ("VISION_BASE_URL", client.base_url),
+            ("VISION_API_KEY", client.api_key),
+            ("VISION_MODEL", client.model),
+        )
+        if not value
+    ]
+    if missing:
+        print("missing config: " + ", ".join(missing), file=sys.stderr)
         return 2
 
+    cache = Cache(cache_root(), enabled=not args.no_cache)
+    print(f"book   {book.id}  pages={book.page_count}")
+    print(f"model  {client.model}")
+    print(f"cache  {cache.root}  enabled={cache.enabled}")
+    print()
+
+    content = BookContent(id=book.id, title=book.title, source=book.source)
+    ns = f"understand/{book.id}"
     started = time.perf_counter()
-    if args.raw:
-        code = run_raw(client, image, args.kind)
-    else:
-        code = run_understand(client, image, args.kind)
-    print(f"elapsed: {time.perf_counter() - started:.2f}s")
-    return code
 
+    for page in book.pages:
+        page_started = time.perf_counter()
+        result = understand_page(page, client, cache=cache, ns=ns)
+        content.pages.append(result)
+        print(_line(page, result, time.perf_counter() - page_started))
 
-def run_raw(client: VisionClient, image: Path, kind: str) -> int:
-    try:
-        reply = client.analyze(page_prompt(kind), image)
-    except VisionError as exc:
-        print(f"failed: {exc}", file=sys.stderr)
-        return 1
-    print(f"reply: {reply[:500]}")
-    return 0
-
-
-def run_understand(client: VisionClient, image: Path, kind: str) -> int:
-    page = PageImage(
-        index=0,
-        filename=image.name,
-        path=str(image),
-        kind=kind,
-    )
-    content = understand_page(page, client)
-
-    print(f"error: {content.error}")
-    print(f"page_text: {content.page_text}")
-    print(f"description: {content.description}")
-    print(f"mood: {content.mood}")
-
-    if content.error:
-        print("hint: rerun with --raw to see the raw reply")
-        return 1
-    return 0
+    path = save_book(content)
+    print()
+    print(f"total   {time.perf_counter() - started:.1f}s")
+    print(f"failed  {content.failed_count}")
+    print(f"stats   {cache.stats()}")
+    print(f"output  {path}")
+    return 0 if content.failed_count == 0 else 1
 
 
 if __name__ == "__main__":

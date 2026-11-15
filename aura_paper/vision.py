@@ -61,8 +61,8 @@ class VisionClient:
         json_mode: bool = True,
     ) -> str:
         """Send one image with a prompt and return the reply text."""
-        if not self.base_url or not self.api_key or not self.model:
-            raise VisionError("vision endpoint is not configured")
+        if not (self.base_url and self.api_key and self.model):
+            raise VisionError(f"vision endpoint is not configured: {self!r}")
 
         image_part = {
             "type": "image_url",
