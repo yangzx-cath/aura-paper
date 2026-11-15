@@ -53,6 +53,12 @@ class LLMClient:
             timeout=float(os.environ.get("LLM_TIMEOUT", "120")),
         )
 
+    def missing_settings(self) -> list[str]:
+        """Return the names of the settings that are still empty."""
+        names = ("LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL")
+        values = (self.base_url, self.api_key, self.model)
+        return [name for name, value in zip(names, values) if not value]
+
     def chat(
         self,
         prompt: str,

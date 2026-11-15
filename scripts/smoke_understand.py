@@ -66,15 +66,7 @@ def main() -> int:
     _mark_spreads(book)
 
     client = LLMClient.from_env()
-    missing = [
-        name
-        for name, value in (
-            ("LLM_BASE_URL", client.base_url),
-            ("LLM_API_KEY", client.api_key),
-            ("LLM_MODEL", client.model),
-        )
-        if not value
-    ]
+    missing = client.missing_settings()
     if missing:
         print("missing config: " + ", ".join(missing), file=sys.stderr)
         return 2
