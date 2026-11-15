@@ -9,8 +9,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-# Environment variables:
-#   VISION_BASE_URL, VISION_API_KEY, VISION_MODEL, VISION_TIMEOUT
+# from_env() reads these variables from the environment.
+# LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, LLM_TIMEOUT
 
 
 class LLMError(Exception):
@@ -45,12 +45,12 @@ class LLMClient:
 
     @classmethod
     def from_env(cls) -> LLMClient:
-        """Build a client from the VISION_* environment variables."""
+        """Build a client from the LLM_* environment variables."""
         return cls(
-            base_url=os.environ.get("VISION_BASE_URL", ""),
-            api_key=os.environ.get("VISION_API_KEY", ""),
-            model=os.environ.get("VISION_MODEL", ""),
-            timeout=float(os.environ.get("VISION_TIMEOUT", "120")),
+            base_url=os.environ.get("LLM_BASE_URL", ""),
+            api_key=os.environ.get("LLM_API_KEY", ""),
+            model=os.environ.get("LLM_MODEL", ""),
+            timeout=float(os.environ.get("LLM_TIMEOUT", "120")),
         )
 
     def analyze(

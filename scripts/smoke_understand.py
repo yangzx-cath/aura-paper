@@ -5,8 +5,8 @@ and writes the result to the output directory. A second run reuses the
 cache and skips the model calls.
 
 Usage:
-    export VISION_API_KEY=sk-xxx
-    python scripts/smoke_vision.py [book_dir] [--no-cache]
+    export LLM_API_KEY=sk-xxx
+    python scripts/smoke_understand.py [book_dir] [--no-cache]
 """
 
 import argparse
@@ -69,9 +69,9 @@ def main() -> int:
     missing = [
         name
         for name, value in (
-            ("VISION_BASE_URL", client.base_url),
-            ("VISION_API_KEY", client.api_key),
-            ("VISION_MODEL", client.model),
+            ("LLM_BASE_URL", client.base_url),
+            ("LLM_API_KEY", client.api_key),
+            ("LLM_MODEL", client.model),
         )
         if not value
     ]
