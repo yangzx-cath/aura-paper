@@ -3,12 +3,18 @@ Interpret page images into structured content.
 """
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .book import Book, PageImage
 from .cache import Cache, file_fingerprint, fingerprint
 from .prompts import page_prompt
 from .vision import VisionClient, VisionError, extract_json
+
+
+# Return the current UTC time in a sortable, timezone-aware form.
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 @dataclass
@@ -25,7 +31,16 @@ class PageContent:
 
     def to_dict(self) -> dict:
         """Return the external JSON shape of this page."""
-        raise NotImplementedError("PageContent.to_dict")
+        return {
+            "index": self.index,
+            "filename": self.filename,
+            "model": self.model,
+            "generated_at": _now(),
+            "page_text": self.page_text,
+            "description": self.description,
+            "mood": self.mood,
+            "error": self.error,
+        }
 
 
 @dataclass
@@ -47,7 +62,15 @@ class BookContent:
 
     def to_dict(self) -> dict:
         """Return the external JSON shape of this book."""
-        raise NotImplementedError("BookContent.to_dict")
+        return {
+            "id": self.id,
+            "title": self.title,
+            "source": self.source,
+            "generated_at": _now(),
+            "page_count": self.page_count,
+            "failed_count": self.failed_count,
+            "pages": [page.to_dict() for page in self.pages],
+        }
 
 
 def understand_page(
