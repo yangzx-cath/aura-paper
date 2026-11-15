@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from aura_paper.book import Book, PageImage
+from aura_paper.cache import Cache
 from aura_paper.understand import understand_book, understand_page
 from aura_paper.vision import VisionClient, VisionError
 
@@ -147,3 +148,103 @@ def test_book_with_no_pages():
 
     assert content.page_count == 0
     assert content.failed_count == 0
+
+
+NS = "understand/book"
+
+
+def make_cached_page(tmp_path, data=b"image", index=3):
+    path = tmp_path / "03.jpg"
+    path.write_bytes(data)
+    return PageImage(index=index, filename="03.jpg", path=str(path))
+
+
+def test_cache_stores_successful_page(tmp_path):
+    cache = Cache(tmp_path / "cache")
+    client = FakeClient(json.dumps({"description": "草地"}))
+
+    page = make_cached_page(tmp_path)
+    understand_page(page, client, cache=cache, ns=NS)
+
+    stored = list((tmp_path / "cache" / NS).glob("*.json"))
+    assert len(stored) == 1
+    assert cache.stats() == {"hit": 0, "miss": 1}
+
+
+def test_cache_reuses_stored_page(tmp_path):
+    cache = Cache(tmp_path / "cache")
+    page = make_cached_page(tmp_path)
+    first = FakeClient(json.dumps({"description": "草地"}))
+    understand_page(page, first, cache=cache, ns=NS)
+
+    second = FakeClient(json.dumps({"description": "更动"}))
+    content = understand_page(page, second, cache=cache, ns=NS)
+
+    assert content.description == "草地"
+    assert second.prompts == []
+    assert cache.stats() == {"hit": 1, "miss": 1}
+
+
+def test_cache_does_not_store_failed_page(tmp_path):
+    cache = Cache(tmp_path / "cache")
+    client = FakeClient(error=VisionError("boom"))
+
+    understand_page(make_cached_page(tmp_path), client, cache=cache, ns=NS)
+
+    assert not (tmp_path / "cache" / NS).exists()
+
+
+def test_failed_page_is_retried(tmp_path):
+    cache = Cache(tmp_path / "cache")
+    page = make_cached_page(tmp_path)
+    failing = FakeClient(error=VisionError("boom"))
+    understand_page(page, failing, cache=cache, ns=NS)
+
+    client = FakeClient(json.dumps({"description": "草地"}))
+    content = understand_page(page, client, cache=cache, ns=NS)
+
+    assert content.description == "草地"
+    assert len(client.prompts) == 1
+
+
+def test_changed_image_is_a_miss(tmp_path):
+    cache = Cache(tmp_path / "cache")
+    first = FakeClient(json.dumps({"description": "一"}))
+    page = make_cached_page(tmp_path, data=b"one")
+    understand_page(page, first, cache=cache, ns=NS)
+
+    second = FakeClient(json.dumps({"description": "二"}))
+    page = make_cached_page(tmp_path, data=b"two")
+    content = understand_page(page, second, cache=cache, ns=NS)
+
+    assert content.description == "二"
+    assert len(second.prompts) == 1
+
+
+def test_cached_page_takes_filename_from_current_page(tmp_path):
+    cache = Cache(tmp_path / "cache")
+    page = make_cached_page(tmp_path)
+    understand_page(
+        page,
+        FakeClient(json.dumps({"description": "草地"})),
+        cache=cache,
+        ns=NS,
+    )
+
+    renamed = PageImage(index=3, filename="renamed.jpg", path=page.path)
+    content = understand_page(renamed, FakeClient(), cache=cache, ns=NS)
+
+    assert content.filename == "renamed.jpg"
+    assert content.description == "草地"
+
+
+def test_disabled_cache_calls_the_model_every_time(tmp_path):
+    cache = Cache(tmp_path / "cache", enabled=False)
+    page = make_cached_page(tmp_path)
+    client = FakeClient(json.dumps({"description": "草地"}))
+
+    understand_page(page, client, cache=cache, ns=NS)
+    understand_page(page, client, cache=cache, ns=NS)
+
+    assert len(client.prompts) == 2
+    assert not (tmp_path / "cache").exists()
