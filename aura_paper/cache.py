@@ -6,7 +6,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 
 class Cache:
@@ -108,14 +108,3 @@ def file_fingerprint(path: str | Path) -> str:
         for chunk in iter(lambda: f.read(_CHUNK_SIZE), b""):
             hasher.update(chunk)
     return hasher.hexdigest()[:16]
-
-
-def recall_json(
-    cache: Cache,
-    ns: str,
-    name: str,
-    key: str,
-    compute: Callable[[], dict],
-) -> dict:
-    """Return the cached entry, or compute and store it."""
-    raise NotImplementedError("recall_json")
