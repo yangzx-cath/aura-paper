@@ -2,6 +2,13 @@
 Prompt templates for model calls.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .understand import BookContent
+
 _LAYOUT_NOTES = {
     "single": "这是一页单页画面。",
     "spread": "这是一张跨页画面，包含左右两页，请按从左到右的顺序阅读和描述画面。",
@@ -39,3 +46,44 @@ def page_prompt(kind: str = "single") -> str:
     note = _LAYOUT_NOTES.get(kind, _LAYOUT_NOTES["single"])
     prompt = _PAGE_TEMPLATE.replace("__LAYOUT__", note)
     return prompt.replace("__MOODS__", _MOOD_WORDS)
+
+
+_STORY_TEMPLATE = """你是一名儿童绘本的编剧助手。
+
+下面是一本绘本逐页的内容，共 __COUNT__ 页。
+
+__PAGES__
+
+请通读全书，严格按下面的 JSON 结构输出：
+
+{
+  "characters": ["主要角色，用书中出现的称呼"],
+  "setting": "故事发生的地点与环境，不超过 20 字",
+  "style": "画面风格关键词，不超过 20 字",
+  "summary": "全书主线，100-200 字",
+  "beats": ["第 1 页的情节推进", "第 2 页的情节推进"]
+}
+
+要求：
+1. 只输出 JSON，不要解释文字，不要使用代码块，五个字段都要出现。
+2. 所有内容使用中文，角色名除外。
+3. characters 用书中最正式的称呼，例如"小鸡球球"而不是"小鸡"或"球球"。后续每页提到同一角色都用这个名字。
+4. beats 的长度必须恰好等于 __COUNT__，按页序排列，每页一句话，20-30 字，只写这一页推进了什么，不要描述画面细节。
+5. summary 概括全书主线，不添加原文没有的情节。
+6. setting 和 style 要能代表全书，用于统一后续的画面生成。
+"""
+
+
+def story_prompt(content: BookContent) -> str:
+    """Build the prompt that turns page contents into a story outline."""
+    blocks = []
+    for page in content.pages:
+        blocks.append(
+            f"第 {page.index + 1} 页\n"
+            f"文字：{page.page_text or '（无字）'}\n"
+            f"画面：{page.description}\n"
+            f"情绪：{page.mood}"
+        )
+
+    prompt = _STORY_TEMPLATE.replace("__PAGES__", "\n\n".join(blocks))
+    return prompt.replace("__COUNT__", str(content.page_count))
