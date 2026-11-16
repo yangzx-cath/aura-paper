@@ -7,7 +7,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .understand import BookContent
+    from .story import Story
+    from .understand import BookContent, PageContent
 
 _LAYOUT_NOTES = {
     "single": "这是一页单页画面。",
@@ -87,3 +88,64 @@ def story_prompt(content: BookContent) -> str:
 
     prompt = _STORY_TEMPLATE.replace("__PAGES__", "\n\n".join(blocks))
     return prompt.replace("__COUNT__", str(content.page_count))
+
+
+_SHOT_TEMPLATE = """你是一名儿童绘本动画分镜师。
+
+请把这一页绘本画面制作成一段连贯的动画。原图会作为视频首帧，
+角色造型、画风、配色和构图必须与原图保持一致。
+
+故事背景：
+- 角色：__CHARACTERS__
+- 地点：__SETTING__
+- 画风：__STYLE__
+- 全书主线：__SUMMARY__
+
+本页分镜：
+- 页码：第 __INDEX__ 页
+- 情节：__BEAT__
+- 画面：__DESCRIPTION__
+- 情绪：__MOOD__
+- 上一页情节：__PREVIOUS__
+
+要求：
+1. 只表现本页情节，不新增角色，不改变角色外观和服装。
+2. 保持原图画风、配色和构图，画面中不要出现文字、字幕、水印或边框。
+3. 动作自然、幅度适中，适合儿童观看，避免剧烈晃动、快速变焦和恐怖画面。
+4. 镜头缓慢推进，使用 [Push in]，不要切换到其他场景。
+5. 不添加原文没有的情节，不描述画面外的内容。
+6. __LAYOUT__
+"""
+
+_SHOT_LAYOUT_NOTES = {
+    "single": "这是一页单页画面，镜头保持稳定。",
+    "spread": "这是一张跨页画面，动作从左到右连贯展开。",
+}
+
+
+def shot_prompt(
+    page: PageContent,
+    story: Story,
+    *,
+    previous: str = "",
+) -> str:
+    """Build the video prompt for one page."""
+    beat = ""
+    if 0 <= page.index < len(story.beats):
+        beat = story.beats[page.index]
+
+    characters = "、".join(story.characters) or "（未提供）"
+    layout = _SHOT_LAYOUT_NOTES.get(page.kind, _SHOT_LAYOUT_NOTES["single"])
+
+    prompt = _SHOT_TEMPLATE.replace("__CHARACTERS__", characters)
+    prompt = prompt.replace("__SETTING__", story.setting or "（未提供）")
+    prompt = prompt.replace("__STYLE__", story.style or "（未提供）")
+    prompt = prompt.replace("__SUMMARY__", story.summary or "（未提供）")
+    prompt = prompt.replace("__INDEX__", str(page.index + 1))
+    prompt = prompt.replace("__BEAT__", beat or "（未提供）")
+    prompt = prompt.replace(
+        "__DESCRIPTION__", page.description or "（未提供）"
+    )
+    prompt = prompt.replace("__MOOD__", page.mood or "（未提供）")
+    prompt = prompt.replace("__PREVIOUS__", previous or "（无）")
+    return prompt.replace("__LAYOUT__", layout)
