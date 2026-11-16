@@ -3,12 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from aura_paper.llm import (
-    LLMClient,
-    LLMError,
-    _to_data_url,
-    extract_json,
-)
+from aura_paper.llm import LLMClient, LLMError
+from aura_paper.utils import data_url, extract_json
 
 SAMPLE_JPG = (
     Path(__file__).resolve().parent.parent
@@ -19,7 +15,7 @@ SAMPLE_JPG = (
 
 
 def test_jpeg_prefix_and_payload():
-    url = _to_data_url(SAMPLE_JPG)
+    url = data_url(SAMPLE_JPG)
 
     header, _, payload = url.partition(",")
     assert header == "data:image/jpeg;base64"
@@ -30,7 +26,7 @@ def test_png_uses_png_mime(tmp_path):
     target = tmp_path / "page.png"
     target.write_bytes(b"\x89PNG\r\n\x1a\nnot really a png")
 
-    url = _to_data_url(target)
+    url = data_url(target)
 
     assert url.startswith("data:image/png;base64,")
 
@@ -39,7 +35,7 @@ def test_bmp_uses_bmp_mime(tmp_path):
     target = tmp_path / "page.bmp"
     target.write_bytes(b"BM fake")
 
-    url = _to_data_url(target)
+    url = data_url(target)
 
     assert url.startswith("data:image/bmp;base64,")
 
@@ -48,8 +44,8 @@ def test_unknown_suffix_raises(tmp_path):
     target = tmp_path / "page.xyz"
     target.write_bytes(b"whatever")
 
-    with pytest.raises(LLMError, match="unsupported image type"):
-        _to_data_url(target)
+    with pytest.raises(ValueError, match="unsupported image type"):
+        data_url(target)
 
 
 def test_extract_plain_json():
@@ -154,5 +150,5 @@ def test_chat_rejects_unsupported_image(tmp_path):
     target.write_bytes(b"x")
     client = LLMClient("http://x/v1", "k", "m")
 
-    with pytest.raises(LLMError, match="unsupported image type"):
+    with pytest.raises(ValueError, match="unsupported image type"):
         client.chat("hi", image_path=target)

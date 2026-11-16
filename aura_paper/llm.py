@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import base64
 import json
 import os
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-# from_env() reads these variables from the environment.
-# LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, LLM_TIMEOUT
+from .utils import data_url
 
 
 class LLMError(Exception):
@@ -74,7 +72,7 @@ class LLMClient:
         if image_path is not None:
             image_part = {
                 "type": "image_url",
-                "image_url": {"url": _to_data_url(image_path)},
+                "image_url": {"url": data_url(image_path)},
             }
             text_part = {"type": "text", "text": prompt}
             content = [image_part, text_part]
@@ -130,35 +128,3 @@ class LLMClient:
                 if isinstance(part, dict)
             )
         return str(content)
-
-
-# Supported image suffixes and their MIME types.
-_MIME_TYPES = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".bmp": "image/bmp",
-}
-
-
-# Convert a local image file to a data URL.
-def _to_data_url(path: Path) -> str:
-    mime = _MIME_TYPES.get(path.suffix.lower())
-    if mime is None:
-        raise LLMError(f"unsupported image type: {path.suffix}")
-    payload = base64.b64encode(path.read_bytes()).decode("ascii")
-    return f"data:{mime};base64,{payload}"
-
-
-def extract_json(text: str) -> dict:
-    """Return the first JSON object found in text."""
-    start = text.find("{")
-    if start < 0:
-        raise ValueError("no JSON object found in text")
-
-    try:
-        obj, _ = json.JSONDecoder().raw_decode(text[start:])
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"invalid JSON: {exc.msg}") from exc
-
-    return obj
