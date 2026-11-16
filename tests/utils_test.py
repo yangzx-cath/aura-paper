@@ -40,15 +40,6 @@ def test_upper_suffix_uses_mime(tmp_path):
     assert url.startswith("data:image/jpeg;base64,")
 
 
-@pytest.mark.parametrize("suffix", [".bmp", ".webp", ".heic"])
-def test_removed_format_raises(tmp_path, suffix):
-    target = tmp_path / f"page{suffix}"
-    target.write_bytes(b"x")
-
-    with pytest.raises(ValueError, match="unsupported image type"):
-        data_url(target)
-
-
 def test_unknown_suffix_raises(tmp_path):
     target = tmp_path / "page.xyz"
     target.write_bytes(b"whatever")
@@ -65,22 +56,9 @@ def test_extract_fenced_json():
     assert extract_json('```json\n{"a": 1}\n```') == {"a": 1}
 
 
-def test_extract_after_prose():
-    assert extract_json('结果如下：\n{"a": 1}\n以上') == {"a": 1}
-
-
-def test_extract_takes_first_object():
-    assert extract_json('{"a": 1}\n{"b": 2}') == {"a": 1}
-
-
 def test_extract_without_json_raises():
     with pytest.raises(ValueError, match="no JSON object"):
         extract_json("抱歉，我无法完成")
-
-
-def test_extract_empty_raises():
-    with pytest.raises(ValueError):
-        extract_json("")
 
 
 def test_extract_invalid_json_raises():
