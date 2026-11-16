@@ -30,7 +30,12 @@ DEFAULT_BOOK = "chicken_and_sunflower"
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run one page video.")
     parser.add_argument("book", nargs="?", default=DEFAULT_BOOK)
-    parser.add_argument("--page", type=int, default=1)
+    parser.add_argument(
+        "--page",
+        type=int,
+        default=2,
+        help="1-based page; default 2 skips the cover",
+    )
     parser.add_argument("--duration", type=int, default=6)
     parser.add_argument("--resolution", default="768P")
     parser.add_argument(
