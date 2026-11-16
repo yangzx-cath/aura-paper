@@ -5,14 +5,14 @@ Interpret page images into structured content.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
 from .book import Book, PageImage
 from .cache import Cache, file_fingerprint, fingerprint
-from .llm import LLMClient, LLMError, extract_json
+from .llm import LLMClient, LLMError
 from .output import write_json
 from .prompts import page_prompt
+from .utils import extract_json, now_iso
 
 
 @dataclass
@@ -36,7 +36,7 @@ class PageContent:
             "filename": self.filename,
             "kind": self.kind,
             "model": self.model,
-            "generated_at": _now(),
+            "generated_at": now_iso(),
             "page_text": self.page_text,
             "description": self.description,
             "mood": self.mood,
@@ -58,10 +58,6 @@ class PageContent:
             model=str(data.get("model") or ""),
             error=str(data.get("error") or ""),
         )
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 @dataclass
@@ -87,7 +83,7 @@ class BookContent:
             "id": self.id,
             "title": self.title,
             "source": self.source,
-            "generated_at": _now(),
+            "generated_at": now_iso(),
             "page_count": self.page_count,
             "failed_count": self.failed_count,
             "pages": [page.to_dict() for page in self.pages],

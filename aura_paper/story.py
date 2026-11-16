@@ -1,14 +1,14 @@
 """Extract the narrative structure of a whole book."""
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 
 from .cache import Cache, fingerprint
-from .llm import LLMClient, LLMError, extract_json
+from .llm import LLMClient, LLMError
 from .output import write_json
 from .prompts import story_prompt
 from .understand import BookContent
+from .utils import extract_json, now_iso
 
 
 @dataclass
@@ -26,7 +26,7 @@ class Story:
     def to_dict(self) -> dict:
         """Return the external JSON shape of this story."""
         return {
-            "generated_at": _now(),
+            "generated_at": now_iso(),
             "model": self.model,
             "characters": self.characters,
             "setting": self.setting,
@@ -35,10 +35,6 @@ class Story:
             "beats": self.beats,
             "error": self.error,
         }
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def build_story(
