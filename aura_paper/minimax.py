@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import os
+import shutil
+import tempfile
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -111,7 +118,26 @@ class VideoTask:
     @classmethod
     def from_response(cls, data: dict) -> VideoTask:
         """Build a task from a create or query response body."""
-        raise NotImplementedError
+        task = data.get("task", data)
+        if not isinstance(task, dict):
+            raise MiniMaxError("malformed task reply")
+
+        content = task.get("content")
+        content = content if isinstance(content, dict) else {}
+        error = task.get("error")
+        if isinstance(error, dict):
+            error = error.get("message") or error.get("code") or ""
+        elif not isinstance(error, str):
+            error = ""
+
+        return cls(
+            task_id=str(task.get("id") or task.get("task_id") or ""),
+            status=str(task.get("status") or ""),
+            video_url=str(content.get("url") or ""),
+            resolution=str(task.get("resolution") or ""),
+            duration=int(task.get("duration") or 0),
+            error=str(error),
+        )
 
 
 class MiniMaxClient:
@@ -167,21 +193,59 @@ class MiniMaxClient:
     # POST /v2/video_generation
     def create_task(self, request: VideoRequest) -> VideoTask:
         """Submit one generation task and return its first snapshot."""
-        raise NotImplementedError
+        payload = request.to_payload(self.model)
+        data = self._post("/v2/video_generation", payload)
+        task = VideoTask.from_response(data)
+        if not task.task_id:
+            raise MiniMaxError("reply carries no task_id")
+        if not task.status:
+            task.status = "queued"
+        return task
 
     # GET /v2/query/video_generation/{task_id}
     def get_task(self, task_id: str) -> VideoTask:
         """Return the current snapshot of one task."""
-        raise NotImplementedError
+        quoted = urllib.parse.quote(task_id, safe="")
+        path = f"/v2/query/video_generation/{quoted}"
+        return VideoTask.from_response(self._get(path, {}))
 
     def wait_task(self, task_id: str) -> VideoTask:
         """Poll a task until it finishes or max_wait elapses."""
-        raise NotImplementedError
+        deadline = time.monotonic() + self.max_wait
+        while True:
+            task = self.get_task(task_id)
+            if task.done:
+                return task
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                task.error = f"timed out after {self.max_wait:.0f}s"
+                return task
+            time.sleep(min(self.poll_interval, remaining))
 
     # The URL is time-limited, so download right away.
     def download(self, url: str, path: str | Path) -> Path:
         """Fetch a finished video to path and return the path."""
-        raise NotImplementedError
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+
+        fd, temp_name = tempfile.mkstemp(dir=target.parent, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "wb") as f:
+                with urllib.request.urlopen(
+                    url, timeout=self.timeout
+                ) as response:
+                    shutil.copyfileobj(response, f)
+            os.replace(temp_name, target)
+        except urllib.error.HTTPError as exc:
+            raise MiniMaxError(f"download HTTP {exc.code}") from exc
+        except urllib.error.URLError as exc:
+            detail = f"cannot download video: {exc.reason}"
+            raise MiniMaxError(detail) from exc
+        except TimeoutError as exc:
+            raise MiniMaxError("download timed out") from exc
+        finally:
+            Path(temp_name).unlink(missing_ok=True)
+        return target
 
     def generate(
         self,
@@ -189,16 +253,83 @@ class MiniMaxClient:
         path: str | Path,
     ) -> VideoTask:
         """Create, wait and download a video in one call."""
-        raise NotImplementedError
+        task = self.create_task(request)
+        task = self.wait_task(task.task_id)
+        if not task.succeeded:
+            return task
+        if not task.video_url:
+            task.error = "task succeeded without a video URL"
+            return task
+        self.download(task.video_url, path)
+        return task
 
     # Send one JSON POST and return the parsed body.
     def _post(self, path: str, payload: dict) -> dict:
-        raise NotImplementedError
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        if len(body) > _MAX_BODY_BYTES:
+            raise ValueError("request body exceeds 64MB")
+        return self._send(path, body, "POST")
 
     # Send one GET and return the parsed body.
     def _get(self, path: str, params: dict) -> dict:
-        raise NotImplementedError
+        query = urllib.parse.urlencode(params)
+        if query:
+            path = f"{path}?{query}"
+        return self._send(path, None, "GET")
 
-    # Raise MiniMaxError on an error reply or a failed task.
+    def _send(self, path: str, body: bytes | None, method: str) -> dict:
+        if not self.api_key:
+            raise MiniMaxError("minimax endpoint is not configured")
+
+        url = self.base_url.rstrip("/") + path
+        request = urllib.request.Request(
+            url,
+            data=body,
+            method=method,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+
+        try:
+            with urllib.request.urlopen(
+                request, timeout=self.timeout
+            ) as response:
+                raw = response.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as exc:
+            raw = exc.read().decode("utf-8", errors="replace")
+            detail = _error_message(raw) or f"HTTP {exc.code}"
+            raise MiniMaxError(detail) from exc
+        except urllib.error.URLError as exc:
+            detail = f"cannot reach {url}: {exc.reason}"
+            raise MiniMaxError(detail) from exc
+        except TimeoutError as exc:
+            raise MiniMaxError(f"timeout after {self.timeout}s") from exc
+
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise MiniMaxError("malformed reply from endpoint") from exc
+        if not isinstance(data, dict):
+            raise MiniMaxError("malformed reply from endpoint")
+        return self._check(data)
+
     def _check(self, data: dict) -> dict:
-        raise NotImplementedError
+        error = data.get("error")
+        if isinstance(error, dict):
+            message = error.get("message") or "request failed"
+            raise MiniMaxError(str(message))
+        return data
+
+
+# Pull the message out of an OpenAI-style error body.
+def _error_message(raw: str) -> str:
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return raw[:300]
+    error = data.get("error") if isinstance(data, dict) else None
+    if isinstance(error, dict):
+        return str(error.get("message") or "")
+    return raw[:300]
