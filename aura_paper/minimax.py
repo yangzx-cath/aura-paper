@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import base64
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from .utils import IMAGE_SUFFIXES, data_url
 
 DEFAULT_BASE_URL = "https://api.minimax.io"
 DEFAULT_MODEL = "MiniMax-H3"
@@ -14,15 +15,9 @@ DEFAULT_MODEL = "MiniMax-H3"
 TASK_PENDING = ("queued", "running")
 TASK_DONE = ("succeeded", "failed", "cancelled")
 
-# Supported image suffixes and their MIME types.
-_MIME_TYPES = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".webp": "image/webp",
-    ".heic": "image/heic",
-    ".heif": "image/heif",
-}
+# Request limits from the video endpoint.
+_MAX_IMAGE_BYTES = 30 * 1024 * 1024
+_MAX_BODY_BYTES = 64 * 1024 * 1024
 
 
 class MiniMaxError(Exception):
@@ -50,6 +45,15 @@ class VideoRequest:
             raise ValueError("frames and reference images cannot be mixed")
         if self.last_frame is not None and self.first_frame is None:
             raise ValueError("last_frame needs first_frame")
+        images = [self.first_frame, self.last_frame]
+        images += self.reference_images
+        for path in images:
+            if path is None:
+                continue
+            if path.suffix.lower() not in IMAGE_SUFFIXES:
+                raise ValueError(f"unsupported image type: {path.suffix}")
+            if path.stat().st_size > _MAX_IMAGE_BYTES:
+                raise ValueError(f"image is larger than 30MB: {path}")
 
     def to_payload(self, model: str) -> dict:
         """Return the request body for the video generation endpoint."""
@@ -65,7 +69,7 @@ class VideoRequest:
             content.append(
                 {
                     "type": "image_url",
-                    "image_url": {"url": _to_data_url(path)},
+                    "image_url": {"url": data_url(path)},
                     "role": role,
                 }
             )
@@ -79,15 +83,6 @@ class VideoRequest:
         if self.ratio is not None:
             payload["ratio"] = self.ratio
         return payload
-
-
-# Convert a local image file to a data URL.
-def _to_data_url(path: Path) -> str:
-    mime = _MIME_TYPES.get(path.suffix.lower())
-    if mime is None:
-        raise MiniMaxError(f"unsupported image type: {path.suffix}")
-    payload = base64.b64encode(path.read_bytes()).decode("ascii")
-    return f"data:{mime};base64,{payload}"
 
 
 @dataclass
