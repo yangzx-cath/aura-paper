@@ -8,11 +8,10 @@ from pathlib import Path
 
 from PIL import Image
 
+from .utils import IMAGE_SUFFIXES
+
 # Page kinds
 PAGE_KINDS = ("single", "spread")
-
-# Image suffixes accepted
-SUPPORTED_SUFFIXES = {".png", ".jpg", ".jpeg", ".bmp"}
 
 
 @dataclass
@@ -83,7 +82,7 @@ class Book:
                 continue
             if entry.name.startswith("."):
                 continue
-            if entry.suffix.lower() not in SUPPORTED_SUFFIXES:
+            if entry.suffix.lower() not in IMAGE_SUFFIXES:
                 continue
             images.append(entry)
 
