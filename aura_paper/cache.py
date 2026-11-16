@@ -6,6 +6,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 
@@ -15,11 +16,13 @@ class Cache:
     root: Path
     enabled: bool
     _stats: dict[str, int]
+    _lock: Lock
 
     def __init__(self, root: str | Path, *, enabled: bool = True) -> None:
         self.root = Path(root).expanduser().resolve()
         self.enabled = enabled
         self._stats = {"hit": 0, "miss": 0}
+        self._lock = Lock()
 
     def path(self, ns: str, name: str, key: str) -> Path:
         """Return the file that would hold this entry."""
@@ -38,15 +41,20 @@ class Cache:
             text = self.path(ns, name, key).read_text(encoding="utf-8")
             data = json.loads(text)
         except (OSError, json.JSONDecodeError):
-            self._stats["miss"] += 1
+            self._count("miss")
             return None
 
         if not isinstance(data, dict):
-            self._stats["miss"] += 1
+            self._count("miss")
             return None
 
-        self._stats["hit"] += 1
+        self._count("hit")
         return data
+
+    # Add one to a counter without losing increments from other threads.
+    def _count(self, key: str) -> None:
+        with self._lock:
+            self._stats[key] += 1
 
     def save_json(self, ns: str, name: str, key: str, data: dict) -> Path:
         """Write the entry and return its path."""
@@ -77,7 +85,8 @@ class Cache:
 
     def stats(self) -> dict[str, int]:
         """Return the running hit and miss counters."""
-        return dict(self._stats)
+        with self._lock:
+            return dict(self._stats)
 
 
 _SEPARATOR = "\x1f"
