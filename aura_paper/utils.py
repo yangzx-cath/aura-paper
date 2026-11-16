@@ -1,4 +1,4 @@
-"""Small helpers shared by the model clients."""
+"""Small helpers shared across the project."""
 
 from __future__ import annotations
 
@@ -7,15 +7,15 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Image suffixes accepted when loading a book.
-IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg"}
-
 # Supported image suffixes and their MIME types.
 MIME_TYPES = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
 }
+
+# Image suffixes accepted across the pipeline.
+IMAGE_SUFFIXES = set(MIME_TYPES)
 
 
 def data_url(path: Path) -> str:
