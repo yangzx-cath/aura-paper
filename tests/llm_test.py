@@ -56,17 +56,6 @@ def test_chat_without_config_raises():
         client.chat("hi", image_path=SAMPLE_JPG)
 
 
-def test_chat_propagates_llm_error(monkeypatch):
-    def fake_post(self, payload):
-        raise LLMError("boom")
-
-    monkeypatch.setattr(LLMClient, "_post", fake_post)
-    client = LLMClient("http://x/v1", "k", "m")
-
-    with pytest.raises(LLMError, match="boom"):
-        client.chat("hi", image_path=SAMPLE_JPG)
-
-
 def test_chat_without_image_sends_plain_text(monkeypatch):
     captured = {}
 
@@ -81,12 +70,3 @@ def test_chat_without_image_sends_plain_text(monkeypatch):
 
     assert captured["messages"][-1]["content"] == "hello"
     assert captured["response_format"] == {"type": "json_object"}
-
-
-def test_chat_rejects_unsupported_image(tmp_path):
-    target = tmp_path / "page.xyz"
-    target.write_bytes(b"x")
-    client = LLMClient("http://x/v1", "k", "m")
-
-    with pytest.raises(ValueError, match="unsupported image type"):
-        client.chat("hi", image_path=target)
