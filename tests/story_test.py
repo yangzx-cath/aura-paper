@@ -4,7 +4,7 @@ from pathlib import Path
 from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient, LLMError
 from aura_paper.prompts import story_prompt
-from aura_paper.story import build_story, save_story
+from aura_paper.story import Story, build_story, save_story
 from aura_paper.understand import BookContent, PageContent
 
 
@@ -152,3 +152,16 @@ def test_save_story_writes_the_story_fields(tmp_path):
     assert data["characters"] == ["小鸡球球", "向日葵"]
     assert data["summary"].startswith("小鸡球球")
     assert len(data["beats"]) == 3
+
+
+def test_story_dict_round_trip():
+    story = Story(
+        characters=["小鸡球球"],
+        setting="春天的小山坡",
+        style="手绘水彩",
+        summary="种下向日葵并守护它长大。",
+        beats=["第一页", "第二页"],
+        model="m",
+    )
+
+    assert Story.from_dict(story.to_dict()) == story
