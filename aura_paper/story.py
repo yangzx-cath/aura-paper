@@ -1,5 +1,7 @@
 """Extract the narrative structure of a whole book."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -35,6 +37,19 @@ class Story:
             "beats": self.beats,
             "error": self.error,
         }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Story:
+        """Build a story from its external JSON shape."""
+        return cls(
+            characters=_text_list(data.get("characters")),
+            setting=str(data.get("setting") or ""),
+            style=str(data.get("style") or ""),
+            summary=str(data.get("summary") or ""),
+            beats=_text_list(data.get("beats")),
+            model=str(data.get("model") or ""),
+            error=str(data.get("error") or ""),
+        )
 
 
 def build_story(
