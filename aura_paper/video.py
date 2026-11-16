@@ -6,9 +6,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .config import out_root
+from .minimax import MiniMaxClient, MiniMaxError, VideoRequest
+from .prompts import shot_prompt
+
 if TYPE_CHECKING:
     from .cache import Cache
-    from .minimax import MiniMaxClient
     from .story import Story
     from .understand import BookContent, PageContent
 
@@ -64,7 +67,19 @@ def clip_path(
     root: str | Path | None = None,
 ) -> Path:
     """Return <root>/<book_id>/clips/page_01.mp4."""
-    raise NotImplementedError
+    name = f"page_{index + 1:02d}.mp4"
+    return _book_dir(book_id, root) / "clips" / name
+
+
+# Return the output directory of one book.
+def _book_dir(book_id: str, root: str | Path | None) -> Path:
+    base = Path(root) if root is not None else out_root()
+    return base / book_id
+
+
+# Resolve the source image of one page.
+def _page_path(content: BookContent, page: PageContent) -> Path:
+    return Path(content.source) / page.filename
 
 
 def generate_clip(
@@ -78,7 +93,46 @@ def generate_clip(
     resolution: str = "768P",
 ) -> VideoClip:
     """Generate one page clip and return its metadata."""
-    raise NotImplementedError
+    previous = ""
+    if page.index > 0 and page.index - 1 < len(story.beats):
+        previous = story.beats[page.index - 1]
+    prompt = shot_prompt(page, story, previous=previous)
+
+    target = clip_path(content.id, page.index, root)
+    request = VideoRequest(
+        prompt=prompt,
+        first_frame=_page_path(content, page),
+        duration=duration,
+        resolution=resolution,
+    )
+    clip = VideoClip(
+        index=page.index,
+        filename=page.filename,
+        prompt=prompt,
+        model=client.model,
+        duration=duration,
+        resolution=resolution,
+        path=str(target.relative_to(_book_dir(content.id, root))),
+    )
+
+    try:
+        task = client.create_task(request)
+        clip.task_id = task.task_id
+        task = client.wait_task(task.task_id)
+        if not task.succeeded:
+            clip.error = task.error or f"task {task.status or 'failed'}"
+            return clip
+        if not task.video_url:
+            clip.error = "task succeeded without a video URL"
+            return clip
+        client.download(task.video_url, target)
+    except (MiniMaxError, ValueError, OSError) as exc:
+        clip.error = str(exc)
+        return clip
+
+    clip.duration = task.duration or duration
+    clip.resolution = task.resolution or resolution
+    return clip
 
 
 def build_video(
