@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,6 +13,16 @@ DEFAULT_MODEL = "MiniMax-H3"
 # Status values returned by the query endpoint.
 TASK_PENDING = ("queued", "running")
 TASK_DONE = ("succeeded", "failed", "cancelled")
+
+# Supported image suffixes and their MIME types.
+_MIME_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
+}
 
 
 class MiniMaxError(Exception):
@@ -30,11 +41,53 @@ class VideoRequest:
     resolution: str = "768P"
     ratio: str | None = None
 
-    # Frames travel as data URLs; frame and reference inputs cannot
-    # be mixed, and a text prompt is always required.
+    def __post_init__(self) -> None:
+        if not self.prompt.strip():
+            raise ValueError("prompt is required")
+        if not 4 <= self.duration <= 15:
+            raise ValueError("duration must be 4 to 15 seconds")
+        if self.reference_images and (self.first_frame or self.last_frame):
+            raise ValueError("frames and reference images cannot be mixed")
+        if self.last_frame is not None and self.first_frame is None:
+            raise ValueError("last_frame needs first_frame")
+
     def to_payload(self, model: str) -> dict:
         """Return the request body for the video generation endpoint."""
-        raise NotImplementedError
+        content: list[dict] = [{"type": "text", "text": self.prompt}]
+        images = [
+            (self.first_frame, "first_frame"),
+            (self.last_frame, "last_frame"),
+        ]
+        images += [(path, "reference_image") for path in self.reference_images]
+        for path, role in images:
+            if path is None:
+                continue
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": _to_data_url(path)},
+                    "role": role,
+                }
+            )
+
+        payload = {
+            "model": model,
+            "content": content,
+            "duration": self.duration,
+            "resolution": self.resolution,
+        }
+        if self.ratio is not None:
+            payload["ratio"] = self.ratio
+        return payload
+
+
+# Convert a local image file to a data URL.
+def _to_data_url(path: Path) -> str:
+    mime = _MIME_TYPES.get(path.suffix.lower())
+    if mime is None:
+        raise MiniMaxError(f"unsupported image type: {path.suffix}")
+    payload = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{payload}"
 
 
 @dataclass
