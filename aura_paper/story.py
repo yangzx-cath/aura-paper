@@ -91,9 +91,9 @@ def _request_story(
 # Copy the story fields, ignoring missing or malformed values.
 def _apply_story(story: Story, fields: dict) -> None:
     story.characters = _text_list(fields.get("characters"))
-    story.setting = fields.get("setting", "") or ""
-    story.style = fields.get("style", "") or ""
-    story.summary = fields.get("summary", "") or ""
+    story.setting = str(fields.get("setting") or "")
+    story.style = str(fields.get("style") or "")
+    story.summary = str(fields.get("summary") or "")
     story.beats = _text_list(fields.get("beats"))
 
 

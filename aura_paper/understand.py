@@ -162,10 +162,10 @@ def _analyze_page(
 
 # Copy the model fields, turning missing or null values into empty strings.
 def _apply_fields(content: PageContent, fields: dict) -> None:
-    content.page_text = fields.get("page_text", "") or ""
-    content.description = fields.get("description", "") or ""
-    content.mood = fields.get("mood", "") or ""
-    content.mood_detail = fields.get("mood_detail", "") or ""
+    content.page_text = str(fields.get("page_text") or "")
+    content.description = str(fields.get("description") or "")
+    content.mood = str(fields.get("mood") or "")
+    content.mood_detail = str(fields.get("mood_detail") or "")
 
 
 # Keep only what the model produced, so page identity stays current.
