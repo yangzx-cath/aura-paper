@@ -1,6 +1,7 @@
 import hashlib
 import re
 from pathlib import Path
+from threading import Thread
 
 import pytest
 
@@ -215,3 +216,20 @@ def test_stats_is_a_copy(tmp_path):
     snapshot = cache.stats()
     snapshot["miss"] = 99
     assert cache.stats()["miss"] == 1
+
+
+def test_counts_stay_correct_under_threads(tmp_path):
+    cache = make_cache(tmp_path)
+    cache.save_json(NS, "page_03", "abc", {"a": 1})
+
+    def read():
+        for _ in range(50):
+            cache.load_json(NS, "page_03", "abc")
+
+    threads = [Thread(target=read) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert cache.stats() == {"hit": 200, "miss": 0}
