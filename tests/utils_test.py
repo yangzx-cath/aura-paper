@@ -1,9 +1,10 @@
 import base64
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
-from aura_paper.utils import data_url, extract_json
+from aura_paper.utils import data_url, extract_json, now_iso
 
 SAMPLE_JPG = (
     Path(__file__).resolve().parent.parent
@@ -28,6 +29,24 @@ def test_png_uses_png_mime(tmp_path):
     url = data_url(target)
 
     assert url.startswith("data:image/png;base64,")
+
+
+def test_upper_suffix_uses_mime(tmp_path):
+    target = tmp_path / "page.JPG"
+    target.write_bytes(b"\xff\xd8fake")
+
+    url = data_url(target)
+
+    assert url.startswith("data:image/jpeg;base64,")
+
+
+@pytest.mark.parametrize("suffix", [".bmp", ".webp", ".heic"])
+def test_removed_format_raises(tmp_path, suffix):
+    target = tmp_path / f"page{suffix}"
+    target.write_bytes(b"x")
+
+    with pytest.raises(ValueError, match="unsupported image type"):
+        data_url(target)
 
 
 def test_unknown_suffix_raises(tmp_path):
@@ -62,3 +81,16 @@ def test_extract_without_json_raises():
 def test_extract_empty_raises():
     with pytest.raises(ValueError):
         extract_json("")
+
+
+def test_extract_invalid_json_raises():
+    with pytest.raises(ValueError, match="invalid JSON"):
+        extract_json("{oops")
+
+
+def test_now_iso_is_utc():
+    value = now_iso()
+    parsed = datetime.fromisoformat(value)
+
+    assert parsed.tzinfo == timezone.utc
+    assert parsed.microsecond == 0
