@@ -12,3 +12,6 @@ __pycache__/
 # Generated files
 out/
 cache/
+
+# Local test books
+data/
