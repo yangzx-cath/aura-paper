@@ -73,7 +73,7 @@ def main() -> int:
         print(f"failed  {story.error}", file=sys.stderr)
         return 1
 
-    path = save_story(story, content.id)
+    path = save_story(story)
     print(f"time    {elapsed:.1f}s")
     print(f"stats   {cache.stats()}")
     print(f"chars   {'、'.join(story.characters)}")
