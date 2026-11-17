@@ -28,19 +28,6 @@ from aura_paper.understand import (
 ROOT = Path(__file__).resolve().parent.parent
 
 
-# A landscape scan holds two book pages, so treat it as a spread.
-def _mark_spreads(book: Book) -> None:
-    for page in book.pages:
-        wide = bool(page.width and page.height and page.width > page.height)
-        page.kind = "spread" if wide else "single"
-
-
-# Format one result line after the page finishes.
-def _line(page: PageImage, result: PageContent, elapsed: float) -> str:
-    status = result.error or result.mood or "-"
-    return f"{page.filename}  {page.kind:<6} {elapsed:6.1f}s  {status}"
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run the understanding pipeline."
@@ -106,6 +93,19 @@ def main() -> int:
     print(f"stats   {cache.stats()}")
     print(f"output  {path}")
     return 0 if content.failed_count == 0 else 1
+
+
+# A landscape scan holds two book pages, so treat it as a spread.
+def _mark_spreads(book: Book) -> None:
+    for page in book.pages:
+        wide = bool(page.width and page.height and page.width > page.height)
+        page.kind = "spread" if wide else "single"
+
+
+# One line per page, so a long run still reads as a progress log.
+def _line(page: PageImage, result: PageContent, elapsed: float) -> str:
+    status = result.error or result.mood or "-"
+    return f"{page.filename}  {page.kind:<6} {elapsed:6.1f}s  {status}"
 
 
 if __name__ == "__main__":
