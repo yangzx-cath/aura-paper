@@ -107,8 +107,7 @@ def _story_pages(content: BookContent) -> list[PageContent]:
     return pages or list(content.pages)
 
 
-# Reserved for the future per-page beat / narration stage.
-_BEAT_TEMPLATE = """你是一名儿童绘本的编剧助手。
+_SCREENPLAY_TEMPLATE = """你是一名儿童绘本的编剧助手。
 
 全书设定：
 - 角色：__CHARACTERS__
@@ -116,7 +115,7 @@ _BEAT_TEMPLATE = """你是一名儿童绘本的编剧助手。
 - 画风：__STYLE__
 - 全书主线：__SUMMARY__
 
-上一页内容：
+上一页已经念过：
 __PREVIOUS__
 
 本页内容：
@@ -125,17 +124,52 @@ __PREVIOUS__
 - 画面：__DESCRIPTION__
 - 情绪：__MOOD__
 
-请严格按下面的 JSON 结构输出：
+请严格按下面的 JSON 结构输出这一页的内容：
 
 {
-  "beat": "本页推进了什么，20-30 字，不描述画面细节"
+  "beat": "这一页推进了什么，20-30 字",
+  "lines": [
+    {"kind": "narration", "speaker": "", "text": "念出来的旁白"},
+    {"kind": "dialogue", "speaker": "角色名", "text": "角色的对白"}
+  ]
 }
 
 要求：
-1. 只输出 JSON，不要解释文字，不要使用代码块。
-2. 只写本页推进了什么，不添加原文没有的情节。
-3. 使用全书统一的角色称呼。
+1. 只输出 JSON，不要解释文字，不要使用代码块，beat 和 lines 都要出现。
+2. beat 使用中文；lines 保留原书的语言，中文书写中文，英文书写英文。
+3. beat 写给分镜看：这一页新发生了什么，不要复述画面，也不要复述旁白。
+4. lines 是念给孩子听的话，按播放顺序排列，一条对应一句话。
+5. 对白是书上原有的台词，必须照抄，不要改写，也不要编新台词。
+6. 旁白只在需要时出现：把这一页接上，或交代画面里看不出来的事。
+   对白已经把这一页讲清楚时，可以完全没有旁白。
+   这一页没有对白时必须写旁白，1-2 句，把事情讲明白。
+7. kind 只能是 narration 或 dialogue。
+   narration 是旁白，speaker 留空字符串。
+   dialogue 是角色说的话，speaker 填角色名。
+8. 接着上一页往下写，不要重复上一页已经念过的内容。
+9. 使用全书统一的角色称呼，不添加原文没有的情节。
 """
+
+
+def screenplay_prompt(
+    page: PageContent,
+    story: Story,
+    *,
+    previous: str = "",
+) -> str:
+    """Build the prompt that plans one page as a scene."""
+    characters = "、".join(story.characters) or "（未提供）"
+    prompt = _SCREENPLAY_TEMPLATE.replace("__CHARACTERS__", characters)
+    prompt = prompt.replace("__SETTING__", story.setting or "（未提供）")
+    prompt = prompt.replace("__STYLE__", story.style or "（未提供）")
+    prompt = prompt.replace("__SUMMARY__", story.summary or "（未提供）")
+    prompt = prompt.replace("__PREVIOUS__", previous or "（这是第一页）")
+    prompt = prompt.replace("__INDEX__", str(page.index + 1))
+    prompt = prompt.replace("__PAGE_TEXT__", page.page_text or "（无字）")
+    prompt = prompt.replace(
+        "__DESCRIPTION__", page.description or "（未提供）"
+    )
+    return prompt.replace("__MOOD__", page.mood or "（未提供）")
 
 
 _SHOT_TEMPLATE = """你是一名儿童绘本动画分镜师。
