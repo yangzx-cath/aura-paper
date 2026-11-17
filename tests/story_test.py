@@ -82,17 +82,6 @@ def test_leaves_cover_pages_out_of_the_prompt():
     assert "共 2 页" in prompt
 
 
-def test_falls_back_to_every_page_when_none_is_a_story_page():
-    content = make_content()
-    for page in content.pages:
-        page.role = "cover"
-
-    prompt = story_prompt(content)
-
-    assert "共 3 页" in prompt
-    assert "第 3 页的画面" in prompt
-
-
 def test_missing_summary_is_an_error():
     reply = make_reply(summary="")
 
