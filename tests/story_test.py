@@ -140,7 +140,7 @@ def test_failed_story_is_not_cached(tmp_path):
 def test_save_story_writes_story_json(tmp_path):
     story = build_story(make_content(), FakeClient(make_reply()))
 
-    path = save_story(story, "demo", tmp_path)
+    path = save_story(story, tmp_path)
 
     assert path == tmp_path / "demo" / "story.json"
     assert path.is_file()
@@ -149,15 +149,17 @@ def test_save_story_writes_story_json(tmp_path):
 def test_save_story_writes_the_story_fields(tmp_path):
     story = build_story(make_content(), FakeClient(make_reply()))
 
-    path = save_story(story, "demo", tmp_path)
+    path = save_story(story, tmp_path)
 
     data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["id"] == "demo"
     assert data["characters"] == ["小鸡球球", "向日葵"]
     assert data["summary"].startswith("小鸡球球")
 
 
 def test_story_dict_round_trip():
     story = Story(
+        id="demo",
         characters=["小鸡球球"],
         setting="春天的小山坡",
         style="手绘水彩",
