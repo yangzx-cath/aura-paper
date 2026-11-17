@@ -117,6 +117,7 @@ def story_prompt(content: BookContent) -> str:
 _SCREENPLAY_TEMPLATE = """你是一名儿童绘本的编剧助手。
 
 全书设定：
+- 语言：__LANGUAGE__
 - 角色：__CHARACTERS__
 - 外形：__CAST__
 - 地点：__SETTING__
@@ -144,7 +145,8 @@ __PREVIOUS__
 
 要求：
 1. 只输出 JSON，不要解释文字，不要使用代码块，beat 和 lines 都要出现。
-2. beat 使用中文；lines 保留原书的语言，中文书写中文，英文书写英文。
+2. beat 使用中文；lines 全部使用__LANGUAGE__。
+   这一页没有原文时，旁白也要用__LANGUAGE__写，不要出现别的语言。
 3. beat 写给分镜看：这一页新发生了什么，不要复述画面，也不要复述旁白。
 4. lines 是念给孩子听的话，按播放顺序排列，一条对应一句话。
 5. 对白是书上原有的台词，必须照抄，不要改写，也不要编新台词。
@@ -167,10 +169,12 @@ def screenplay_prompt(
     story: Story,
     *,
     previous: str = "",
+    language: str = "",
 ) -> str:
     """Build the prompt that plans one page as a scene."""
     characters = "、".join(story.characters) or "（未提供）"
     prompt = _SCREENPLAY_TEMPLATE.replace("__CHARACTERS__", characters)
+    prompt = prompt.replace("__LANGUAGE__", language or "原文的语言")
     prompt = prompt.replace("__CAST__", _cast_text(story))
     prompt = prompt.replace("__SETTING__", story.setting or "（未提供）")
     prompt = prompt.replace("__STYLE__", story.style or "（未提供）")

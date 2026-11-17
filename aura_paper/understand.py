@@ -100,6 +100,14 @@ class BookContent:
         pages = [page for page in self.pages if page.role == "story"]
         return pages or list(self.pages)
 
+    # Language the pages are printed in, so narration can stay in it.
+    @property
+    def language(self) -> str:
+        text = "".join(page.page_text for page in self.pages)
+        letters = [char for char in text if char.isalpha()]
+        english = sum(1 for char in letters if char.isascii())
+        return "英文" if english * 2 > len(letters) else "中文"
+
     def to_dict(self) -> dict:
         """Return the external JSON shape of this book."""
         return {
