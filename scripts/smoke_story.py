@@ -1,12 +1,12 @@
 """Manual smoke test for the story stage.
 
-Reads out/<book>/book.json, builds the narrative structure and writes
+Reads out/<book>/book.json, derives the story context and writes
 story.json next to it.
 
 Usage:
     export LLM_API_KEY=sk-xxx
-    python scripts/smoke_story.py [book_id]
-    python scripts/smoke_story.py --dump-prompt > prompt.txt
+    python scripts/smoke_story.py <book_id>
+    python scripts/smoke_story.py <book_id> --dump-prompt > prompt.txt
 """
 
 import argparse
@@ -23,12 +23,11 @@ from aura_paper.story import build_story, save_story
 from aura_paper.understand import BookContent
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_BOOK = "chicken_and_sunflower"
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the story stage.")
-    parser.add_argument("book", nargs="?", default=DEFAULT_BOOK)
+    parser.add_argument("book", help="book id under the output directory")
     parser.add_argument(
         "--dump-prompt",
         action="store_true",
@@ -63,7 +62,7 @@ def main() -> int:
     print(f"book    {content.id}  pages={content.page_count}")
     print(f"model   {client.model}  timeout={client.timeout:.0f}s")
     print(f"cache   {cache.root}  enabled={cache.enabled}")
-    print("asking the model for the narrative structure", flush=True)
+    print("asking the model for the story context", flush=True)
 
     started = time.perf_counter()
     story = build_story(content, client, cache=cache)
