@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 
 from aura_paper.book import Book, PageImage
@@ -85,6 +86,22 @@ def test_success():
     assert content.error == ""
 
 
+def test_reads_the_page_role():
+    reply = json.dumps({"role": "cover", "description": "封面"})
+
+    content = understand_page(make_page(), FakeClient(reply))
+
+    assert content.role == "cover"
+
+
+def test_unknown_page_role_falls_back_to_story():
+    reply = json.dumps({"role": "back", "description": "末页"})
+
+    content = understand_page(make_page(), FakeClient(reply))
+
+    assert content.role == "story"
+
+
 def test_llm_error_is_recorded():
     client = FakeClient(error=LLMError("boom"))
 
@@ -156,6 +173,33 @@ def test_book_with_no_pages():
 
     assert content.page_count == 0
     assert content.failed_count == 0
+
+
+# Make the first page the slowest, so it finishes after the pages behind it.
+class SlowFirstPageClient(FakeClient):
+    def chat(
+        self,
+        prompt: str,
+        *,
+        image_path: Path | None = None,
+        json_mode: bool = True,
+    ) -> str:
+        if image_path is not None and Path(image_path).name == "00.jpg":
+            time.sleep(0.05)
+        return super().chat(prompt, image_path=image_path, json_mode=json_mode)
+
+
+def test_workers_read_every_page_in_order():
+    pages = [
+        PageImage(index=index, filename=f"{index:02d}.jpg", path="x.jpg")
+        for index in range(4)
+    ]
+    client = SlowFirstPageClient(json.dumps({"description": "草地"}))
+
+    content = understand_book(make_book(pages), client, workers=3)
+
+    assert len(client.prompts) == 4
+    assert [page.index for page in content.pages] == [0, 1, 2, 3]
 
 
 NS = "understand/book"
@@ -246,6 +290,31 @@ def test_cached_page_takes_filename_from_current_page(tmp_path):
     assert content.description == "草地"
 
 
+def test_cache_keeps_every_page_field(tmp_path):
+    cache = Cache(tmp_path / "cache")
+    page = make_cached_page(tmp_path)
+    reply = json.dumps(
+        {
+            "role": "cover",
+            "page_text": "小蝴蝶，你好。",
+            "footer": "定价：38.00 元",
+            "description": "封面",
+            "mood": "温暖",
+            "mood_detail": "有一点期待",
+        }
+    )
+    understand_page(page, FakeClient(reply), cache=cache, ns=NS)
+
+    content = understand_page(page, FakeClient(), cache=cache, ns=NS)
+
+    assert content.role == "cover"
+    assert content.page_text == "小蝴蝶，你好。"
+    assert content.footer == "定价：38.00 元"
+    assert content.description == "封面"
+    assert content.mood == "温暖"
+    assert content.mood_detail == "有一点期待"
+
+
 def make_cached_book(tmp_path, count=3):
     pages = []
     for index in range(count):
@@ -261,7 +330,7 @@ def test_book_caches_each_page(tmp_path):
     book = make_cached_book(tmp_path)
     client = FakeClient(json.dumps({"description": "草地"}))
 
-    understand_book(book, client, cache=cache)
+    understand_book(book, client, cache=cache, workers=3)
 
     root = tmp_path / "cache" / "understand" / book.id
     assert len(list(root.glob("*.json"))) == 3
@@ -354,7 +423,9 @@ def test_book_dict_round_trip():
         index=1,
         filename="02.jpg",
         kind="spread",
+        role="cover",
         page_text="文字",
+        footer="定价：38.00 元",
         description="草地",
         mood="温暖",
         model="m",
