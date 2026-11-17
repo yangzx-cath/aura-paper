@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from math import ceil
 from pathlib import Path
+from typing import Callable
 
 from .cache import Cache, fingerprint
 from .llm import LLMClient, LLMError
@@ -156,6 +158,7 @@ def build_screenplay(
     *,
     cache: Cache | None = None,
     workers: int = 1,
+    on_page: Callable[[PageContent, PageScene, float], None] | None = None,
 ) -> Screenplay:
     """Write the beat and lines of every story page."""
     assert workers >= 1
@@ -170,7 +173,11 @@ def build_screenplay(
 
     def run(task: tuple[PageContent, str]) -> PageScene:
         page, previous = task
-        return _build_scene(page, previous, content.id, story, client, cache)
+        started = time.perf_counter()
+        scene = _build_scene(page, previous, content, story, client, cache)
+        if on_page is not None:
+            on_page(page, scene, time.perf_counter() - started)
+        return scene
 
     if workers == 1:
         scenes = [run(task) for task in tasks]
@@ -192,19 +199,21 @@ def _source_text(page: PageContent) -> str:
 def _build_scene(
     page: PageContent,
     previous: str,
-    book_id: str,
+    content: BookContent,
     story: Story,
     client: LLMClient,
     cache: Cache | None,
 ) -> PageScene:
     scene = PageScene(index=page.index, model=client.model)
-    prompt = screenplay_prompt(page, story, previous=previous)
+    prompt = screenplay_prompt(
+        page, story, previous=previous, language=content.language
+    )
 
     if cache is None:
         scene = _request_scene(scene, client, prompt)
         return _finish_scene(scene)
 
-    ns = f"screenplay/{book_id}"
+    ns = f"screenplay/{content.id}"
     name = f"page_{page.index:02d}"
     key = fingerprint(prompt, client.model)
 

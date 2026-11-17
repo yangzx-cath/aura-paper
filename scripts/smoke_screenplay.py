@@ -15,6 +15,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from threading import Lock
 
 from aura_paper.cache import Cache
 from aura_paper.config import cache_root, load_env, out_root
@@ -22,7 +23,7 @@ from aura_paper.llm import LLMClient
 from aura_paper.prompts import screenplay_prompt
 from aura_paper.screenplay import PageScene, build_screenplay, save_screenplay
 from aura_paper.story import Story
-from aura_paper.understand import BookContent
+from aura_paper.understand import BookContent, PageContent
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -83,18 +84,26 @@ def main() -> int:
 
     cache = Cache(cache_root(), enabled=not args.no_cache)
     print(f"book    {content.id}  story pages={len(content.story_pages)}")
+    print(f"language {content.language}")
     print(f"model   {client.model}  timeout={client.timeout:.0f}s")
     print(f"cache   {cache.root}  enabled={cache.enabled}")
     print(f"workers {args.workers}")
     print("writing the beat and lines of every page", flush=True)
 
     started = time.perf_counter()
+    lock = Lock()
+
+    def show(page: PageContent, scene: PageScene, elapsed: float) -> None:
+        with lock:
+            print(_line(page, scene, elapsed), flush=True)
+
     screenplay = build_screenplay(
         content,
         story,
         client,
         cache=cache,
         workers=args.workers,
+        on_page=show,
     )
     elapsed = time.perf_counter() - started
 
@@ -135,10 +144,18 @@ def _dump_prompt(content: BookContent, story: Story, number: int) -> int:
         before = pages[position - 1]
         previous = before.page_text or before.description
 
-    prompt = screenplay_prompt(page, story, previous=previous)
+    prompt = screenplay_prompt(
+        page, story, previous=previous, language=content.language
+    )
     print(f"prompt length: {len(prompt)}", file=sys.stderr)
     print(prompt)
     return 0
+
+
+# One line per page, so a long run still reads as a progress log.
+def _line(page: PageContent, scene: PageScene, elapsed: float) -> str:
+    status = scene.error or f"{scene.duration}s"
+    return f"{page.index + 1:02d}  {elapsed:6.1f}s  {status}  {scene.beat}"
 
 
 # Keep one scene to a few lines, so a long book still fits one screen.
