@@ -1,4 +1,4 @@
-"""Extract the narrative structure of a whole book."""
+"""Derive the story context shared by every page of a book."""
 
 from __future__ import annotations
 
@@ -15,8 +15,9 @@ from .utils import extract_json, now_iso
 
 @dataclass
 class Story:
-    """Narrative structure of a whole book."""
+    """Story context shared by every page."""
 
+    id: str = ""
     characters: list[str] = field(default_factory=list)
     setting: str = ""
     style: str = ""
@@ -27,6 +28,7 @@ class Story:
     def to_dict(self) -> dict:
         """Return the external JSON shape of this story."""
         return {
+            "id": self.id,
             "generated_at": now_iso(),
             "model": self.model,
             "characters": self.characters,
@@ -40,6 +42,7 @@ class Story:
     def from_dict(cls, data: dict) -> Story:
         """Build a story from its external JSON shape."""
         return cls(
+            id=str(data.get("id") or ""),
             characters=_text_list(data.get("characters")),
             setting=str(data.get("setting") or ""),
             style=str(data.get("style") or ""),
@@ -55,9 +58,9 @@ def build_story(
     *,
     cache: Cache | None = None,
 ) -> Story:
-    """Build the narrative structure from the parsed book content."""
+    """Derive the story context from the parsed book content."""
     prompt = story_prompt(content)
-    story = Story(model=client.model)
+    story = Story(id=content.id, model=client.model)
 
     if cache is None:
         return _request_story(story, client, prompt)
@@ -65,7 +68,7 @@ def build_story(
     ns = f"story/{content.id}"
     key = fingerprint(prompt, client.model)
 
-    entry = cache.load_json(ns, "book", key)
+    entry = cache.load_json(ns, "story", key)
     if entry is not None:
         _apply_story(story, entry)
         return story
@@ -73,7 +76,7 @@ def build_story(
     story = _request_story(story, client, prompt)
     # Errors are never cached, so a malformed story is retried next run.
     if not story.error:
-        cache.save_json(ns, "book", key, _story_fields(story))
+        cache.save_json(ns, "story", key, _story_fields(story))
     return story
 
 
@@ -123,8 +126,7 @@ def _story_fields(story: Story) -> dict:
 
 def save_story(
     story: Story,
-    book_id: str,
     root: str | Path | None = None,
 ) -> Path:
-    """Write the story to <root>/<book_id>/story.json."""
-    return write_json(book_id, "story", story.to_dict(), root)
+    """Write the story to <root>/<id>/story.json."""
+    return write_json(story.id, "story", story.to_dict(), root)
