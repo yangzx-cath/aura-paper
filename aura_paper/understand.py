@@ -17,6 +17,8 @@ from .output import write_json
 from .prompts import page_prompt
 from .utils import extract_json, now_iso
 
+PAGE_ROLES = ("cover", "story", "end")
+
 
 @dataclass
 class PageContent:
@@ -25,6 +27,7 @@ class PageContent:
     index: int
     filename: str
     kind: str = "single"
+    role: str = "story"
     page_text: str = ""
     description: str = ""
     mood: str = ""
@@ -38,6 +41,7 @@ class PageContent:
             "index": self.index,
             "filename": self.filename,
             "kind": self.kind,
+            "role": self.role,
             "model": self.model,
             "generated_at": now_iso(),
             "page_text": self.page_text,
@@ -54,6 +58,7 @@ class PageContent:
             index=int(data.get("index") or 0),
             filename=str(data.get("filename") or ""),
             kind=str(data.get("kind") or "single"),
+            role=_role(data.get("role")),
             page_text=str(data.get("page_text") or ""),
             description=str(data.get("description") or ""),
             mood=str(data.get("mood") or ""),
@@ -165,15 +170,23 @@ def _analyze_page(
 
 # Copy the model fields, turning missing or null values into empty strings.
 def _apply_fields(content: PageContent, fields: dict) -> None:
+    content.role = _role(fields.get("role"))
     content.page_text = str(fields.get("page_text") or "")
     content.description = str(fields.get("description") or "")
     content.mood = str(fields.get("mood") or "")
     content.mood_detail = str(fields.get("mood_detail") or "")
 
 
+# Keep a page role inside the supported set, defaulting to a story page.
+def _role(value: object) -> str:
+    text = str(value or "").strip().lower()
+    return text if text in PAGE_ROLES else "story"
+
+
 # Keep only what the model produced, so page identity stays current.
 def _page_fields(content: PageContent) -> dict:
     return {
+        "role": content.role,
         "page_text": content.page_text,
         "description": content.description,
         "mood": content.mood,
