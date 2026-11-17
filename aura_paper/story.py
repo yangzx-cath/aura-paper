@@ -14,11 +14,32 @@ from .utils import extract_json, now_iso
 
 
 @dataclass
+class Cast:
+    """One character with the look that keeps pages consistent."""
+
+    name: str
+    look: str = ""
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this character."""
+        return {"name": self.name, "look": self.look}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Cast:
+        """Build a character from its external JSON shape."""
+        return cls(
+            name=str(data.get("name") or ""),
+            look=str(data.get("look") or ""),
+        )
+
+
+@dataclass
 class Story:
     """Story context shared by every page."""
 
     id: str = ""
     characters: list[str] = field(default_factory=list)
+    cast: list[Cast] = field(default_factory=list)
     setting: str = ""
     style: str = ""
     summary: str = ""
@@ -32,6 +53,7 @@ class Story:
             "generated_at": now_iso(),
             "model": self.model,
             "characters": self.characters,
+            "cast": [member.to_dict() for member in self.cast],
             "setting": self.setting,
             "style": self.style,
             "summary": self.summary,
@@ -44,6 +66,7 @@ class Story:
         return cls(
             id=str(data.get("id") or ""),
             characters=_text_list(data.get("characters")),
+            cast=_cast_list(data.get("cast")),
             setting=str(data.get("setting") or ""),
             style=str(data.get("style") or ""),
             summary=str(data.get("summary") or ""),
@@ -57,6 +80,16 @@ def _text_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item) for item in value if item]
+
+
+# Read the cast list, dropping entries that carry no name.
+def _cast_list(value: object) -> list[Cast]:
+    if not isinstance(value, list):
+        return []
+    members = [
+        Cast.from_dict(item) for item in value if isinstance(item, dict)
+    ]
+    return [member for member in members if member.name]
 
 
 def build_story(
@@ -109,6 +142,7 @@ def _request_story(
 # Copy the story fields, ignoring missing or malformed values.
 def _apply_story(story: Story, fields: dict) -> None:
     story.characters = _text_list(fields.get("characters"))
+    story.cast = _cast_list(fields.get("cast"))
     story.setting = str(fields.get("setting") or "")
     story.style = str(fields.get("style") or "")
     story.summary = str(fields.get("summary") or "")
@@ -118,6 +152,7 @@ def _apply_story(story: Story, fields: dict) -> None:
 def _story_fields(story: Story) -> dict:
     return {
         "characters": story.characters,
+        "cast": [member.to_dict() for member in story.cast],
         "setting": story.setting,
         "style": story.style,
         "summary": story.summary,

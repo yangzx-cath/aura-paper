@@ -72,20 +72,29 @@ __PAGES__
 
 {
   "characters": ["主要角色，用书中出现的称呼"],
+  "cast": [
+    {"name": "角色名，和 characters 完全一致", "look": "外形，不超过 20 字"}
+  ],
   "setting": "故事发生的地点与环境，不超过 20 字",
   "style": "画面风格关键词，不超过 20 字",
   "summary": "全书主线，100-200 字"
 }
 
 要求：
-1. 只输出 JSON，不要解释文字，不要使用代码块，四个字段都要出现。
+1. 只输出 JSON，不要解释文字，不要使用代码块，五个字段都要出现。
 2. 所有内容使用中文，角色名除外。
 3. characters 用书中最正式的称呼，例如"小鸡球球"而不是"小鸡"或"球球"。
 4. characters 只列书里真实出现的角色。书名、电影名、海报和招牌上的字、
    作者、译者、出版社都不是角色。
 5. 叙述者从头到尾没有名字时，不要给他编名字，用"我"占位。
-6. summary 概括全书主线，不添加原文没有的情节。
-7. setting 和 style 要能代表全书，用于统一后续的画面生成。
+6. cast 和 characters 是同一批角色，名字一字不差，顺序也一致。
+7. look 只写画面里看得见的特征：体型、颜色、头发、服装、随身物品。
+   不写性格、身份和人物关系，也不要写动作。
+8. 叙述者"我"同样要写外形，按画面里反复出现的那个孩子来写。
+9. 家人算角色；店员、其他观众、路人只是背景，不算。
+   海报里和电影里的人物也不算。
+10. summary 概括全书主线，不添加原文没有的情节。
+11. setting 和 style 要能代表全书，用于统一后续的画面生成。
 """
 
 
@@ -109,6 +118,7 @@ _SCREENPLAY_TEMPLATE = """你是一名儿童绘本的编剧助手。
 
 全书设定：
 - 角色：__CHARACTERS__
+- 外形：__CAST__
 - 地点：__SETTING__
 - 画风：__STYLE__
 - 全书主线：__SUMMARY__
@@ -148,6 +158,7 @@ __PREVIOUS__
 8. 不要给没有名字的角色编名字，speaker 只能用全书设定里的称呼或"我"。
 9. 接着上一页往下写，不要重复上一页已经念过的内容。
 10. 使用全书统一的角色称呼，不添加原文没有的情节。
+11. 旁白提到角色时以外形为准，不要给他加原文没说的性别、年龄或亲属关系。
 """
 
 
@@ -160,6 +171,7 @@ def screenplay_prompt(
     """Build the prompt that plans one page as a scene."""
     characters = "、".join(story.characters) or "（未提供）"
     prompt = _SCREENPLAY_TEMPLATE.replace("__CHARACTERS__", characters)
+    prompt = prompt.replace("__CAST__", _cast_text(story))
     prompt = prompt.replace("__SETTING__", story.setting or "（未提供）")
     prompt = prompt.replace("__STYLE__", story.style or "（未提供）")
     prompt = prompt.replace("__SUMMARY__", story.summary or "（未提供）")
@@ -170,6 +182,17 @@ def screenplay_prompt(
         "__DESCRIPTION__", page.description or "（未提供）"
     )
     return prompt.replace("__MOOD__", page.mood or "（未提供）")
+
+
+# Render the cast as "名字（外形）" so a scene knows how each one looks.
+def _cast_text(story: Story) -> str:
+    parts = []
+    for member in story.cast:
+        if member.look:
+            parts.append(f"{member.name}（{member.look}）")
+        else:
+            parts.append(member.name)
+    return "；".join(parts) or "（未提供）"
 
 
 _SHOT_TEMPLATE = """你是一名儿童绘本动画分镜师。

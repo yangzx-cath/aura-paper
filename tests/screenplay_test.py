@@ -3,7 +3,7 @@ import json
 from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient
 from aura_paper.screenplay import Line, PageScene, Screenplay, build_screenplay
-from aura_paper.story import Story
+from aura_paper.story import Cast, Story
 from aura_paper.understand import BookContent, PageContent
 
 
@@ -22,6 +22,7 @@ def make_story():
     return Story(
         id="demo",
         characters=["Kuan"],
+        cast=[Cast("Kuan", "圆滚滚的蓝色机器人")],
         setting="电影院",
         style="纸纹拼贴",
         summary="兄弟俩去看电影。",
@@ -100,6 +101,14 @@ def test_gives_each_page_the_text_of_the_one_before():
     assert "第 1 页原文" in client.prompts[1]
     assert "第 3 页原文" not in client.prompts[1]
     assert "（这是第一页）" in client.prompts[0]
+
+
+def test_tells_the_model_how_each_character_looks():
+    client = FakeClient(make_reply())
+
+    build_screenplay(make_content(1), make_story(), client)
+
+    assert "Kuan（圆滚滚的蓝色机器人）" in client.prompts[0]
 
 
 def test_missing_lines_are_an_error():

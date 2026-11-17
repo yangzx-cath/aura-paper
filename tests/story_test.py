@@ -4,7 +4,7 @@ from pathlib import Path
 from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient, LLMError
 from aura_paper.prompts import story_prompt
-from aura_paper.story import Story, build_story, save_story
+from aura_paper.story import Cast, Story, build_story, save_story
 from aura_paper.understand import BookContent, PageContent
 
 
@@ -44,6 +44,10 @@ def make_content(count=3):
 def make_reply(**overrides):
     data = {
         "characters": ["小鸡球球", "向日葵"],
+        "cast": [
+            {"name": "小鸡球球", "look": "圆滚滚的黄色小鸡"},
+            {"name": "向日葵", "look": "比小鸡还高的一朵花"},
+        ],
         "setting": "春天的小山坡",
         "style": "手绘水彩，柔和明亮",
         "summary": "小鸡球球种下向日葵，并一直守护它长大。",
@@ -56,6 +60,7 @@ def test_builds_story_fields():
     story = build_story(make_content(), FakeClient(make_reply()))
 
     assert story.characters == ["小鸡球球", "向日葵"]
+    assert story.cast[0] == Cast("小鸡球球", "圆滚滚的黄色小鸡")
     assert story.setting == "春天的小山坡"
     assert story.style.startswith("手绘水彩")
     assert story.summary.startswith("小鸡球球")
@@ -135,6 +140,20 @@ def test_save_story_writes_story_json(tmp_path):
     assert path.is_file()
 
 
+def test_cast_entries_without_a_name_are_skipped():
+    reply = make_reply(
+        cast=[
+            None,
+            {"look": "没有名字"},
+            {"name": "小鸡球球", "look": "圆滚滚的黄色小鸡"},
+        ]
+    )
+
+    story = build_story(make_content(), FakeClient(reply))
+
+    assert [member.name for member in story.cast] == ["小鸡球球"]
+
+
 def test_save_story_writes_the_story_fields(tmp_path):
     story = build_story(make_content(), FakeClient(make_reply()))
 
@@ -143,6 +162,7 @@ def test_save_story_writes_the_story_fields(tmp_path):
     data = json.loads(path.read_text(encoding="utf-8"))
     assert data["id"] == "demo"
     assert data["characters"] == ["小鸡球球", "向日葵"]
+    assert data["cast"][0]["look"] == "圆滚滚的黄色小鸡"
     assert data["summary"].startswith("小鸡球球")
 
 
@@ -150,6 +170,7 @@ def test_story_dict_round_trip():
     story = Story(
         id="demo",
         characters=["小鸡球球"],
+        cast=[Cast("小鸡球球", "圆滚滚的黄色小鸡")],
         setting="春天的小山坡",
         style="手绘水彩",
         summary="种下向日葵并守护它长大。",
