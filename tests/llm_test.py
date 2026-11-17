@@ -70,3 +70,33 @@ def test_chat_without_image_sends_plain_text(monkeypatch):
 
     assert captured["messages"][-1]["content"] == "hello"
     assert captured["response_format"] == {"type": "json_object"}
+
+
+def test_chat_sends_the_reasoning_effort(monkeypatch):
+    captured = {}
+
+    def fake_post(self, payload):
+        captured.update(payload)
+        return "ok"
+
+    monkeypatch.setattr(LLMClient, "_post", fake_post)
+    client = LLMClient("http://x/v1", "k", "m", reasoning_effort="low")
+
+    client.chat("hello")
+
+    assert captured["reasoning_effort"] == "low"
+
+
+def test_chat_omits_an_unset_reasoning_effort(monkeypatch):
+    captured = {}
+
+    def fake_post(self, payload):
+        captured.update(payload)
+        return "ok"
+
+    monkeypatch.setattr(LLMClient, "_post", fake_post)
+    client = LLMClient("http://x/v1", "k", "m")
+
+    client.chat("hello")
+
+    assert "reasoning_effort" not in captured
