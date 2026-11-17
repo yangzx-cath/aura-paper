@@ -175,6 +175,35 @@ def test_book_with_no_pages():
     assert content.failed_count == 0
 
 
+def test_story_pages_skip_cover_and_end():
+    book = BookContent(
+        id="demo",
+        title="示例",
+        source="/src",
+        pages=[
+            PageContent(index=0, filename="01.jpg", role="cover"),
+            PageContent(index=1, filename="02.jpg"),
+            PageContent(index=2, filename="03.jpg", role="end"),
+        ],
+    )
+
+    assert [page.index for page in book.story_pages] == [1]
+
+
+def test_story_pages_fall_back_to_every_page():
+    book = BookContent(
+        id="demo",
+        title="示例",
+        source="/src",
+        pages=[
+            PageContent(index=0, filename="01.jpg", role="cover"),
+            PageContent(index=1, filename="02.jpg", role="end"),
+        ],
+    )
+
+    assert [page.index for page in book.story_pages] == [0, 1]
+
+
 # Make the first page the slowest, so it finishes after the pages behind it.
 class SlowFirstPageClient(FakeClient):
     def chat(
