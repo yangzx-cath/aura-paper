@@ -61,6 +61,11 @@ class LLMClient:
         values = (self.base_url, self.api_key, self.model)
         return [name for name, value in zip(names, values) if not value]
 
+    # Settings that change the reply, so callers can cache on them.
+    @property
+    def signature(self) -> tuple[str, str]:
+        return (self.model, self.reasoning_effort)
+
     def chat(
         self,
         prompt: str,

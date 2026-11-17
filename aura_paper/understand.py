@@ -156,8 +156,7 @@ def understand_page(
     key = fingerprint(
         file_fingerprint(page.path),
         prompt,
-        client.model,
-        client.reasoning_effort,
+        *client.signature,
     )
 
     entry = cache.load_json(ns, name, key)

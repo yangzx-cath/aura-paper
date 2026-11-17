@@ -106,7 +106,7 @@ def build_story(
         return _request_story(story, client, prompt)
 
     ns = f"story/{content.id}"
-    key = fingerprint(prompt, client.model, client.reasoning_effort)
+    key = fingerprint(prompt, *client.signature)
 
     entry = cache.load_json(ns, "story", key)
     if entry is not None:
