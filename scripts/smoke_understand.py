@@ -6,7 +6,7 @@ cache and skips the model calls.
 
 Usage:
     export LLM_API_KEY=sk-xxx
-    python scripts/smoke_understand.py [book_dir] [--no-cache]
+    python scripts/smoke_understand.py <book_dir> [--no-cache] [--workers N]
 """
 
 import argparse
@@ -26,7 +26,6 @@ from aura_paper.understand import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_BOOK = ROOT / "data" / "chicken_and_sunflower"
 
 
 # A landscape scan holds two book pages, so treat it as a spread.
@@ -46,7 +45,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run the understanding pipeline."
     )
-    parser.add_argument("book", nargs="?", default=str(DEFAULT_BOOK))
+    parser.add_argument("book", help="directory holding the page images")
     parser.add_argument(
         "--no-cache",
         action="store_true",
@@ -101,8 +100,9 @@ def main() -> int:
 
     path = save_book(content)
     print()
-    print(f"total   {time.perf_counter() - started:.1f}s")
+    print(f"pages   {content.page_count}")
     print(f"failed  {content.failed_count}")
+    print(f"total   {time.perf_counter() - started:.1f}s")
     print(f"stats   {cache.stats()}")
     print(f"output  {path}")
     return 0 if content.failed_count == 0 else 1
