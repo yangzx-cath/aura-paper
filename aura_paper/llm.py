@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 from .utils import data_url
+
+# The endpoint drops calls when it runs out of capacity, so repeat those.
+RETRY_STATUS = (429, 500, 502, 503, 504)
+RETRIES = 4
+RETRY_DELAY = 2.0
 
 
 class LLMError(Exception):
@@ -103,30 +109,7 @@ class LLMClient:
         return self._post(payload)
 
     def _post(self, payload: dict) -> str:
-        url = self.base_url.rstrip("/") + "/chat/completions"
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        request = urllib.request.Request(
-            url,
-            data=body,
-            method="POST",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-        )
-
-        try:
-            with urllib.request.urlopen(
-                request, timeout=self.timeout
-            ) as response:
-                raw = response.read().decode("utf-8", errors="replace")
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")[:300]
-            raise LLMError(f"HTTP {exc.code}: {detail}") from exc
-        except urllib.error.URLError as exc:
-            raise LLMError(f"cannot reach {url}: {exc.reason}") from exc
-        except TimeoutError as exc:
-            raise LLMError(f"timeout after {self.timeout}s") from exc
+        raw = self._send(payload)
 
         try:
             data = json.loads(raw)
@@ -141,3 +124,35 @@ class LLMClient:
                 if isinstance(part, dict)
             )
         return str(content)
+
+    # Send the request, waiting out the endpoint while it is at capacity.
+    def _send(self, payload: dict) -> str:
+        url = self.base_url.rstrip("/") + "/chat/completions"
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        request = urllib.request.Request(
+            url,
+            data=body,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+
+        delay = RETRY_DELAY
+        for attempt in range(1, RETRIES + 1):
+            try:
+                with urllib.request.urlopen(
+                    request, timeout=self.timeout
+                ) as response:
+                    return response.read().decode("utf-8", errors="replace")
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")[:300]
+                if exc.code not in RETRY_STATUS or attempt == RETRIES:
+                    raise LLMError(f"HTTP {exc.code}: {detail}") from exc
+                time.sleep(delay)
+                delay *= 2
+            except urllib.error.URLError as exc:
+                raise LLMError(f"cannot reach {url}: {exc.reason}") from exc
+            except TimeoutError as exc:
+                raise LLMError(f"timeout after {self.timeout}s") from exc
