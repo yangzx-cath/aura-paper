@@ -203,6 +203,34 @@ def test_story_pages_fall_back_to_every_page():
     assert [page.index for page in book.story_pages] == [0, 1]
 
 
+def test_language_follows_the_printed_text():
+    book = BookContent(
+        id="demo",
+        title="示例",
+        source="/src",
+        pages=[
+            PageContent(index=0, filename="01.jpg", page_text="小鸡在走路"),
+            PageContent(index=1, filename="02.jpg"),
+        ],
+    )
+
+    assert book.language == "中文"
+
+
+def test_an_english_book_reads_as_english():
+    book = BookContent(
+        id="demo",
+        title="示例",
+        source="/src",
+        pages=[
+            PageContent(index=0, filename="01.jpg", page_text="Kuan and I"),
+            PageContent(index=1, filename="02.jpg"),
+        ],
+    )
+
+    assert book.language == "英文"
+
+
 NS = "understand/book"
 
 

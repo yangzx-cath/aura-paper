@@ -111,12 +111,31 @@ def test_tells_the_model_how_each_character_looks():
     assert "Kuan（圆滚滚的蓝色机器人）" in client.prompts[0]
 
 
-def test_missing_lines_are_an_error():
+def test_tells_the_model_which_language_to_speak():
+    client = FakeClient(make_reply())
+
+    build_screenplay(make_content(1), make_story(), client)
+
+    assert "- 语言：中文" in client.prompts[0]
+
+
+def test_a_silent_page_is_not_an_error():
     client = FakeClient(json.dumps({"beat": "有情节"}, ensure_ascii=False))
 
     screenplay = build_screenplay(make_content(1), make_story(), client)
 
-    assert screenplay.pages[0].error == "model returned no lines"
+    assert screenplay.pages[0].error == ""
+    assert screenplay.pages[0].duration == 4
+
+
+def test_missing_beat_is_an_error():
+    reply = make_reply(beat="")
+
+    screenplay = build_screenplay(
+        make_content(1), make_story(), FakeClient(reply)
+    )
+
+    assert screenplay.pages[0].error == "model returned no beat"
 
 
 def test_a_page_that_does_not_fit_one_clip_is_an_error():
@@ -131,7 +150,7 @@ def test_a_page_that_does_not_fit_one_clip_is_an_error():
 
 def test_a_failed_scene_is_not_cached(tmp_path):
     cache = Cache(tmp_path / "cache")
-    client = FakeClient(json.dumps({"beat": "有情节"}, ensure_ascii=False))
+    client = FakeClient(make_reply(beat=""))
 
     build_screenplay(make_content(1), make_story(), client, cache=cache)
 
