@@ -243,10 +243,9 @@ def _request_scene(
         return scene
 
     _apply_scene(scene, fields)
+    # A silent page is a real choice, so only the beat is required.
     if not scene.beat:
         scene.error = "model returned no beat"
-    elif not scene.lines:
-        scene.error = "model returned no lines"
     return scene
 
 
