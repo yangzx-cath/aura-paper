@@ -202,12 +202,84 @@ class MiniMaxClient:
             task.status = "queued"
         return task
 
+    # Send one JSON POST and return the parsed body.
+    def _post(self, path: str, payload: dict) -> dict:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        if len(body) > _MAX_BODY_BYTES:
+            raise ValueError("request body exceeds 64MB")
+        return self._send(path, body, "POST")
+
+    def _send(self, path: str, body: bytes | None, method: str) -> dict:
+        if not self.api_key:
+            raise MiniMaxError("minimax endpoint is not configured")
+
+        url = self.base_url.rstrip("/") + path
+        request = urllib.request.Request(
+            url,
+            data=body,
+            method=method,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+
+        try:
+            with urllib.request.urlopen(
+                request, timeout=self.timeout
+            ) as response:
+                raw = response.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as exc:
+            raw = exc.read().decode("utf-8", errors="replace")
+            detail = self._error_message(raw) or f"HTTP {exc.code}"
+            raise MiniMaxError(detail) from exc
+        except urllib.error.URLError as exc:
+            detail = f"cannot reach {url}: {exc.reason}"
+            raise MiniMaxError(detail) from exc
+        except TimeoutError as exc:
+            raise MiniMaxError(f"timeout after {self.timeout}s") from exc
+
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise MiniMaxError("malformed reply from endpoint") from exc
+        if not isinstance(data, dict):
+            raise MiniMaxError("malformed reply from endpoint")
+        return self._check(data)
+
+    # Pull the message out of an OpenAI-style error body.
+    @staticmethod
+    def _error_message(raw: str) -> str:
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return raw[:300]
+        error = data.get("error") if isinstance(data, dict) else None
+        if isinstance(error, dict):
+            return str(error.get("message") or "")
+        return raw[:300]
+
+    @staticmethod
+    def _check(data: dict) -> dict:
+        error = data.get("error")
+        if isinstance(error, dict):
+            message = error.get("message") or "request failed"
+            raise MiniMaxError(str(message))
+        return data
+
     # GET /v2/query/video_generation/{task_id}
     def get_task(self, task_id: str) -> VideoTask:
         """Return the current snapshot of one task."""
         quoted = urllib.parse.quote(task_id, safe="")
         path = f"/v2/query/video_generation/{quoted}"
         return VideoTask.from_response(self._get(path, {}))
+
+    # Send one GET and return the parsed body.
+    def _get(self, path: str, params: dict) -> dict:
+        query = urllib.parse.urlencode(params)
+        if query:
+            path = f"{path}?{query}"
+        return self._send(path, None, "GET")
 
     def wait_task(self, task_id: str) -> VideoTask:
         """Poll a task until it finishes or max_wait elapses."""
@@ -262,74 +334,3 @@ class MiniMaxClient:
             return task
         self.download(task.video_url, path)
         return task
-
-    # Send one JSON POST and return the parsed body.
-    def _post(self, path: str, payload: dict) -> dict:
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        if len(body) > _MAX_BODY_BYTES:
-            raise ValueError("request body exceeds 64MB")
-        return self._send(path, body, "POST")
-
-    # Send one GET and return the parsed body.
-    def _get(self, path: str, params: dict) -> dict:
-        query = urllib.parse.urlencode(params)
-        if query:
-            path = f"{path}?{query}"
-        return self._send(path, None, "GET")
-
-    def _send(self, path: str, body: bytes | None, method: str) -> dict:
-        if not self.api_key:
-            raise MiniMaxError("minimax endpoint is not configured")
-
-        url = self.base_url.rstrip("/") + path
-        request = urllib.request.Request(
-            url,
-            data=body,
-            method=method,
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-        )
-
-        try:
-            with urllib.request.urlopen(
-                request, timeout=self.timeout
-            ) as response:
-                raw = response.read().decode("utf-8", errors="replace")
-        except urllib.error.HTTPError as exc:
-            raw = exc.read().decode("utf-8", errors="replace")
-            detail = _error_message(raw) or f"HTTP {exc.code}"
-            raise MiniMaxError(detail) from exc
-        except urllib.error.URLError as exc:
-            detail = f"cannot reach {url}: {exc.reason}"
-            raise MiniMaxError(detail) from exc
-        except TimeoutError as exc:
-            raise MiniMaxError(f"timeout after {self.timeout}s") from exc
-
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise MiniMaxError("malformed reply from endpoint") from exc
-        if not isinstance(data, dict):
-            raise MiniMaxError("malformed reply from endpoint")
-        return self._check(data)
-
-    def _check(self, data: dict) -> dict:
-        error = data.get("error")
-        if isinstance(error, dict):
-            message = error.get("message") or "request failed"
-            raise MiniMaxError(str(message))
-        return data
-
-
-# Pull the message out of an OpenAI-style error body.
-def _error_message(raw: str) -> str:
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        return raw[:300]
-    error = data.get("error") if isinstance(data, dict) else None
-    if isinstance(error, dict):
-        return str(error.get("message") or "")
-    return raw[:300]

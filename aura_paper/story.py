@@ -52,6 +52,13 @@ class Story:
         )
 
 
+# Turn a list from the model reply into strings, dropping empty entries.
+def _text_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if item]
+
+
 def build_story(
     content: BookContent,
     client: LLMClient,
@@ -105,13 +112,6 @@ def _apply_story(story: Story, fields: dict) -> None:
     story.setting = str(fields.get("setting") or "")
     story.style = str(fields.get("style") or "")
     story.summary = str(fields.get("summary") or "")
-
-
-# Turn a list from the model reply into strings, dropping empty entries.
-def _text_list(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [str(item) for item in value if item]
 
 
 # Keep only what the model produced, so the cache holds no book identity.

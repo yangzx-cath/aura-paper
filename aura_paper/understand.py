@@ -71,6 +71,12 @@ class PageContent:
         )
 
 
+# Keep a page role inside the supported set, defaulting to a story page.
+def _role(value: object) -> str:
+    text = str(value or "").strip().lower()
+    return text if text in PAGE_ROLES else "story"
+
+
 @dataclass
 class BookContent:
     """Structured content of a whole book."""
@@ -185,12 +191,6 @@ def _apply_fields(content: PageContent, fields: dict) -> None:
     content.description = str(fields.get("description") or "")
     content.mood = str(fields.get("mood") or "")
     content.mood_detail = str(fields.get("mood_detail") or "")
-
-
-# Keep a page role inside the supported set, defaulting to a story page.
-def _role(value: object) -> str:
-    text = str(value or "").strip().lower()
-    return text if text in PAGE_ROLES else "story"
 
 
 # Keep only what the model produced, so page identity stays current.

@@ -77,11 +77,6 @@ def _book_dir(book_id: str, root: str | Path | None) -> Path:
     return base / book_id
 
 
-# Resolve the source image of one page.
-def _page_path(content: BookContent, page: PageContent) -> Path:
-    return Path(content.source) / page.filename
-
-
 def generate_clip(
     content: BookContent,
     page: PageContent,
@@ -130,6 +125,11 @@ def generate_clip(
     clip.duration = task.duration or duration
     clip.resolution = task.resolution or resolution
     return clip
+
+
+# Resolve the source image of one page.
+def _page_path(content: BookContent, page: PageContent) -> Path:
+    return Path(content.source) / page.filename
 
 
 def build_video(
