@@ -4,9 +4,11 @@ Interpret page images into structured content.
 
 from __future__ import annotations
 
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
 from .book import Book, PageImage
 from .cache import Cache, file_fingerprint, fingerprint
@@ -185,6 +187,7 @@ def understand_book(
     *,
     cache: Cache | None = None,
     workers: int = 1,
+    on_page: Callable[[PageImage, PageContent, float], None] | None = None,
 ) -> BookContent:
     """Read every page of a book and collect the results."""
     assert workers >= 1
@@ -199,7 +202,11 @@ def understand_book(
 
     # A bad page only sets PageContent.error, so other pages keep going.
     def run(page: PageImage) -> PageContent:
-        return understand_page(page, client, cache=cache, ns=ns)
+        started = time.perf_counter()
+        result = understand_page(page, client, cache=cache, ns=ns)
+        if on_page is not None:
+            on_page(page, result, time.perf_counter() - started)
+        return result
 
     if workers == 1:
         results = [run(page) for page in book.pages]
