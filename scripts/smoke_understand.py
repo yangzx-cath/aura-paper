@@ -19,10 +19,9 @@ from aura_paper.cache import Cache
 from aura_paper.config import cache_root, load_env
 from aura_paper.llm import LLMClient
 from aura_paper.understand import (
-    BookContent,
     PageContent,
     save_book,
-    understand_page,
+    understand_book,
 )
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,10 +35,10 @@ def _mark_spreads(book: Book) -> None:
         page.kind = "spread" if wide else "single"
 
 
-# Format one progress line for a page that just finished.
-def _line(page: PageImage, result: PageContent, elapsed: float) -> str:
+# Format one result line after the page finishes.
+def _line(page: PageImage, result: PageContent) -> str:
     status = result.error or result.mood or "-"
-    return f"{page.filename}  {page.kind:<6} {elapsed:6.1f}s  {status}"
+    return f"{page.filename}  {page.kind:<6} {status}"
 
 
 def main() -> int:
@@ -51,6 +50,12 @@ def main() -> int:
         "--no-cache",
         action="store_true",
         help="ignore the cache and do not write it",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="number of pages to run in parallel (default=1)",
     )
     args = parser.parse_args()
 
@@ -72,20 +77,16 @@ def main() -> int:
         return 2
 
     cache = Cache(cache_root(), enabled=not args.no_cache)
-    print(f"book   {book.id}  pages={book.page_count}")
-    print(f"model  {client.model}")
-    print(f"cache  {cache.root}  enabled={cache.enabled}")
+    print(f"book    {book.id}  pages={book.page_count}")
+    print(f"model   {client.model}")
+    print(f"cache   {cache.root}  enabled={cache.enabled}")
+    print(f"workers {args.workers}")
     print()
 
-    content = BookContent(id=book.id, title=book.title, source=book.source)
-    ns = f"understand/{book.id}"
     started = time.perf_counter()
-
-    for page in book.pages:
-        page_started = time.perf_counter()
-        result = understand_page(page, client, cache=cache, ns=ns)
-        content.pages.append(result)
-        print(_line(page, result, time.perf_counter() - page_started))
+    content = understand_book(book, client, cache=cache, workers=args.workers)
+    for page, result in zip(book.pages, content.pages):
+        print(_line(page, result))
 
     path = save_book(content)
     print()
