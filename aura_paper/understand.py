@@ -88,6 +88,12 @@ class BookContent:
     def failed_count(self) -> int:
         return sum(1 for page in self.pages if page.error)
 
+    # Pages that carry the story, or every page when none is marked "story".
+    @property
+    def story_pages(self) -> list[PageContent]:
+        pages = [page for page in self.pages if page.role == "story"]
+        return pages or list(self.pages)
+
     def to_dict(self) -> dict:
         """Return the external JSON shape of this book."""
         return {
