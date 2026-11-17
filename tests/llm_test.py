@@ -1,3 +1,7 @@
+import io
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -100,3 +104,60 @@ def test_chat_omits_an_unset_reasoning_effort(monkeypatch):
     client.chat("hello")
 
     assert "reasoning_effort" not in captured
+
+
+class FakeResponse:
+    def __init__(self, body):
+        self.body = body.encode("utf-8")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self):
+        return self.body
+
+
+def fake_urlopen(monkeypatch, replies):
+    calls = []
+
+    def open_request(request, timeout=0):
+        calls.append(request)
+        reply = replies[min(len(calls), len(replies)) - 1]
+        if isinstance(reply, int):
+            raise urllib.error.HTTPError(
+                request.full_url,
+                reply,
+                "error",
+                {},
+                io.BytesIO(b'{"error": "failed"}'),
+            )
+        return FakeResponse(reply)
+
+    monkeypatch.setattr(urllib.request, "urlopen", open_request)
+    monkeypatch.setattr(time, "sleep", lambda seconds: None)
+    return calls
+
+
+def test_retries_while_the_endpoint_is_at_capacity(monkeypatch):
+    calls = fake_urlopen(
+        monkeypatch,
+        [503, '{"choices": [{"message": {"content": "ok"}}]}'],
+    )
+
+    client = LLMClient("http://x/v1", "k", "m")
+
+    assert client.chat("hello") == "ok"
+    assert len(calls) == 2
+
+
+def test_a_bad_request_is_not_retried(monkeypatch):
+    calls = fake_urlopen(monkeypatch, [400])
+
+    client = LLMClient("http://x/v1", "k", "m")
+
+    with pytest.raises(LLMError, match="HTTP 400"):
+        client.chat("hello")
+    assert len(calls) == 1
