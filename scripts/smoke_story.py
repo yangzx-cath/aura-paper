@@ -83,10 +83,6 @@ def main() -> int:
     print("summary")
     print(story.summary)
     print()
-    print("beats")
-    for index, beat in enumerate(story.beats, start=1):
-        print(f"  {index:02d}  {beat}")
-    print()
     print(f"output  {path}")
     return 0
 

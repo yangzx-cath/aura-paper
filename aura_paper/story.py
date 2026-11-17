@@ -21,7 +21,6 @@ class Story:
     setting: str = ""
     style: str = ""
     summary: str = ""
-    beats: list[str] = field(default_factory=list)
     model: str = ""
     error: str = ""
 
@@ -34,7 +33,6 @@ class Story:
             "setting": self.setting,
             "style": self.style,
             "summary": self.summary,
-            "beats": self.beats,
             "error": self.error,
         }
 
@@ -46,7 +44,6 @@ class Story:
             setting=str(data.get("setting") or ""),
             style=str(data.get("style") or ""),
             summary=str(data.get("summary") or ""),
-            beats=_text_list(data.get("beats")),
             model=str(data.get("model") or ""),
             error=str(data.get("error") or ""),
         )
@@ -63,7 +60,7 @@ def build_story(
     story = Story(model=client.model)
 
     if cache is None:
-        return _request_story(story, client, prompt, content)
+        return _request_story(story, client, prompt)
 
     ns = f"story/{content.id}"
     key = fingerprint(prompt, client.model)
@@ -73,7 +70,7 @@ def build_story(
         _apply_story(story, entry)
         return story
 
-    story = _request_story(story, client, prompt, content)
+    story = _request_story(story, client, prompt)
     # Errors are never cached, so a malformed story is retried next run.
     if not story.error:
         cache.save_json(ns, "book", key, _story_fields(story))
@@ -85,7 +82,6 @@ def _request_story(
     story: Story,
     client: LLMClient,
     prompt: str,
-    content: BookContent,
 ) -> Story:
     try:
         reply = client.chat(prompt)
@@ -95,10 +91,7 @@ def _request_story(
         return story
 
     _apply_story(story, fields)
-    if len(story.beats) != content.page_count:
-        expected = content.page_count
-        story.error = f"expected {expected} beats, got {len(story.beats)}"
-    elif not story.summary:
+    if not story.summary:
         story.error = "model returned no summary"
     return story
 
@@ -109,7 +102,6 @@ def _apply_story(story: Story, fields: dict) -> None:
     story.setting = str(fields.get("setting") or "")
     story.style = str(fields.get("style") or "")
     story.summary = str(fields.get("summary") or "")
-    story.beats = _text_list(fields.get("beats"))
 
 
 # Turn a list from the model reply into strings, dropping empty entries.
@@ -126,7 +118,6 @@ def _story_fields(story: Story) -> dict:
         "setting": story.setting,
         "style": story.style,
         "summary": story.summary,
-        "beats": story.beats,
     }
 
 

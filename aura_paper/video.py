@@ -93,10 +93,7 @@ def generate_clip(
     resolution: str = "768P",
 ) -> VideoClip:
     """Generate one page clip and return its metadata."""
-    previous = ""
-    if page.index > 0 and page.index - 1 < len(story.beats):
-        previous = story.beats[page.index - 1]
-    prompt = shot_prompt(page, story, previous=previous)
+    prompt = shot_prompt(page, story)
 
     target = clip_path(content.id, page.index, root)
     request = VideoRequest(

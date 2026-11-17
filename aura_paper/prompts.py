@@ -61,17 +61,15 @@ __PAGES__
   "characters": ["主要角色，用书中出现的称呼"],
   "setting": "故事发生的地点与环境，不超过 20 字",
   "style": "画面风格关键词，不超过 20 字",
-  "summary": "全书主线，100-200 字",
-  "beats": ["第 1 页的情节推进", "第 2 页的情节推进"]
+  "summary": "全书主线，100-200 字"
 }
 
 要求：
-1. 只输出 JSON，不要解释文字，不要使用代码块，五个字段都要出现。
+1. 只输出 JSON，不要解释文字，不要使用代码块，四个字段都要出现。
 2. 所有内容使用中文，角色名除外。
-3. characters 用书中最正式的称呼，例如"小鸡球球"而不是"小鸡"或"球球"。后续每页提到同一角色都用这个名字。
-4. beats 的长度必须恰好等于 __COUNT__，按页序排列，每页一句话，20-30 字，只写这一页推进了什么，不要描述画面细节。
-5. summary 概括全书主线，不添加原文没有的情节。
-6. setting 和 style 要能代表全书，用于统一后续的画面生成。
+3. characters 用书中最正式的称呼，例如"小鸡球球"而不是"小鸡"或"球球"。
+4. summary 概括全书主线，不添加原文没有的情节。
+5. setting 和 style 要能代表全书，用于统一后续的画面生成。
 """
 
 
@@ -90,6 +88,37 @@ def story_prompt(content: BookContent) -> str:
     return prompt.replace("__COUNT__", str(content.page_count))
 
 
+# Reserved for the future per-page beat / narration stage.
+_BEAT_TEMPLATE = """你是一名儿童绘本的编剧助手。
+
+全书设定：
+- 角色：__CHARACTERS__
+- 地点：__SETTING__
+- 画风：__STYLE__
+- 全书主线：__SUMMARY__
+
+上一页内容：
+__PREVIOUS__
+
+本页内容：
+- 页码：第 __INDEX__ 页
+- 文字：__PAGE_TEXT__
+- 画面：__DESCRIPTION__
+- 情绪：__MOOD__
+
+请严格按下面的 JSON 结构输出：
+
+{
+  "beat": "本页推进了什么，20-30 字，不描述画面细节"
+}
+
+要求：
+1. 只输出 JSON，不要解释文字，不要使用代码块。
+2. 只写本页推进了什么，不添加原文没有的情节。
+3. 使用全书统一的角色称呼。
+"""
+
+
 _SHOT_TEMPLATE = """你是一名儿童绘本动画分镜师。
 
 请把这一页绘本画面制作成一段连贯的动画。原图会作为视频首帧，
@@ -103,13 +132,11 @@ _SHOT_TEMPLATE = """你是一名儿童绘本动画分镜师。
 
 本页分镜：
 - 页码：第 __INDEX__ 页
-- 情节：__BEAT__
 - 画面：__DESCRIPTION__
 - 情绪：__MOOD__
-- 上一页情节：__PREVIOUS__
 
 要求：
-1. 只表现本页情节，不新增角色，不改变角色外观和服装。
+1. 只表现本页画面内容，不新增角色，不改变角色外观和服装。
 2. 保持原图画风、配色和构图，画面中不要出现文字、字幕、水印或边框。
 3. 动作自然、幅度适中，适合儿童观看，避免剧烈晃动、快速变焦和恐怖画面。
 4. 镜头缓慢推进，使用 [Push in]，不要切换到其他场景。
@@ -126,14 +153,8 @@ _SHOT_LAYOUT_NOTES = {
 def shot_prompt(
     page: PageContent,
     story: Story,
-    *,
-    previous: str = "",
 ) -> str:
     """Build the video prompt for one page."""
-    beat = ""
-    if 0 <= page.index < len(story.beats):
-        beat = story.beats[page.index]
-
     characters = "、".join(story.characters) or "（未提供）"
     layout = _SHOT_LAYOUT_NOTES.get(page.kind, _SHOT_LAYOUT_NOTES["single"])
 
@@ -142,10 +163,8 @@ def shot_prompt(
     prompt = prompt.replace("__STYLE__", story.style or "（未提供）")
     prompt = prompt.replace("__SUMMARY__", story.summary or "（未提供）")
     prompt = prompt.replace("__INDEX__", str(page.index + 1))
-    prompt = prompt.replace("__BEAT__", beat or "（未提供）")
     prompt = prompt.replace(
         "__DESCRIPTION__", page.description or "（未提供）"
     )
     prompt = prompt.replace("__MOOD__", page.mood or "（未提供）")
-    prompt = prompt.replace("__PREVIOUS__", previous or "（无）")
     return prompt.replace("__LAYOUT__", layout)

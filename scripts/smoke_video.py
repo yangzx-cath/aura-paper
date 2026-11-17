@@ -72,14 +72,8 @@ def main() -> int:
     if story.error:
         print(f"story error: {story.error}", file=sys.stderr)
         return 2
-    if len(story.beats) != content.page_count:
-        print("story beats do not match page count", file=sys.stderr)
-        return 2
 
-    previous = ""
-    if page.index > 0:
-        previous = story.beats[page.index - 1]
-    prompt = shot_prompt(page, story, previous=previous)
+    prompt = shot_prompt(page, story)
 
     if args.dry_run:
         print(f"prompt length: {len(prompt)}", file=sys.stderr)
