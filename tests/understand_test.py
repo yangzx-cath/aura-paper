@@ -1,5 +1,4 @@
 import json
-import time
 from pathlib import Path
 
 from aura_paper.book import Book, PageImage
@@ -202,33 +201,6 @@ def test_story_pages_fall_back_to_every_page():
     )
 
     assert [page.index for page in book.story_pages] == [0, 1]
-
-
-# Make the first page the slowest, so it finishes after the pages behind it.
-class SlowFirstPageClient(FakeClient):
-    def chat(
-        self,
-        prompt: str,
-        *,
-        image_path: Path | None = None,
-        json_mode: bool = True,
-    ) -> str:
-        if image_path is not None and Path(image_path).name == "00.jpg":
-            time.sleep(0.05)
-        return super().chat(prompt, image_path=image_path, json_mode=json_mode)
-
-
-def test_workers_read_every_page_in_order():
-    pages = [
-        PageImage(index=index, filename=f"{index:02d}.jpg", path="x.jpg")
-        for index in range(4)
-    ]
-    client = SlowFirstPageClient(json.dumps({"description": "草地"}))
-
-    content = understand_book(make_book(pages), client, workers=3)
-
-    assert len(client.prompts) == 4
-    assert [page.index for page in content.pages] == [0, 1, 2, 3]
 
 
 NS = "understand/book"

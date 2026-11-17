@@ -175,6 +175,7 @@ def build_screenplay(
     if workers == 1:
         scenes = [run(task) for task in tasks]
     else:
+        # pool.map() keeps the input order, so scenes line up with the pages.
         with ThreadPoolExecutor(max_workers=workers) as pool:
             scenes = list(pool.map(run, tasks))
 

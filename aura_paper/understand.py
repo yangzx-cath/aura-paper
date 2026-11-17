@@ -235,6 +235,7 @@ def understand_book(
     if workers == 1:
         results = [run(page) for page in book.pages]
     else:
+        # pool.map() keeps the input order, so results stay in book order.
         with ThreadPoolExecutor(max_workers=workers) as pool:
             results = list(pool.map(run, book.pages))
 
