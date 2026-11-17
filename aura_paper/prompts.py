@@ -87,8 +87,9 @@ __PAGES__
 
 def story_prompt(content: BookContent) -> str:
     """Build the prompt that turns page contents into a story outline."""
+    pages = _story_pages(content)
     blocks = []
-    for page in content.pages:
+    for page in pages:
         blocks.append(
             f"第 {page.index + 1} 页\n"
             f"文字：{page.page_text or '（无字）'}\n"
@@ -97,7 +98,13 @@ def story_prompt(content: BookContent) -> str:
         )
 
     prompt = _STORY_TEMPLATE.replace("__PAGES__", "\n\n".join(blocks))
-    return prompt.replace("__COUNT__", str(content.page_count))
+    return prompt.replace("__COUNT__", str(len(pages)))
+
+
+# Return the story pages, or every page when none is marked "story".
+def _story_pages(content: BookContent) -> list[PageContent]:
+    pages = [page for page in content.pages if page.role == "story"]
+    return pages or list(content.pages)
 
 
 # Reserved for the future per-page beat / narration stage.
