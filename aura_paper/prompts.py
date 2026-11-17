@@ -87,7 +87,7 @@ __PAGES__
 
 def story_prompt(content: BookContent) -> str:
     """Build the prompt that turns page contents into a story outline."""
-    pages = _story_pages(content)
+    pages = content.story_pages
     blocks = []
     for page in pages:
         blocks.append(
@@ -101,12 +101,6 @@ def story_prompt(content: BookContent) -> str:
     return prompt.replace("__COUNT__", str(len(pages)))
 
 
-# Return the story pages, or every page when none is marked "story".
-def _story_pages(content: BookContent) -> list[PageContent]:
-    pages = [page for page in content.pages if page.role == "story"]
-    return pages or list(content.pages)
-
-
 _SCREENPLAY_TEMPLATE = """你是一名儿童绘本的编剧助手。
 
 全书设定：
@@ -115,7 +109,7 @@ _SCREENPLAY_TEMPLATE = """你是一名儿童绘本的编剧助手。
 - 画风：__STYLE__
 - 全书主线：__SUMMARY__
 
-上一页已经念过：
+上一页的内容（不要重复）：
 __PREVIOUS__
 
 本页内容：
