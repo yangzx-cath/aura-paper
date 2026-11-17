@@ -4,6 +4,7 @@ Interpret page images into structured content.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -183,8 +184,11 @@ def understand_book(
     client: LLMClient,
     *,
     cache: Cache | None = None,
+    workers: int = 1,
 ) -> BookContent:
     """Read every page of a book and collect the results."""
+    assert workers >= 1
+
     content = BookContent(
         id=book.id,
         title=book.title,
@@ -192,11 +196,18 @@ def understand_book(
     )
 
     ns = f"understand/{book.id}"
-    # A bad page only sets PageContent.error, so the loop keeps going.
-    for page in book.pages:
-        result = understand_page(page, client, cache=cache, ns=ns)
-        content.pages.append(result)
 
+    # A bad page only sets PageContent.error, so other pages keep going.
+    def run(page: PageImage) -> PageContent:
+        return understand_page(page, client, cache=cache, ns=ns)
+
+    if workers == 1:
+        results = [run(page) for page in book.pages]
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            results = list(pool.map(run, book.pages))
+
+    content.pages = results
     return content
 
 
