@@ -4,16 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+from .cache import Cache
 from .config import out_root
 from .minimax import MiniMaxClient, MiniMaxError, VideoRequest
 from .prompts import shot_prompt
-
-if TYPE_CHECKING:
-    from .cache import Cache
-    from .story import Story
-    from .understand import BookContent, PageContent
+from .story import Story
+from .understand import BookContent, PageContent
 
 
 @dataclass

@@ -6,19 +6,14 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from math import ceil
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from .cache import fingerprint
-from .llm import LLMError
+from .cache import Cache, fingerprint
+from .llm import LLMClient, LLMError
 from .output import write_json
 from .prompts import screenplay_prompt
+from .story import Story
+from .understand import BookContent, PageContent
 from .utils import extract_json, now_iso
-
-if TYPE_CHECKING:
-    from .cache import Cache
-    from .llm import LLMClient
-    from .story import Story
-    from .understand import BookContent, PageContent
 
 LINE_KINDS = ("narration", "dialogue")
 
