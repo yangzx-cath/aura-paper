@@ -215,7 +215,7 @@ def _build_scene(
 
     ns = f"screenplay/{content.id}"
     name = f"page_{page.index:02d}"
-    key = fingerprint(prompt, client.model)
+    key = fingerprint(prompt, client.model, client.reasoning_effort)
 
     entry = cache.load_json(ns, name, key)
     if entry is not None:
