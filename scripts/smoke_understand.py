@@ -13,6 +13,7 @@ import argparse
 import sys
 import time
 from pathlib import Path
+from threading import Lock
 
 from aura_paper.book import Book, PageImage
 from aura_paper.cache import Cache
@@ -36,9 +37,9 @@ def _mark_spreads(book: Book) -> None:
 
 
 # Format one result line after the page finishes.
-def _line(page: PageImage, result: PageContent) -> str:
+def _line(page: PageImage, result: PageContent, elapsed: float) -> str:
     status = result.error or result.mood or "-"
-    return f"{page.filename}  {page.kind:<6} {status}"
+    return f"{page.filename}  {page.kind:<6} {elapsed:6.1f}s  {status}"
 
 
 def main() -> int:
@@ -84,9 +85,19 @@ def main() -> int:
     print()
 
     started = time.perf_counter()
-    content = understand_book(book, client, cache=cache, workers=args.workers)
-    for page, result in zip(book.pages, content.pages):
-        print(_line(page, result))
+    lock = Lock()
+
+    def show(page: PageImage, result: PageContent, elapsed: float) -> None:
+        with lock:
+            print(_line(page, result, elapsed), flush=True)
+
+    content = understand_book(
+        book,
+        client,
+        cache=cache,
+        workers=args.workers,
+        on_page=show,
+    )
 
     path = save_book(content)
     print()
