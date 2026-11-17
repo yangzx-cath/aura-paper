@@ -29,6 +29,7 @@ class PageContent:
     kind: str = "single"
     role: str = "story"
     page_text: str = ""
+    footer: str = ""
     description: str = ""
     mood: str = ""
     mood_detail: str = ""
@@ -45,6 +46,7 @@ class PageContent:
             "model": self.model,
             "generated_at": now_iso(),
             "page_text": self.page_text,
+            "footer": self.footer,
             "description": self.description,
             "mood": self.mood,
             "mood_detail": self.mood_detail,
@@ -60,6 +62,7 @@ class PageContent:
             kind=str(data.get("kind") or "single"),
             role=_role(data.get("role")),
             page_text=str(data.get("page_text") or ""),
+            footer=str(data.get("footer") or ""),
             description=str(data.get("description") or ""),
             mood=str(data.get("mood") or ""),
             mood_detail=str(data.get("mood_detail") or ""),
@@ -172,6 +175,7 @@ def _analyze_page(
 def _apply_fields(content: PageContent, fields: dict) -> None:
     content.role = _role(fields.get("role"))
     content.page_text = str(fields.get("page_text") or "")
+    content.footer = str(fields.get("footer") or "")
     content.description = str(fields.get("description") or "")
     content.mood = str(fields.get("mood") or "")
     content.mood_detail = str(fields.get("mood_detail") or "")
@@ -188,6 +192,7 @@ def _page_fields(content: PageContent) -> dict:
     return {
         "role": content.role,
         "page_text": content.page_text,
+        "footer": content.footer,
         "description": content.description,
         "mood": content.mood,
         "mood_detail": content.mood_detail,
