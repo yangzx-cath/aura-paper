@@ -99,6 +99,7 @@ def test_gives_each_page_the_text_of_the_one_before():
     build_screenplay(make_content(), make_story(), client)
 
     assert "第 1 页原文" in client.prompts[1]
+    assert "第 1 页画面" in client.prompts[1]
     assert "第 3 页原文" not in client.prompts[1]
     assert "（这是第一页）" in client.prompts[0]
 

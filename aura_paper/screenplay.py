@@ -165,10 +165,10 @@ def build_screenplay(
 
     screenplay = Screenplay(id=content.id, model=client.model)
     pages = content.story_pages
-    # Each page takes the previous page's original text as its context.
-    # That text is already in book.json, so no page depends on another one.
+    # Each page takes the previous page's text and description as context.
+    # Both are already in book.json, so no page depends on another one.
     # They can run in parallel and cache on their own.
-    before = [""] + [_source_text(page) for page in pages[:-1]]
+    before = [""] + [_previous_context(page) for page in pages[:-1]]
     tasks = list(zip(pages, before))
 
     def run(task: tuple[PageContent, str]) -> PageScene:
@@ -190,9 +190,11 @@ def build_screenplay(
     return screenplay
 
 
-# Text of one page that the next page reads as context.
-def _source_text(page: PageContent) -> str:
-    return page.page_text or page.description
+# Text and picture of one page that the next page reads as context.
+def _previous_context(page: PageContent) -> str:
+    text = page.page_text or "（无字）"
+    description = page.description or "（未提供）"
+    return f"文字：{text}\n画面：{description}"
 
 
 # Ask the model for one page, reusing the cache when its prompt is unchanged.
