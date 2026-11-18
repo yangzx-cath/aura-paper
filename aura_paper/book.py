@@ -94,8 +94,7 @@ class Book:
 
         pages: list[PageImage] = []
         for index, image in enumerate(images):
-            size = _image_size(image)
-            width, height = size if size else (None, None)
+            width, height = _image_size(image)
             pages.append(
                 PageImage(
                     index=index,
@@ -138,11 +137,7 @@ def _validate_kinds(
     return overrides
 
 
-# Read an image header and return its (width, height), or None on failure.
-def _image_size(path: Path) -> tuple[int, int] | None:
-    try:
-        with Image.open(path) as image:
-            return image.size
-    except Exception:
-        # A broken file must not break loading the whole book.
-        return None
+# Read an image header and return its (width, height).
+def _image_size(path: Path) -> tuple[int, int]:
+    with Image.open(path) as image:
+        return image.size

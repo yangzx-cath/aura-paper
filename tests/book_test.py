@@ -80,12 +80,9 @@ def test_pages_have_size():
     assert (book.pages[1].width, book.pages[1].height) == (1360, 800)
 
 
-def test_broken_image_has_no_size(tmp_path):
+def test_broken_image_stops_the_load(tmp_path):
     (tmp_path / "bad.jpg").write_bytes(b"not an image")
 
     book = Book("test")
-    book.load(tmp_path)
-
-    assert book.page_count == 1
-    assert book.pages[0].width is None
-    assert book.pages[0].height is None
+    with pytest.raises(OSError):
+        book.load(tmp_path)
