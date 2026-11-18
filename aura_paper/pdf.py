@@ -137,10 +137,6 @@ def render_pdf(
     except pdfium.PdfiumError as exc:
         raise PdfError(f"{source.name}: {exc}") from exc
 
-    if len(doc) == 0:
-        doc.close()
-        raise PdfError(f"no pages in {source.name}")
-
     for index in range(len(doc)):
         started = time.perf_counter()
         page = _render_page(doc, index, target, content.dpi, quality)
@@ -189,7 +185,10 @@ def _page_text(page: pdfium.PdfPage) -> str:
         text = textpage.get_text_bounded()
     finally:
         textpage.close()
+    return _clean_text(text)
 
+
+def _clean_text(text: str) -> str:
     text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
     # A wrong encoding decodes into replacement characters.
     if text.count("\ufffd") * 3 > len(text):
