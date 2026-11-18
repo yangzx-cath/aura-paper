@@ -1,12 +1,13 @@
 """Manual smoke test for one page video.
 
-Reads out/<book>/book.json and story.json, generates one page clip and
-writes it to out/<book>/clips/page_01.mp4.
+Reads out/<book>/book.json, story.json and screenplay.json, generates one
+page clip and writes it to out/<book>/clips/page_01.mp4.
 
 Usage:
     export MINIMAX_API_KEY=sk-xxx
     python scripts/smoke_video.py [book_id]
     python scripts/smoke_video.py [book_id] --page 2
+    python scripts/smoke_video.py [book_id] --duration 8
     python scripts/smoke_video.py --dry-run
 """
 
@@ -19,6 +20,7 @@ from pathlib import Path
 from aura_paper.config import load_env, out_root
 from aura_paper.minimax import MiniMaxClient
 from aura_paper.prompts import shot_prompt
+from aura_paper.screenplay import Screenplay
 from aura_paper.story import Story
 from aura_paper.understand import BookContent
 from aura_paper.video import clip_path, generate_clip
@@ -36,7 +38,12 @@ def main() -> int:
         default=2,
         help="1-based page; default 2 skips the cover",
     )
-    parser.add_argument("--duration", type=int, default=6)
+    parser.add_argument(
+        "--duration",
+        type=int,
+        default=None,
+        help="override the screenplay scene duration",
+    )
     parser.add_argument("--resolution", default="768P")
     parser.add_argument(
         "--dry-run",
@@ -50,11 +57,13 @@ def main() -> int:
     book_dir = out_root() / args.book
     book_path = book_dir / "book.json"
     story_path = book_dir / "story.json"
-    for path in (book_path, story_path):
+    screenplay_path = book_dir / "screenplay.json"
+    for path in (book_path, story_path, screenplay_path):
         if not path.is_file():
             print(f"missing {path}", file=sys.stderr)
             print(
-                "run smoke_understand.py and smoke_story.py first",
+                "run smoke_understand.py, smoke_story.py and "
+                "smoke_screenplay.py first",
                 file=sys.stderr,
             )
             return 2
@@ -63,6 +72,9 @@ def main() -> int:
         json.loads(book_path.read_text(encoding="utf-8"))
     )
     story = Story.from_dict(json.loads(story_path.read_text(encoding="utf-8")))
+    screenplay = Screenplay.from_dict(
+        json.loads(screenplay_path.read_text(encoding="utf-8"))
+    )
 
     if not 1 <= args.page <= content.page_count:
         print(f"page out of range: {args.page}", file=sys.stderr)
@@ -72,10 +84,32 @@ def main() -> int:
     if story.error:
         print(f"story error: {story.error}", file=sys.stderr)
         return 2
+    if screenplay.error:
+        print(f"screenplay error: {screenplay.error}", file=sys.stderr)
+        return 2
 
-    prompt = shot_prompt(page, story)
+    scenes = {scene.index: scene for scene in screenplay.pages}
+    scene = scenes.get(page.index)
+    if scene is None:
+        print(
+            f"page {args.page} has no screenplay scene; "
+            "cover and back pages cannot be generated",
+            file=sys.stderr,
+        )
+        return 2
+    if scene.error:
+        print(f"screenplay error: {scene.error}", file=sys.stderr)
+        return 2
+
+    seconds = args.duration
+    if seconds is None:
+        seconds = scene.duration
+
+    prompt = shot_prompt(page, story, beat=scene.beat)
 
     if args.dry_run:
+        print(f"scene   {seconds}s  {len(scene.lines)} lines", file=sys.stderr)
+        print(f"beat    {scene.beat}", file=sys.stderr)
         print(f"prompt length: {len(prompt)}", file=sys.stderr)
         print(prompt)
         return 0
@@ -88,8 +122,9 @@ def main() -> int:
 
     print(f"book    {content.id}  pages={content.page_count}")
     print(f"page    {args.page}  {page.filename}")
+    print(f"scene   {seconds}s  {len(scene.lines)} lines  {scene.beat}")
     print(f"model   {client.model}  timeout={client.timeout:.0f}s")
-    print(f"video   {args.duration}s  {args.resolution}")
+    print(f"video   {seconds}s  {args.resolution}")
     print(
         f"wait    poll={client.poll_interval:.0f}s  "
         f"max={client.max_wait:.0f}s"
@@ -102,6 +137,7 @@ def main() -> int:
         page,
         story,
         client,
+        scene=scene,
         duration=args.duration,
         resolution=args.resolution,
     )
