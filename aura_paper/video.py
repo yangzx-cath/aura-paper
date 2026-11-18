@@ -88,6 +88,7 @@ def generate_clip(
 ) -> VideoClip:
     """Generate one page clip and return its metadata.
 
+    The page image is sent as a reference image, not as the first frame.
     When a screenplay scene is given, its beat drives the shot prompt and
     its duration is used unless duration is explicitly overridden.
     """
@@ -119,7 +120,7 @@ def generate_clip(
 
     request = VideoRequest(
         prompt=prompt,
-        first_frame=_page_path(content, page),
+        reference_images=[_page_path(content, page)],
         duration=seconds,
         resolution=resolution,
     )

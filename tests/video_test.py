@@ -86,6 +86,8 @@ def test_generate_clip_uses_scene_duration_and_beat(tmp_path):
     assert clip.duration == 9
     assert clip.task_id == "task-1"
     assert client.request.duration == 9
+    assert client.request.first_frame is None
+    assert client.request.reference_images == [tmp_path / "page_2.png"]
     assert scene.beat in client.request.prompt
     assert clip_path("demo", 1, tmp_path).read_bytes() == b"video"
 
