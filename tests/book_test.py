@@ -2,50 +2,25 @@ from pathlib import Path
 
 import pytest
 
-from aura_paper.book import Book, load_book
-
-SAMPLE_DIR = (
-    Path(__file__).resolve().parent.parent / "data" / "chicken_and_sunflower"
-)
+from aura_paper.book import load_book
 
 
-def load(**kwargs) -> Book:
-    return load_book(SAMPLE_DIR, book_id="test", **kwargs)
-
-
-def test_load_sample_dir():
-    book = load()
+def test_load_sample_dir(sample_book):
+    book = load_book(sample_book, book_id="test")
 
     assert book.page_count == 19
     assert [p.index for p in book.pages] == list(range(19))
     assert book.pages[0].filename == "01.jpg"
     assert book.pages[-1].filename == "19.jpg"
-    assert book.source == str(SAMPLE_DIR.resolve())
+    assert book.source == str(sample_book.resolve())
     assert all(Path(p.path).is_absolute() for p in book.pages)
-    assert all(p.kind == "single" for p in book.pages)
 
 
-def test_kinds_override():
-    book = load(default_kind="spread", kinds={"02.jpg": "single"})
-    kinds = {p.filename: p.kind for p in book.pages}
+def test_a_wide_scan_is_a_spread(sample_book):
+    book = load_book(sample_book, book_id="test")
+    kinds = [(p.width, p.height, p.kind) for p in book.pages[:2]]
 
-    assert kinds["02.jpg"] == "single"
-    assert kinds["01.jpg"] == "spread"
-
-
-def test_unknown_filename_raises():
-    with pytest.raises(ValueError, match="unknown page filenames"):
-        load(kinds={"nope.jpg": "spread"})
-
-
-def test_invalid_kind_raises():
-    with pytest.raises(ValueError, match="invalid kind"):
-        load(kinds={"01.jpg": "wide"})
-
-
-def test_non_filename_key_raises():
-    with pytest.raises(ValueError, match="must be a filename"):
-        load(kinds={1: "spread"})
+    assert kinds == [(680, 800, "single"), (1360, 800, "spread")]
 
 
 def test_missing_source_raises(tmp_path):
@@ -58,21 +33,21 @@ def test_empty_dir_raises(tmp_path):
         load_book(tmp_path, book_id="test")
 
 
-def test_load_book_uses_the_given_id():
-    book = load_book(SAMPLE_DIR, book_id="C01")
+def test_load_book_uses_the_given_id(sample_book):
+    book = load_book(sample_book, book_id="C01")
 
     assert book.id == "C01"
-    assert book.source == str(SAMPLE_DIR.resolve())
+    assert book.source == str(sample_book.resolve())
 
 
-def test_load_book_defaults_to_the_directory_name():
-    book = load_book(SAMPLE_DIR)
+def test_load_book_defaults_to_the_directory_name(sample_book):
+    book = load_book(sample_book)
 
-    assert book.id == SAMPLE_DIR.name
+    assert book.id == sample_book.name
 
 
-def test_pages_have_size():
-    book = load()
+def test_pages_have_size(sample_book):
+    book = load_book(sample_book, book_id="test")
 
     assert all(p.width and p.height for p in book.pages)
     # Check the exact values to catch swapped or misread dimensions.
