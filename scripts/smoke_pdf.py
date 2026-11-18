@@ -82,7 +82,7 @@ def main() -> int:
 # One line per page, so a long run still reads as a progress log.
 def show(page: PdfPage, elapsed: float) -> None:
     size = f"{page.width}x{page.height}"
-    head = f"{page.index + 1:02d}  {elapsed:5.1f}s  {size:<12}"
+    head = f"{page.index:02d}  {elapsed:5.1f}s  {size:<12}"
     print(f"{head} text={len(page.text)}", flush=True)
 
 

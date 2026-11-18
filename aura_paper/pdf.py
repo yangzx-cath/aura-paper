@@ -23,6 +23,7 @@ MAX_DPI = 600
 
 IMAGE_QUALITY = 92
 
+# Numbered from zero: the first page of a picture book is its cover.
 PAGE_TEMPLATE = "page_{number:03d}.jpg"
 
 
@@ -156,10 +157,11 @@ def _render_page(
     dpi: int,
     quality: int,
 ) -> PdfPage:
-    name = PAGE_TEMPLATE.format(number=index + 1)
+    name = PAGE_TEMPLATE.format(number=index)
     page = doc[index]
     try:
-        # copy() detaches the pixels from the pdfium bitmap.
+        # PDF user units are points, 72 to an inch, so the scale turns dpi
+        # into that unit.
         image = page.render(scale=dpi / 72).to_pil().copy()
         text = _page_text(page)
     finally:
