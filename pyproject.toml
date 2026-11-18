@@ -7,7 +7,7 @@ name = "aura-paper"
 description = "An interactive video adaptation of a paper picture book"
 requires-python = ">=3.11"
 dynamic = ["version"]
-dependencies = ["pillow>=11.0"]
+dependencies = ["pillow>=11.0", "pypdfium2>=5.15"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.4"]
