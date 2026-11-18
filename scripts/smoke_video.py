@@ -1,14 +1,14 @@
 """Manual smoke test for one page video.
 
 Reads out/<book>/book.json, story.json and screenplay.json, generates one
-page clip and writes it to out/<book>/clips/page_01.mp4.
+page clip and writes it to out/<book>/clips/page_XX.mp4.
 
 Usage:
     export MINIMAX_API_KEY=sk-xxx
-    python scripts/smoke_video.py [book_id]
-    python scripts/smoke_video.py [book_id] --page 2
-    python scripts/smoke_video.py [book_id] --duration 8
-    python scripts/smoke_video.py --dry-run
+    python scripts/smoke_video.py <book_id>
+    python scripts/smoke_video.py <book_id> --page 2
+    python scripts/smoke_video.py <book_id> --duration 8
+    python scripts/smoke_video.py <book_id> --dump-prompt
 """
 
 import argparse
@@ -26,12 +26,11 @@ from aura_paper.understand import BookContent
 from aura_paper.video import clip_path, generate_clip
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_BOOK = "chicken_and_sunflower"
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run one page video.")
-    parser.add_argument("book", nargs="?", default=DEFAULT_BOOK)
+    parser.add_argument("book", help="book id under the output directory")
     parser.add_argument(
         "--page",
         type=int,
@@ -46,7 +45,7 @@ def main() -> int:
     )
     parser.add_argument("--resolution", default="768P")
     parser.add_argument(
-        "--dry-run",
+        "--dump-prompt",
         action="store_true",
         help="print the prompt and exit without calling the model",
     )
@@ -107,7 +106,7 @@ def main() -> int:
 
     prompt = shot_prompt(page, story, beat=scene.beat)
 
-    if args.dry_run:
+    if args.dump_prompt:
         print(f"scene   {seconds}s  {len(scene.lines)} lines", file=sys.stderr)
         print(f"beat    {scene.beat}", file=sys.stderr)
         print(f"prompt length: {len(prompt)}", file=sys.stderr)
