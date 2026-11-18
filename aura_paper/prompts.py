@@ -222,6 +222,7 @@ _SHOT_TEMPLATE = """你是一名儿童绘本动画分镜师。
 
 本页分镜：
 - 页码：第 __INDEX__ 页
+- 剧情：__BEAT__
 - 画面：__DESCRIPTION__
 - 情绪：__MOOD__
 
@@ -230,7 +231,7 @@ _SHOT_TEMPLATE = """你是一名儿童绘本动画分镜师。
 2. 画面中不要出现文字、字幕、水印或边框。
 3. 动作自然、幅度适中，适合儿童观看，避免剧烈晃动、快速变焦和恐怖画面。
 4. 镜头运动克制，不切换场景；单页使用 [Push in] 缓慢推进，跨页从左到右缓慢平移。
-5. 不添加原文没有的情节，不描述画面外的内容。
+5. 剧情提示只表现本页画面里的动作；不添加原文没有的情节，不描述画面外的内容。
 6. __LAYOUT__
 """
 
@@ -243,6 +244,8 @@ _SHOT_LAYOUT_NOTES = {
 def shot_prompt(
     page: PageContent,
     story: Story,
+    *,
+    beat: str = "",
 ) -> str:
     """Build the video prompt for one page."""
     characters = "、".join(story.characters) or "（未提供）"
@@ -253,6 +256,7 @@ def shot_prompt(
     prompt = prompt.replace("__STYLE__", story.style or "（未提供）")
     prompt = prompt.replace("__SUMMARY__", story.summary or "（未提供）")
     prompt = prompt.replace("__INDEX__", str(page.index + 1))
+    prompt = prompt.replace("__BEAT__", beat.strip() or "（按画面自然动作）")
     prompt = prompt.replace(
         "__DESCRIPTION__", page.description or "（未提供）"
     )
