@@ -6,7 +6,8 @@ cache and skips the model calls.
 
 Usage:
     export LLM_API_KEY=sk-xxx
-    python scripts/smoke_understand.py <book_dir> [--no-cache] [--workers N]
+    python scripts/smoke_understand.py <book_dir> [--book-id ID]
+        [--no-cache] [--workers N]
 """
 
 import argparse
@@ -34,6 +35,11 @@ def main() -> int:
     )
     parser.add_argument("book", help="directory holding the page images")
     parser.add_argument(
+        "--book-id",
+        default="",
+        help="book id; defaults to the directory name",
+    )
+    parser.add_argument(
         "--no-cache",
         action="store_true",
         help="ignore the cache and do not write it",
@@ -53,7 +59,7 @@ def main() -> int:
         print(f"not a book directory: {source}", file=sys.stderr)
         return 2
 
-    book = Book(source.name)
+    book = Book(args.book_id.strip() or source.name)
     book.load(source)
     _mark_spreads(book)
 
