@@ -43,8 +43,6 @@ def load_book(
     *,
     book_id: str = "",
     title: str = "",
-    default_kind: str = "single",
-    kinds: dict[str, str] | None = None,
 ) -> Book:
     """Load a book from an image directory."""
     path = Path(source).expanduser().resolve()
@@ -52,8 +50,6 @@ def load_book(
         raise FileNotFoundError(f"source does not exist: {path}")
     if not path.is_dir():
         raise ValueError(f"not an image directory: {path}")
-
-    assert default_kind in PAGE_KINDS
 
     images: list[Path] = []
     for entry in path.iterdir():
@@ -69,7 +65,6 @@ def load_book(
         raise ValueError(f"no supported images in {path}")
 
     images.sort(key=lambda p: _natural_key(p.name))
-    overrides = _validate_kinds(kinds, images)
 
     pages: list[PageImage] = []
     for index, image in enumerate(images):
@@ -81,7 +76,7 @@ def load_book(
                 path=str(image),
                 width=width,
                 height=height,
-                kind=overrides.get(image.name, default_kind),
+                kind=_kind(width, height),
             )
         )
 
@@ -99,24 +94,9 @@ def _natural_key(name: str) -> tuple:
     return tuple(int(part) if part.isdigit() else part for part in parts)
 
 
-# Validate per-page kinds and return them keyed by filename.
-def _validate_kinds(
-    kinds: dict[str, str] | None,
-    images: list[Path],
-) -> dict[str, str]:
-    overrides: dict[str, str] = {}
-    for key, kind in (kinds or {}).items():
-        if not isinstance(key, str):
-            raise ValueError(f"kinds key must be a filename: {key!r}")
-        if kind not in PAGE_KINDS:
-            raise ValueError(f"invalid kind for {key!r}: {kind!r}")
-        overrides[key] = kind
-
-    unknown = set(overrides) - {p.name for p in images}
-    if unknown:
-        raise ValueError(f"unknown page filenames: {sorted(unknown)}")
-
-    return overrides
+# A wide scan usually holds two pages side by side.
+def _kind(width: int, height: int) -> str:
+    return "spread" if width > height else "single"
 
 
 # Read an image header and return its (width, height).
