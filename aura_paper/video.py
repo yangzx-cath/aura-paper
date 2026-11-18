@@ -9,6 +9,7 @@ from .cache import Cache
 from .config import out_root
 from .minimax import MiniMaxClient, MiniMaxError, VideoRequest
 from .prompts import shot_prompt
+from .screenplay import PageScene
 from .story import Story
 from .understand import BookContent, PageContent
 
@@ -80,28 +81,47 @@ def generate_clip(
     story: Story,
     client: MiniMaxClient,
     *,
+    scene: PageScene | None = None,
     root: str | Path | None = None,
-    duration: int = 6,
+    duration: int | None = None,
     resolution: str = "768P",
 ) -> VideoClip:
-    """Generate one page clip and return its metadata."""
-    prompt = shot_prompt(page, story)
+    """Generate one page clip and return its metadata.
+
+    When a screenplay scene is given, its beat drives the shot prompt and
+    its duration is used unless duration is explicitly overridden.
+    """
+    if scene is not None and scene.index != page.index:
+        raise ValueError(
+            f"scene {scene.index} does not match page {page.index}"
+        )
+
+    beat = scene.beat if scene is not None else ""
+    prompt = shot_prompt(page, story, beat=beat)
+    seconds = duration
+    if seconds is None:
+        seconds = scene.duration if scene is not None else 6
 
     target = clip_path(content.id, page.index, root)
-    request = VideoRequest(
-        prompt=prompt,
-        first_frame=_page_path(content, page),
-        duration=duration,
-        resolution=resolution,
-    )
     clip = VideoClip(
         index=page.index,
         filename=page.filename,
         prompt=prompt,
         model=client.model,
-        duration=duration,
+        duration=seconds,
         resolution=resolution,
         path=str(target.relative_to(_book_dir(content.id, root))),
+    )
+
+    if scene is not None and scene.error:
+        clip.error = scene.error
+        return clip
+
+    request = VideoRequest(
+        prompt=prompt,
+        first_frame=_page_path(content, page),
+        duration=seconds,
+        resolution=resolution,
     )
 
     try:
@@ -119,7 +139,7 @@ def generate_clip(
         clip.error = str(exc)
         return clip
 
-    clip.duration = task.duration or duration
+    clip.duration = task.duration or seconds
     clip.resolution = task.resolution or resolution
     return clip
 
