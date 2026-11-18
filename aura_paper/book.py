@@ -1,4 +1,4 @@
-"""Load page images from a directory into a book."""
+"""The source pages of one book, before they are understood."""
 
 import re
 from dataclasses import dataclass, field
@@ -8,43 +8,41 @@ from PIL import Image
 
 from .utils import IMAGE_SUFFIXES
 
-# Page kinds
-PAGE_KINDS = ("portrait", "landscape")
-
 
 @dataclass
-class PageImage:
-    """One page image of a book."""
+class Page:
+    """One page image of a book, as the source provides it."""
 
     index: int
     filename: str
-    path: str
-    width: int | None = None
-    height: int | None = None
-    kind: str = "portrait"
+    width: int = 0
+    height: int = 0
+    text: str = ""  # Printed text read from the PDF text layer.
 
 
 @dataclass
 class Book:
-    """One book and its ordered page images."""
+    """One book and its ordered pages."""
 
     id: str
+    source: str = ""  # Where the pages came from.
+    directory: str = ""  # Where the page images live.
+    dpi: int = 0
     title: str = ""
-    source: str = ""
-    pages: list[PageImage] = field(default_factory=list)
+    pages: list[Page] = field(default_factory=list)
 
     @property
     def page_count(self) -> int:
         return len(self.pages)
 
 
-def load_book(
+def load_images(
     source: str | Path,
     *,
     book_id: str = "",
     title: str = "",
 ) -> Book:
-    """Load a book from an image directory."""
+    """Build a book from a directory of page images."""
     path = Path(source).expanduser().resolve()
     if not path.exists():
         raise FileNotFoundError(f"source does not exist: {path}")
@@ -66,24 +64,23 @@ def load_book(
 
     images.sort(key=lambda p: _natural_key(p.name))
 
-    pages: list[PageImage] = []
+    pages: list[Page] = []
     for index, image in enumerate(images):
         width, height = _image_size(image)
         pages.append(
-            PageImage(
+            Page(
                 index=index,
                 filename=image.name,
-                path=str(image),
                 width=width,
                 height=height,
-                kind="landscape" if width > height else "portrait",
             )
         )
 
     return Book(
         id=str(book_id or "").strip() or path.name,
-        title=title,
         source=str(path),
+        directory=str(path),
+        title=title,
         pages=pages,
     )
 
