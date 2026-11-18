@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from threading import Lock
 
-from aura_paper.book import Book, PageImage, load_book
+from aura_paper.book import PageImage, load_book
 from aura_paper.cache import Cache
 from aura_paper.config import cache_root, load_env
 from aura_paper.llm import LLMClient
@@ -60,7 +60,6 @@ def main() -> int:
         return 2
 
     book = load_book(source, book_id=args.book_id)
-    _mark_spreads(book)
 
     client = LLMClient.from_env()
     missing = client.missing_settings()
@@ -98,13 +97,6 @@ def main() -> int:
     print(f"stats   {cache.stats()}")
     print(f"output  {path}")
     return 0 if content.failed_count == 0 else 1
-
-
-# A landscape scan holds two book pages, so treat it as a spread.
-def _mark_spreads(book: Book) -> None:
-    for page in book.pages:
-        wide = bool(page.width and page.height and page.width > page.height)
-        page.kind = "spread" if wide else "single"
 
 
 # One line per page, so a long run still reads as a progress log.
