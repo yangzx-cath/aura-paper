@@ -26,7 +26,7 @@ class PageContent:
 
     index: int
     filename: str
-    kind: str = "single"
+    kind: str = "portrait"
     role: str = "story"
     page_text: str = ""
     footer: str = ""
@@ -59,7 +59,7 @@ class PageContent:
         return cls(
             index=int(data.get("index") or 0),
             filename=str(data.get("filename") or ""),
-            kind=str(data.get("kind") or "single"),
+            kind=str(data.get("kind") or "portrait"),
             role=_role(data.get("role")),
             page_text=str(data.get("page_text") or ""),
             footer=str(data.get("footer") or ""),

@@ -11,8 +11,8 @@ if TYPE_CHECKING:
     from .understand import BookContent, PageContent
 
 _LAYOUT_NOTES = {
-    "single": "这是一页单页画面。",
-    "spread": "这是一张跨页画面，包含左右两页，请按从左到右的顺序阅读和描述画面。",
+    "portrait": "这是一张竖幅画面，通常是一页。",
+    "landscape": "这是一张横幅画面，通常横跨左右两页，请按从左到右的顺序阅读和描述。",
 }
 
 # A closed set keeps mood usable for music and tone mapping.
@@ -62,9 +62,9 @@ _PAGE_TEMPLATE = """你是一名儿童绘本内容理解助手。
 """
 
 
-def page_prompt(kind: str = "single") -> str:
-    """Build the prompt for one page, aware of single or spread layout."""
-    note = _LAYOUT_NOTES.get(kind, _LAYOUT_NOTES["single"])
+def page_prompt(kind: str = "portrait") -> str:
+    """Build the prompt for one page, aware of the page shape."""
+    note = _LAYOUT_NOTES.get(kind, _LAYOUT_NOTES["portrait"])
     prompt = _PAGE_TEMPLATE.replace("__LAYOUT__", note)
     return prompt.replace("__MOODS__", _MOOD_WORDS)
 
@@ -231,14 +231,14 @@ _SHOT_TEMPLATE = """你是一名儿童绘本动画分镜师。
    不改变角色造型、服装和画面风格。
 2. 画面中不要出现文字、字幕、水印或边框。
 3. 动作自然、幅度适中，适合儿童观看，避免剧烈晃动、快速变焦和恐怖画面。
-4. 镜头运动克制，不切换场景；单页使用 [Push in] 缓慢推进，跨页从左到右缓慢平移。
+4. 镜头运动克制，不切换场景；竖幅使用 [Push in] 缓慢推进，横幅从左到右缓慢平移。
 5. 剧情提示只表现本页画面里的动作；不添加原文没有的情节，不描述画面外的内容。
 6. __LAYOUT__
 """
 
 _SHOT_LAYOUT_NOTES = {
-    "single": "这是一页单页画面。",
-    "spread": "这是一张跨页画面，动作从左到右连贯展开。",
+    "portrait": "这是一张竖幅画面，镜头保持稳定。",
+    "landscape": "这是一张横幅画面，动作从左到右连贯展开。",
 }
 
 
@@ -250,7 +250,7 @@ def shot_prompt(
 ) -> str:
     """Build the video prompt for one page."""
     characters = "、".join(story.characters) or "（未提供）"
-    layout = _SHOT_LAYOUT_NOTES.get(page.kind, _SHOT_LAYOUT_NOTES["single"])
+    layout = _SHOT_LAYOUT_NOTES.get(page.kind, _SHOT_LAYOUT_NOTES["portrait"])
 
     prompt = _SHOT_TEMPLATE.replace("__CHARACTERS__", characters)
     prompt = prompt.replace("__SETTING__", story.setting or "（未提供）")

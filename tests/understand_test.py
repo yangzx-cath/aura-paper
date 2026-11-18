@@ -52,7 +52,7 @@ class SequenceClient(FakeClient):
         return item
 
 
-def make_page(kind="single"):
+def make_page(kind="portrait"):
     return PageImage(
         index=3,
         filename="03.jpg",
@@ -79,7 +79,7 @@ def test_success():
 
     assert content.index == 3
     assert content.filename == "03.jpg"
-    assert content.kind == "single"
+    assert content.kind == "portrait"
     assert content.model == "fake-model"
     assert content.page_text == "你好"
     assert content.description == "草地"
@@ -134,18 +134,18 @@ def test_empty_payload_is_an_error():
     assert content.error == "model returned no content"
 
 
-def test_spread_page_uses_spread_prompt():
+def test_landscape_page_uses_landscape_prompt():
     client = FakeClient(json.dumps({"page_text": "文字"}))
 
-    content = understand_page(make_page(kind="spread"), client)
+    content = understand_page(make_page(kind="landscape"), client)
 
-    assert content.kind == "spread"
-    assert "跨页" in client.prompts[0]
+    assert content.kind == "landscape"
+    assert "横幅" in client.prompts[0]
 
 
 def test_book_collects_every_page():
     reply = json.dumps({"description": "草地", "mood": "温暖"})
-    pages = [make_page(), make_page("spread")]
+    pages = [make_page(), make_page("landscape")]
 
     content = understand_book(make_book(pages), FakeClient(reply))
 
@@ -445,14 +445,14 @@ def test_save_book_writes_the_page_fields(tmp_path):
     data = json.loads(path.read_text(encoding="utf-8"))
     assert data["page_count"] == 1
     assert data["pages"][0]["description"] == "草地"
-    assert data["pages"][0]["kind"] == "single"
+    assert data["pages"][0]["kind"] == "portrait"
 
 
 def test_book_dict_round_trip():
     page = PageContent(
         index=1,
         filename="02.jpg",
-        kind="spread",
+        kind="landscape",
         role="cover",
         page_text="文字",
         footer="定价：38.00 元",

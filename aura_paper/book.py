@@ -9,7 +9,7 @@ from PIL import Image
 from .utils import IMAGE_SUFFIXES
 
 # Page kinds
-PAGE_KINDS = ("single", "spread")
+PAGE_KINDS = ("portrait", "landscape")
 
 
 @dataclass
@@ -21,7 +21,7 @@ class PageImage:
     path: str
     width: int | None = None
     height: int | None = None
-    kind: str = "single"  # one of PAGE_KINDS
+    kind: str = "portrait"
 
 
 @dataclass
@@ -76,7 +76,7 @@ def load_book(
                 path=str(image),
                 width=width,
                 height=height,
-                kind=_kind(width, height),
+                kind="landscape" if width > height else "portrait",
             )
         )
 
@@ -92,11 +92,6 @@ def load_book(
 def _natural_key(name: str) -> tuple:
     parts = re.split(r"(\d+)", name.lower())
     return tuple(int(part) if part.isdigit() else part for part in parts)
-
-
-# A wide scan usually holds two pages side by side.
-def _kind(width: int, height: int) -> str:
-    return "spread" if width > height else "single"
 
 
 # Read an image header and return its (width, height).

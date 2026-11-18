@@ -20,7 +20,7 @@ def test_a_wide_scan_is_a_spread(sample_book):
     book = load_book(sample_book, book_id="test")
     kinds = [(p.width, p.height, p.kind) for p in book.pages[:2]]
 
-    assert kinds == [(680, 800, "single"), (1360, 800, "spread")]
+    assert kinds == [(680, 800, "portrait"), (1360, 800, "landscape")]
 
 
 def test_missing_source_raises(tmp_path):
