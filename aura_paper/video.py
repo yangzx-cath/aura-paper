@@ -135,7 +135,7 @@ def generate_clip(
             clip.error = "task succeeded without a video URL"
             return clip
         client.download(task.video_url, target)
-    except (MiniMaxError, ValueError, OSError) as exc:
+    except (MiniMaxError, ValueError) as exc:
         clip.error = str(exc)
         return clip
 

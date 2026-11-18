@@ -28,7 +28,7 @@ _MAX_BODY_BYTES = 64 * 1024 * 1024
 
 
 class MiniMaxError(Exception):
-    """Raised when the service cannot return a usable result."""
+    """Error for MiniMax calls."""
 
 
 @dataclass

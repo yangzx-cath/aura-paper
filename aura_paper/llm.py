@@ -18,7 +18,7 @@ RETRY_DELAY = 2.0
 
 
 class LLMError(Exception):
-    """Raised when the endpoint cannot return a usable answer."""
+    """Error for LLM calls."""
 
 
 class LLMClient:
@@ -114,7 +114,7 @@ class LLMClient:
         try:
             content = data["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
-            raise LLMError("malformed response from endpoint") from exc
+            raise LLMError("malformed reply from endpoint") from exc
 
         if isinstance(content, list):
             content = "".join(
@@ -160,7 +160,7 @@ class LLMClient:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as exc:
-            raise LLMError("malformed response from endpoint") from exc
+            raise LLMError("malformed reply from endpoint") from exc
         if not isinstance(data, dict):
-            raise LLMError("malformed response from endpoint")
+            raise LLMError("malformed reply from endpoint")
         return data
