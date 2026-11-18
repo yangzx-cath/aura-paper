@@ -109,12 +109,11 @@ class LLMClient:
         return self._post(payload)
 
     def _post(self, payload: dict) -> str:
-        raw = self._send(payload)
+        data = self._send(payload)
 
         try:
-            data = json.loads(raw)
             content = data["choices"][0]["message"]["content"]
-        except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
+        except (KeyError, IndexError, TypeError) as exc:
             raise LLMError("malformed response from endpoint") from exc
 
         if isinstance(content, list):
@@ -125,8 +124,7 @@ class LLMClient:
             )
         return str(content)
 
-    # Send the request, waiting out the endpoint while it is at capacity.
-    def _send(self, payload: dict) -> str:
+    def _send(self, payload: dict) -> dict:
         url = self.base_url.rstrip("/") + "/chat/completions"
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(
@@ -140,12 +138,14 @@ class LLMClient:
         )
 
         delay = RETRY_DELAY
+        raw = ""
         for attempt in range(1, RETRIES + 1):
             try:
                 with urllib.request.urlopen(
                     request, timeout=self.timeout
                 ) as response:
-                    return response.read().decode("utf-8", errors="replace")
+                    raw = response.read().decode("utf-8", errors="replace")
+                break
             except urllib.error.HTTPError as exc:
                 detail = exc.read().decode("utf-8", errors="replace")[:300]
                 if exc.code not in RETRY_STATUS or attempt == RETRIES:
@@ -156,3 +156,11 @@ class LLMClient:
                 raise LLMError(f"cannot reach {url}: {exc.reason}") from exc
             except TimeoutError as exc:
                 raise LLMError(f"timeout after {self.timeout}s") from exc
+
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise LLMError("malformed response from endpoint") from exc
+        if not isinstance(data, dict):
+            raise LLMError("malformed response from endpoint")
+        return data
