@@ -1,9 +1,7 @@
-"""
-Book input component: load an image directory into a structured Book.
-"""
+"""Load page images from a directory into a book."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from PIL import Image
@@ -16,99 +14,83 @@ PAGE_KINDS = ("single", "spread")
 
 @dataclass
 class PageImage:
-    """One page of a book, backed by a single image file."""
+    """One page image of a book."""
 
     index: int
     filename: str
     path: str
     width: int | None = None
     height: int | None = None
-    kind: str = "single"  # one of PAGE_KINDS, set manually
+    kind: str = "single"  # one of PAGE_KINDS
 
 
+@dataclass
 class Book:
-    """A book: an ordered list of pages."""
+    """One book and its ordered page images."""
 
     id: str
-    title: str
-    source: str  # image directory, set by load()
-    pages: list[PageImage]
-
-    def __init__(self, id: str, title: str = "") -> None:
-        self.id = id
-        self.title = title
-        self.source = ""
-        self.pages = []
-
-    def __repr__(self) -> str:
-        count = self.page_count
-        return f"Book(id={self.id!r}, title={self.title!r}, pages={count})"
+    title: str = ""
+    source: str = ""
+    pages: list[PageImage] = field(default_factory=list)
 
     @property
     def page_count(self) -> int:
         return len(self.pages)
 
-    def load(
-        self,
-        source: str | Path,
-        *,
-        default_kind: str = "single",
-        kinds: dict[str, str] | None = None,
-    ) -> None:
-        """Load the pages of this book from an image directory.
 
-        Args:
-            source: directory holding the page images.
-            default_kind: kind for every page, one of PAGE_KINDS.
-            kinds: per-page overrides keyed by filename,
-                e.g. {"003.jpg": "spread"}.
-        """
-        if self.pages:
-            raise RuntimeError(
-                f"{self.id!r} is already loaded from {self.source!r}"
+def load_book(
+    source: str | Path,
+    *,
+    book_id: str = "",
+    title: str = "",
+    default_kind: str = "single",
+    kinds: dict[str, str] | None = None,
+) -> Book:
+    """Load a book from an image directory."""
+    path = Path(source).expanduser().resolve()
+    if not path.exists():
+        raise FileNotFoundError(f"source does not exist: {path}")
+    if not path.is_dir():
+        raise ValueError(f"not an image directory: {path}")
+
+    assert default_kind in PAGE_KINDS
+
+    images: list[Path] = []
+    for entry in path.iterdir():
+        if not entry.is_file():
+            continue
+        if entry.name.startswith("."):
+            continue
+        if entry.suffix.lower() not in IMAGE_SUFFIXES:
+            continue
+        images.append(entry)
+
+    if not images:
+        raise ValueError(f"no supported images in {path}")
+
+    images.sort(key=lambda p: _natural_key(p.name))
+    overrides = _validate_kinds(kinds, images)
+
+    pages: list[PageImage] = []
+    for index, image in enumerate(images):
+        width, height = _image_size(image)
+        pages.append(
+            PageImage(
+                index=index,
+                filename=image.name,
+                path=str(image),
+                width=width,
+                height=height,
+                kind=overrides.get(image.name, default_kind),
             )
+        )
 
-        path = Path(source).expanduser().resolve()
-        if not path.exists():
-            raise FileNotFoundError(f"source does not exist: {path}")
-        if not path.is_dir():
-            raise ValueError(f"not an image directory: {path}")
-
-        assert default_kind in PAGE_KINDS
-
-        images: list[Path] = []
-        for entry in path.iterdir():
-            if not entry.is_file():
-                continue
-            if entry.name.startswith("."):
-                continue
-            if entry.suffix.lower() not in IMAGE_SUFFIXES:
-                continue
-            images.append(entry)
-
-        if not images:
-            raise ValueError(f"no supported images in {path}")
-
-        images.sort(key=lambda p: _natural_key(p.name))
-        overrides = _validate_kinds(kinds, images)
-
-        pages: list[PageImage] = []
-        for index, image in enumerate(images):
-            width, height = _image_size(image)
-            pages.append(
-                PageImage(
-                    index=index,
-                    filename=image.name,
-                    path=str(image),
-                    width=width,
-                    height=height,
-                    kind=overrides.get(image.name, default_kind),
-                )
-            )
-
-        # Assign only after everything succeeded, so a failure keeps old pages.
-        self.pages = pages
-        self.source = str(path)
+    return Book(
+        id=str(book_id or "").strip() or path.name,
+        title=title,
+        source=str(path),
+        pages=pages,
+    )
 
 
 # Build a sort key so page_2 comes before page_10.

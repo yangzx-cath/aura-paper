@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from aura_paper.book import Book
+from aura_paper.book import Book, load_book
 
 SAMPLE_DIR = (
     Path(__file__).resolve().parent.parent / "data" / "chicken_and_sunflower"
@@ -10,9 +10,7 @@ SAMPLE_DIR = (
 
 
 def load(**kwargs) -> Book:
-    book = Book("test")
-    book.load(SAMPLE_DIR, **kwargs)
-    return book
+    return load_book(SAMPLE_DIR, book_id="test", **kwargs)
 
 
 def test_load_sample_dir():
@@ -51,24 +49,26 @@ def test_non_filename_key_raises():
 
 
 def test_missing_source_raises(tmp_path):
-    book = Book("test")
     with pytest.raises(FileNotFoundError):
-        book.load(tmp_path / "missing")
+        load_book(tmp_path / "missing", book_id="test")
 
 
 def test_empty_dir_raises(tmp_path):
-    book = Book("test")
     with pytest.raises(ValueError, match="no supported images"):
-        book.load(tmp_path)
+        load_book(tmp_path, book_id="test")
 
 
-def test_load_twice_raises_and_keeps_pages():
-    book = load()
+def test_load_book_uses_the_given_id():
+    book = load_book(SAMPLE_DIR, book_id="C01")
 
-    with pytest.raises(RuntimeError, match="already loaded"):
-        book.load(SAMPLE_DIR)
+    assert book.id == "C01"
+    assert book.source == str(SAMPLE_DIR.resolve())
 
-    assert book.page_count == 19
+
+def test_load_book_defaults_to_the_directory_name():
+    book = load_book(SAMPLE_DIR)
+
+    assert book.id == SAMPLE_DIR.name
 
 
 def test_pages_have_size():
@@ -83,6 +83,5 @@ def test_pages_have_size():
 def test_broken_image_stops_the_load(tmp_path):
     (tmp_path / "bad.jpg").write_bytes(b"not an image")
 
-    book = Book("test")
     with pytest.raises(OSError):
-        book.load(tmp_path)
+        load_book(tmp_path, book_id="test")

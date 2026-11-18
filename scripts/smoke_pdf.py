@@ -13,7 +13,7 @@ import sys
 import time
 from pathlib import Path
 
-from aura_paper.book import Book
+from aura_paper.book import load_book
 from aura_paper.config import load_env, out_root
 from aura_paper.pdf import (
     DEFAULT_DPI,
@@ -68,8 +68,7 @@ def main() -> int:
     elapsed = time.perf_counter() - started
     path = save_pages(content)
 
-    book = Book(content.id)
-    book.load(content.directory)
+    book = load_book(content.directory, book_id=content.id)
 
     print()
     print(f"pages   {content.page_count}")

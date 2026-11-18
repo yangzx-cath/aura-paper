@@ -62,10 +62,12 @@ def make_page(kind="single"):
 
 
 def make_book(pages):
-    book = Book("chicken", title="小鸡球球")
-    book.source = "/tmp/chicken"
-    book.pages = pages
-    return book
+    return Book(
+        id="chicken",
+        title="小鸡球球",
+        source="/tmp/chicken",
+        pages=pages,
+    )
 
 
 def test_success():
@@ -404,8 +406,7 @@ def test_namespaces_are_isolated_per_book(tmp_path):
     client = FakeClient(json.dumps({"description": "一"}))
     understand_book(first, client, cache=cache)
 
-    other = Book("other")
-    other.pages = first.pages
+    other = Book(id="other", pages=first.pages)
     second = FakeClient(json.dumps({"description": "二"}))
     content = understand_book(other, second, cache=cache)
 
