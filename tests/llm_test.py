@@ -2,21 +2,13 @@ import io
 import time
 import urllib.error
 import urllib.request
-from pathlib import Path
 
 import pytest
 
 from aura_paper.llm import LLMClient, LLMError
 
-SAMPLE_JPG = (
-    Path(__file__).resolve().parent.parent
-    / "data"
-    / "chicken_and_sunflower"
-    / "01.jpg"
-)
 
-
-def test_chat_builds_payload(monkeypatch):
+def test_chat_builds_payload(monkeypatch, sample_jpeg):
     captured = {}
 
     def fake_post(self, payload):
@@ -26,7 +18,7 @@ def test_chat_builds_payload(monkeypatch):
     monkeypatch.setattr(LLMClient, "_post", fake_post)
     client = LLMClient("http://x/v1", "k", "m")
 
-    assert client.chat("describe", image_path=SAMPLE_JPG) == "reply"
+    assert client.chat("describe", image_path=sample_jpeg) == "reply"
 
     system, user = captured["messages"]
     content = user["content"]
@@ -37,7 +29,7 @@ def test_chat_builds_payload(monkeypatch):
     assert captured["response_format"] == {"type": "json_object"}
 
 
-def test_chat_without_json_mode(monkeypatch):
+def test_chat_without_json_mode(monkeypatch, sample_jpeg):
     captured = {}
 
     def fake_post(self, payload):
@@ -47,7 +39,7 @@ def test_chat_without_json_mode(monkeypatch):
     monkeypatch.setattr(LLMClient, "_post", fake_post)
     client = LLMClient("http://x/v1", "k", "m")
 
-    client.chat("hi", image_path=SAMPLE_JPG, json_mode=False)
+    client.chat("hi", image_path=sample_jpeg, json_mode=False)
 
     assert "response_format" not in captured
     assert captured["messages"][0]["role"] == "user"
@@ -57,7 +49,7 @@ def test_chat_without_config_raises():
     client = LLMClient("", "", "")
 
     with pytest.raises(LLMError, match="not configured"):
-        client.chat("hi", image_path=SAMPLE_JPG)
+        client.chat("hi")
 
 
 def test_chat_without_image_sends_plain_text(monkeypatch):

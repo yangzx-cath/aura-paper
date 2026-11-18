@@ -1,25 +1,17 @@
 import base64
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pytest
 
 from aura_paper.utils import data_url, extract_json, now_iso
 
-SAMPLE_JPG = (
-    Path(__file__).resolve().parent.parent
-    / "data"
-    / "chicken_and_sunflower"
-    / "01.jpg"
-)
 
-
-def test_jpeg_prefix_and_payload():
-    url = data_url(SAMPLE_JPG)
+def test_jpeg_prefix_and_payload(sample_jpeg):
+    url = data_url(sample_jpeg)
 
     header, _, payload = url.partition(",")
     assert header == "data:image/jpeg;base64"
-    assert base64.b64decode(payload) == SAMPLE_JPG.read_bytes()
+    assert base64.b64decode(payload) == sample_jpeg.read_bytes()
 
 
 def test_png_uses_png_mime(tmp_path):

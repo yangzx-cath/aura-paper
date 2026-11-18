@@ -56,7 +56,7 @@ def make_page(kind="single"):
     return PageImage(
         index=3,
         filename="03.jpg",
-        path="data/chicken_and_sunflower/03.jpg",
+        path="page.jpg",
         kind=kind,
     )
 
