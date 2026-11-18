@@ -11,8 +11,11 @@ if TYPE_CHECKING:
     from .understand import BookContent, PageContent
 
 _LAYOUT_NOTES = {
-    "portrait": "这是一张竖幅画面，通常是一页。",
-    "landscape": "这是一张横幅画面，通常横跨左右两页，请按从左到右的顺序阅读和描述。",
+    "portrait": "这是一张竖幅画面。",
+    "landscape": (
+        "这是一张横幅画面。先看是一整幅图还是左右两页拼在一起；"
+        "如果是两页，按从左到右的顺序阅读和描述。"
+    ),
 }
 
 # A closed set keeps mood usable for music and tone mapping.
@@ -238,7 +241,7 @@ _SHOT_TEMPLATE = """你是一名儿童绘本动画分镜师。
 
 _SHOT_LAYOUT_NOTES = {
     "portrait": "这是一张竖幅画面，镜头保持稳定。",
-    "landscape": "这是一张横幅画面，动作从左到右连贯展开。",
+    "landscape": "这是一张横幅画面，镜头从左到右缓慢平移。",
 }
 
 
