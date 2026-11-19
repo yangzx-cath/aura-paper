@@ -177,7 +177,7 @@ def understand_cover(
         model=client.model,
     )
     cover = CoverContent()
-    prompt = cover_prompt(kind)
+    prompt = cover_prompt()
     path = Path(directory) / page.filename
 
     if cache is None:
@@ -260,7 +260,7 @@ def understand_page(
         kind=kind,
         model=client.model,
     )
-    prompt = page_prompt(kind)
+    prompt = page_prompt()
     path = Path(directory) / page.filename
 
     if cache is None:
