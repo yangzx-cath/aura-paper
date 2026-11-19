@@ -241,5 +241,5 @@ def save_split(
     split: Split,
     root: str | Path | None = None,
 ) -> Path:
-    """Write the split book to <root>/<book_id>/split.json."""
-    return write_json(split.book.id, "split", split.book.to_dict(), root)
+    """Write the page list to <root>/<book_id>/pages.json."""
+    return write_json(split.book.id, "pages", split.book.to_dict(), root)
