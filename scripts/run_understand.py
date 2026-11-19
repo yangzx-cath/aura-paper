@@ -1,8 +1,8 @@
 """Run the understanding stage from the command line.
 
-Reads out/<book>/book.json from the PDF stage, runs every page through the
-vision model, and writes the result to content.json. A second run reuses
-the cache and skips the model calls.
+Reads out/<book>/pages.json from the splitting stage, runs every page
+through the vision model, and writes the result to content.json. A second
+run reuses the cache and skips the model calls.
 
 Usage:
     export LLM_API_KEY=sk-xxx
@@ -52,13 +52,10 @@ def main() -> int:
 
     load_env(ROOT / ".env")
 
-    # The splitting stage rewrites the page list, so prefer its output.
     book_path = out_root() / args.book / "pages.json"
     if not book_path.is_file():
-        book_path = out_root() / args.book / "book.json"
-    if not book_path.is_file():
         print(f"missing {book_path}", file=sys.stderr)
-        print("start with run_pdf.py", file=sys.stderr)
+        print("start with run_split.py", file=sys.stderr)
         return 2
 
     book = Book.from_dict(json.loads(book_path.read_text(encoding="utf-8")))
