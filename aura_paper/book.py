@@ -90,7 +90,7 @@ class Book:
         )
 
 
-def load_images(
+def load_book_from_images(
     source: str | Path,
     *,
     book_id: str = "",

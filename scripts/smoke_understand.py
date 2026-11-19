@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 from threading import Lock
 
-from aura_paper.book import Page, load_images
+from aura_paper.book import Page, load_book_from_images
 from aura_paper.cache import Cache
 from aura_paper.config import cache_root, load_env
 from aura_paper.llm import LLMClient
@@ -59,7 +59,7 @@ def main() -> int:
         print(f"not a book directory: {source}", file=sys.stderr)
         return 2
 
-    book = load_images(source, book_id=args.book_id)
+    book = load_book_from_images(source, book_id=args.book_id)
 
     client = LLMClient.from_env()
     missing = client.missing_settings()
