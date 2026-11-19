@@ -18,6 +18,35 @@ _LAYOUT_NOTES = {
     ),
 }
 
+_COVER_TEMPLATE = """你是一名儿童绘本编辑。
+
+请阅读这本书的封面，严格按下面的 JSON 结构输出：
+
+{
+  "title": "书名",
+  "author": "作者",
+  "illustrator": "绘者",
+  "description": "必填，2-4 句话描述封面画面：地点、可见人物/物体、动作、氛围"
+}
+
+要求：
+1. 只输出 JSON，不要解释文字，不要使用代码块，四个字段都要出现。
+2. description 使用中文；title、author、illustrator 保留封面上的原文，不要翻译。
+3. title 取封面上最大最显眼的字，去掉书名号和引号。
+4. author、illustrator 按封面上的"文/著/图/绘/译"等标注区分；
+   封面没写的留空字符串，不要从画面或正文推断。
+5. 画面上的人物名字不是作者，封面上写的才是。
+6. 画面中看不到的信息不要编造。
+7. __LAYOUT__
+"""
+
+
+def cover_prompt(kind: str = "portrait") -> str:
+    """Build the prompt that reads the book metadata off the cover."""
+    note = _LAYOUT_NOTES.get(kind, _LAYOUT_NOTES["portrait"])
+    return _COVER_TEMPLATE.replace("__LAYOUT__", note)
+
+
 # A closed set keeps mood usable for music and tone mapping.
 _MOOD_WORDS = (
     "好奇、欢快、兴奋、惊喜、温暖、平静、期待、担忧、害怕、生气、失落、悲伤"
@@ -28,7 +57,6 @@ _PAGE_TEMPLATE = """你是一名儿童绘本内容理解助手。
 请阅读这一页绘本，严格按下面的 JSON 结构输出：
 
 {
-  "role": "本页在书中的角色，从 cover、story、end 中选一个",
   "page_text": "属于故事本身的印刷文字，逐字转录，没有时留空字符串",
   "footer": "不属于故事的印刷文字，逐字转录，没有时留空字符串",
   "description": "必填，2-4 句话描述画面：地点、可见人物/物体、动作、氛围，不要复述页面文字",
@@ -37,7 +65,7 @@ _PAGE_TEMPLATE = """你是一名儿童绘本内容理解助手。
 }
 
 要求：
-1. 只输出 JSON，不要解释文字，不要使用代码块，六个字段都要出现，description 不能为空。
+1. 只输出 JSON，不要解释文字，不要使用代码块，五个字段都要出现，description 不能为空。
 2. 除 page_text 和 footer 外，其余内容使用中文；这两个字段保留原文语言。
 3. page_text 只放讲给孩子听的故事文字：角色对白、拟声词、叙述句。没有就留空字符串。
    海报标题、招牌、标签、价签等画面道具文字，放 footer。
@@ -54,14 +82,7 @@ _PAGE_TEMPLATE = """你是一名儿童绘本内容理解助手。
 8. 画面中看不到的信息不要编造。只出现手、脚、背影等局部时，不要判断是谁，也不要
    写角色名或"我"；写清可见的部位、肤色、衣袖、饰品、动作、物品和位置，留给后续
    结合上下文判断。局部有机器结构、明显服装等特征时照实写出来，但不要替它命名。
-9. role 只用来标记"不属于故事内容"的页面。判断依据是这一页有没有推进故事情节，
-   而不是画面里有没有角色——封面和封底常常也画着主角，但那只是装饰和呼应：
-   - cover：封面或书名页，书名、作者、出版社等书目文字是主要内容，画面即使有角色也不构成情节；
-   - end：封底，以版权信息或装饰画面为主，画面即使重复了书中的角色，也不推进故事；
-   - story：其余所有页。最后一页即使印着版权信息，只要画的是一个新情节，仍然算 story。
-   很多绘本没有独立封面和封底，这时每一页都是 story。拿不准时 role 用 story，
-   不要因为留白或水印就判成 cover 或 end。
-10. __LAYOUT__
+9. __LAYOUT__
 """
 
 
