@@ -117,7 +117,9 @@ def load_book_from_images(
     if not images:
         raise ValueError(f"no supported images in {path}")
 
-    images.sort(key=lambda p: _natural_key(p.name))
+    # The name breaks ties, so two files with the same page number
+    # (1.jpg and 01.jpg) keep a stable order.
+    images.sort(key=lambda p: (_natural_key(p.name), p.name))
 
     pages: list[Page] = []
     for index, image in enumerate(images):

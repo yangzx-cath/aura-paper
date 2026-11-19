@@ -71,6 +71,15 @@ def test_sorts_page_2_before_page_10(tmp_path):
     ]
 
 
+def test_same_page_number_sorts_by_name(tmp_path):
+    for name in ("1.jpg", "01.jpg"):
+        Image.new("RGB", (10, 10), "white").save(tmp_path / name)
+
+    book = load_book_from_images(tmp_path, book_id="test")
+
+    assert [p.filename for p in book.pages] == ["01.jpg", "1.jpg"]
+
+
 def test_broken_image_stops_the_load(tmp_path):
     (tmp_path / "bad.jpg").write_bytes(b"not an image")
 
