@@ -48,7 +48,6 @@ def make_content(root: Path) -> tuple[BookContent, PageContent]:
     )
     content = BookContent(
         id="demo",
-        title="示例",
         source=str(root),
         pages=[page],
     )

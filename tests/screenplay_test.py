@@ -29,9 +29,9 @@ def make_story():
     )
 
 
-def make_content(count=3, roles=None):
-    pages = []
-    for index in range(count):
+def make_content(count=3):
+    pages = [PageContent(index=0, filename="00.jpg", page_text="封面")]
+    for index in range(1, count + 1):
         pages.append(
             PageContent(
                 index=index,
@@ -40,9 +40,7 @@ def make_content(count=3, roles=None):
                 description=f"第 {index + 1} 页画面",
             )
         )
-    for index, role in (roles or {}).items():
-        pages[index].role = role
-    return BookContent(id="demo", title="示例", source="/src", pages=pages)
+    return BookContent(id="demo", source="/src", pages=pages)
 
 
 def make_reply(**overrides):
@@ -83,14 +81,14 @@ def test_pages_that_are_not_a_list_become_empty():
     assert screenplay.pages == []
 
 
-def test_skips_pages_that_are_not_story():
-    content = make_content(roles={0: "cover", 2: "end"})
+def test_skips_the_cover_page():
+    content = make_content()
 
     screenplay = build_screenplay(
         content, make_story(), FakeClient(make_reply())
     )
 
-    assert [scene.index for scene in screenplay.pages] == [1]
+    assert [scene.index for scene in screenplay.pages] == [1, 2, 3]
 
 
 def test_gives_each_page_the_text_of_the_one_before():
@@ -98,10 +96,10 @@ def test_gives_each_page_the_text_of_the_one_before():
 
     build_screenplay(make_content(), make_story(), client)
 
-    assert "第 1 页原文" in client.prompts[1]
-    assert "第 1 页画面" in client.prompts[1]
-    assert "第 3 页原文" not in client.prompts[1]
+    # The first story page has no story page before it, so it starts the chain.
     assert "（这是第一页）" in client.prompts[0]
+    assert "第 2 页原文" in client.prompts[1]
+    assert "第 1 页原文" not in client.prompts[1]
 
 
 def test_tells_the_model_how_each_character_looks():

@@ -29,8 +29,8 @@ class FakeClient(LLMClient):
 
 
 def make_content(count=3):
-    pages = []
-    for index in range(count):
+    pages = [PageContent(index=0, filename="00.jpg", page_text="封面")]
+    for index in range(1, count + 1):
         pages.append(
             PageContent(
                 index=index,
@@ -38,7 +38,7 @@ def make_content(count=3):
                 description=f"第 {index + 1} 页的画面",
             )
         )
-    return BookContent(id="demo", title="示例", source="/src", pages=pages)
+    return BookContent(id="demo", source="/src", pages=pages)
 
 
 def make_reply(**overrides):
@@ -78,13 +78,13 @@ def test_sends_the_story_prompt():
 
 def test_leaves_cover_pages_out_of_the_prompt():
     content = make_content()
-    content.pages[0].role = "cover"
+    # Page 0 is the cover, so its printed text never reaches the story.
     content.pages[0].page_text = "湖北长江出版集团"
 
     prompt = story_prompt(content)
 
     assert "湖北长江出版集团" not in prompt
-    assert "共 2 页" in prompt
+    assert "共 3 页" in prompt
 
 
 def test_missing_summary_is_an_error():
