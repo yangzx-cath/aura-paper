@@ -56,6 +56,7 @@ class PageContent:
     description: str = ""
     mood: str = ""
     mood_detail: str = ""
+    uncertain: list[str] = field(default_factory=list)
     model: str = ""
     error: str = ""
 
@@ -72,6 +73,7 @@ class PageContent:
             "description": self.description,
             "mood": self.mood,
             "mood_detail": self.mood_detail,
+            "uncertain": self.uncertain,
             "error": self.error,
         }
 
@@ -87,6 +89,7 @@ class PageContent:
             description=str(data.get("description") or ""),
             mood=str(data.get("mood") or ""),
             mood_detail=str(data.get("mood_detail") or ""),
+            uncertain=_text_list(data.get("uncertain")),
             model=str(data.get("model") or ""),
             error=str(data.get("error") or ""),
         )
@@ -312,6 +315,21 @@ def _apply_fields(content: PageContent, fields: dict) -> None:
     content.description = str(fields.get("description") or "")
     content.mood = str(fields.get("mood") or "")
     content.mood_detail = str(fields.get("mood_detail") or "")
+    content.uncertain = _text_list(fields.get("uncertain"))
+
+
+# Read the note list, keeping one line per text entry.
+def _text_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    texts = []
+    for item in value:
+        if isinstance(item, (dict, list)):
+            continue
+        text = str(item).strip()
+        if text:
+            texts.append(text)
+    return texts
 
 
 # Keep only what the model produced, so page identity stays current.
@@ -322,6 +340,7 @@ def _page_fields(content: PageContent) -> dict:
         "description": content.description,
         "mood": content.mood,
         "mood_detail": content.mood_detail,
+        "uncertain": content.uncertain,
     }
 
 
