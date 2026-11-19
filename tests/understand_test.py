@@ -6,9 +6,11 @@ from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient, LLMError
 from aura_paper.understand import (
     BookContent,
+    CoverContent,
     PageContent,
     save_content,
     understand_book,
+    understand_cover,
     understand_page,
 )
 
@@ -60,11 +62,45 @@ def make_page(kind="portrait"):
 def make_book(pages, directory="/tmp/chicken"):
     return Book(
         id="chicken",
-        title="小鸡球球",
         source="/tmp/chicken.pdf",
         directory=directory,
         pages=pages,
     )
+
+
+def test_reads_the_cover():
+    reply = json.dumps(
+        {
+            "title": "小蝴蝶",
+            "author": "张三",
+            "illustrator": "李四",
+            "description": "封面上有一只蝴蝶",
+        }
+    )
+
+    content, cover = understand_cover(make_page(), FakeClient(reply))
+
+    assert cover.title == "小蝴蝶"
+    assert cover.author == "张三"
+    assert cover.illustrator == "李四"
+    assert content.error == ""
+    assert content.description == "封面上有一只蝴蝶"
+
+
+def test_cover_uses_the_cover_prompt():
+    client = FakeClient(json.dumps({"title": "小蝴蝶"}))
+
+    understand_cover(make_page(), client)
+
+    assert "封面" in client.prompts[0]
+    assert "page_text" not in client.prompts[0]
+
+
+def test_a_cover_without_a_title_is_an_error():
+    content, cover = understand_cover(make_page(), FakeClient("{}"))
+
+    assert cover.title == ""
+    assert content.error == "model returned no content"
 
 
 def test_success():
@@ -82,22 +118,6 @@ def test_success():
     assert content.description == "草地"
     assert content.mood == "温暖"
     assert content.error == ""
-
-
-def test_reads_the_page_role():
-    reply = json.dumps({"role": "cover", "description": "封面"})
-
-    content = understand_page(make_page(), FakeClient(reply))
-
-    assert content.role == "cover"
-
-
-def test_unknown_page_role_falls_back_to_story():
-    reply = json.dumps({"role": "back", "description": "末页"})
-
-    content = understand_page(make_page(), FakeClient(reply))
-
-    assert content.role == "story"
 
 
 def test_llm_error_is_recorded():
@@ -141,7 +161,9 @@ def test_landscape_page_uses_landscape_prompt():
 
 
 def test_book_collects_every_page():
-    reply = json.dumps({"description": "草地", "mood": "温暖"})
+    reply = json.dumps(
+        {"title": "小鸡球球", "description": "草地", "mood": "温暖"}
+    )
     pages = [make_page(), make_page("landscape")]
 
     content = understand_book(make_book(pages), FakeClient(reply))
@@ -154,16 +176,34 @@ def test_book_collects_every_page():
     assert [p.description for p in content.pages] == ["草地", "草地"]
 
 
-def test_book_keeps_going_after_a_failed_page():
+def test_a_failed_cover_counts_as_a_failure():
     replies = [LLMError("boom"), json.dumps({"description": "草地"})]
     pages = [make_page(), make_page()]
 
     content = understand_book(make_book(pages), SequenceClient(replies))
 
-    assert content.page_count == 2
     assert content.failed_count == 1
-    assert content.pages[0].error == "boom"
     assert content.pages[1].description == "草地"
+
+    cover = content.cover_page
+    assert cover is not None
+    assert cover.error == "boom"
+
+
+def test_book_keeps_going_after_a_failed_page():
+    replies = [
+        json.dumps({"title": "小蝴蝶"}),
+        LLMError("boom"),
+        json.dumps({"description": "草地"}),
+    ]
+    pages = [make_page(), make_page(), make_page()]
+
+    content = understand_book(make_book(pages), SequenceClient(replies))
+
+    assert content.page_count == 3
+    assert content.failed_count == 1
+    assert content.pages[1].error == "boom"
+    assert content.pages[2].description == "草地"
 
 
 def test_book_with_no_pages():
@@ -171,41 +211,37 @@ def test_book_with_no_pages():
 
     assert content.page_count == 0
     assert content.failed_count == 0
+    assert content.cover_page is None
 
 
-def test_story_pages_skip_cover_and_end():
+def test_story_pages_skip_the_cover():
     book = BookContent(
         id="demo",
-        title="示例",
         source="/src",
+        cover=CoverContent(title="小蝴蝶"),
         pages=[
-            PageContent(index=0, filename="01.jpg", role="cover"),
+            PageContent(index=0, filename="01.jpg"),
             PageContent(index=1, filename="02.jpg"),
-            PageContent(index=2, filename="03.jpg", role="end"),
+            PageContent(index=2, filename="03.jpg"),
         ],
     )
 
-    assert [page.index for page in book.story_pages] == [1]
+    assert [page.index for page in book.story_pages] == [1, 2]
 
 
-def test_story_pages_fall_back_to_every_page():
+def test_story_pages_of_a_single_page_book():
     book = BookContent(
         id="demo",
-        title="示例",
         source="/src",
-        pages=[
-            PageContent(index=0, filename="01.jpg", role="cover"),
-            PageContent(index=1, filename="02.jpg", role="end"),
-        ],
+        pages=[PageContent(index=0, filename="01.jpg")],
     )
 
-    assert [page.index for page in book.story_pages] == [0, 1]
+    assert book.story_pages == []
 
 
 def test_language_follows_the_printed_text():
     book = BookContent(
         id="demo",
-        title="示例",
         source="/src",
         pages=[
             PageContent(index=0, filename="01.jpg", page_text="小鸡在走路"),
@@ -219,7 +255,6 @@ def test_language_follows_the_printed_text():
 def test_an_english_book_reads_as_english():
     book = BookContent(
         id="demo",
-        title="示例",
         source="/src",
         pages=[
             PageContent(index=0, filename="01.jpg", page_text="Kuan and I"),
@@ -348,7 +383,6 @@ def test_cache_keeps_every_page_field(tmp_path):
     page = make_cached_page(tmp_path)
     reply = json.dumps(
         {
-            "role": "cover",
             "page_text": "小蝴蝶，你好。",
             "footer": "定价：38.00 元",
             "description": "封面",
@@ -360,7 +394,6 @@ def test_cache_keeps_every_page_field(tmp_path):
 
     content = read_page(page, FakeClient(), cache, tmp_path)
 
-    assert content.role == "cover"
     assert content.page_text == "小蝴蝶，你好。"
     assert content.footer == "定价：38.00 元"
     assert content.description == "封面"
@@ -449,7 +482,7 @@ def test_disabled_cache_calls_the_model_every_time(tmp_path):
 
 
 def test_save_content_writes_content_json(tmp_path):
-    book = BookContent(id="demo", title="示例", source="/src")
+    book = BookContent(id="demo", source="/src")
 
     path = save_content(book, tmp_path)
 
@@ -459,7 +492,7 @@ def test_save_content_writes_content_json(tmp_path):
 
 def test_save_content_writes_the_page_fields(tmp_path):
     page = PageContent(index=2, filename="03.jpg", description="草地")
-    book = BookContent(id="demo", title="示例", source="/src")
+    book = BookContent(id="demo", source="/src")
     book.pages.append(page)
 
     path = save_content(book, tmp_path)
@@ -475,14 +508,17 @@ def test_book_dict_round_trip():
         index=1,
         filename="02.jpg",
         kind="landscape",
-        role="cover",
         page_text="文字",
         footer="定价：38.00 元",
         description="草地",
         mood="温暖",
         model="m",
     )
-    book = BookContent(id="demo", title="示例", source="/src")
-    book.pages.append(page)
+    book = BookContent(
+        id="demo",
+        source="/src",
+        cover=CoverContent(title="小蝴蝶", author="张三"),
+        pages=[page],
+    )
 
     assert BookContent.from_dict(book.to_dict()) == book
