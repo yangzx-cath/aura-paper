@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from .cover import cover_prompt
-from .page import page_prompt
-from .screenplay import screenplay_prompt
-from .shot import shot_prompt
-from .split import split_prompt
-from .story import story_prompt
+from .cover_prompt import cover_prompt
+from .page_prompt import page_prompt
+from .screenplay_prompt import screenplay_prompt
+from .shot_prompt import shot_prompt
+from .split_prompt import split_prompt
+from .story_prompt import story_prompt
 
 __all__ = [
     "cover_prompt",
