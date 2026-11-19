@@ -1,7 +1,5 @@
 """How each page shape is described to the model."""
 
-from __future__ import annotations
-
 READING_NOTES = {
     "portrait": "这是一张竖幅画面。",
     "landscape": (

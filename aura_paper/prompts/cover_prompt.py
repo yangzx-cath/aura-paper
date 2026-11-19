@@ -1,7 +1,5 @@
 """Prompt that reads the book details off the cover."""
 
-from __future__ import annotations
-
 from .layout import reading_note
 
 TEMPLATE = """你是一名儿童绘本编辑。

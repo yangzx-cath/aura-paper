@@ -1,7 +1,5 @@
 """Prompt that asks whether an image holds two pages."""
 
-from __future__ import annotations
-
 TEMPLATE = """你是一名儿童绘本排版助手。
 
 一张扫描图里可能并排放着左右两页，也可能是一整幅画面横跨左右。

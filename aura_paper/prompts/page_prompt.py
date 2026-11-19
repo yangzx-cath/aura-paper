@@ -1,7 +1,5 @@
 """Prompt that reads one page into structured content."""
 
-from __future__ import annotations
-
 from .layout import reading_note
 
 # A closed set keeps mood usable for music and tone mapping.

@@ -1,7 +1,5 @@
 """Prompt builders, one module for each kind of model call."""
 
-from __future__ import annotations
-
 from .cover_prompt import cover_prompt
 from .page_prompt import page_prompt
 from .screenplay_prompt import screenplay_prompt
