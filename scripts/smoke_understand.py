@@ -16,13 +16,13 @@ import time
 from pathlib import Path
 from threading import Lock
 
-from aura_paper.book import PageImage, load_book
+from aura_paper.book import Page, load_images
 from aura_paper.cache import Cache
 from aura_paper.config import cache_root, load_env
 from aura_paper.llm import LLMClient
 from aura_paper.understand import (
     PageContent,
-    save_book,
+    save_content,
     understand_book,
 )
 
@@ -59,7 +59,7 @@ def main() -> int:
         print(f"not a book directory: {source}", file=sys.stderr)
         return 2
 
-    book = load_book(source, book_id=args.book_id)
+    book = load_images(source, book_id=args.book_id)
 
     client = LLMClient.from_env()
     missing = client.missing_settings()
@@ -77,7 +77,7 @@ def main() -> int:
     started = time.perf_counter()
     lock = Lock()
 
-    def show(page: PageImage, result: PageContent, elapsed: float) -> None:
+    def show(page: Page, result: PageContent, elapsed: float) -> None:
         with lock:
             print(_line(page, result, elapsed), flush=True)
 
@@ -89,7 +89,7 @@ def main() -> int:
         on_page=show,
     )
 
-    path = save_book(content)
+    path = save_content(content)
     print()
     print(f"pages   {content.page_count}")
     print(f"failed  {content.failed_count}")
@@ -100,7 +100,7 @@ def main() -> int:
 
 
 # One line per page, so a long run still reads as a progress log.
-def _line(page: PageImage, result: PageContent, elapsed: float) -> str:
+def _line(page: Page, result: PageContent, elapsed: float) -> str:
     status = result.error or result.mood or "-"
     return f"{page.filename}  {page.kind:<9} {elapsed:6.1f}s  {status}"
 

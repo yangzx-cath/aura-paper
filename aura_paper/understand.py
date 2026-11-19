@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from .book import Book, PageImage
+from .book import Book, Page
 from .cache import Cache, file_fingerprint, fingerprint
 from .llm import LLMClient, LLMError
 from .output import write_json
@@ -134,27 +134,30 @@ class BookContent:
 
 
 def understand_page(
-    page: PageImage,
+    page: Page,
     client: LLMClient,
     *,
     cache: Cache | None = None,
     ns: str = "understand",
+    directory: str = "",
 ) -> PageContent:
     """Read one page and return its structured content."""
+    kind = "landscape" if page.width > page.height else "portrait"
     content = PageContent(
         index=page.index,
         filename=page.filename,
-        kind=page.kind,
+        kind=kind,
         model=client.model,
     )
-    prompt = page_prompt(page.kind)
+    prompt = page_prompt(kind)
+    path = Path(directory) / page.filename
 
     if cache is None:
-        return _analyze_page(content, client, prompt, page)
+        return _analyze_page(content, client, prompt, path)
 
     name = f"page_{page.index:02d}"
     key = fingerprint(
-        file_fingerprint(page.path),
+        file_fingerprint(path),
         prompt,
         *client.signature,
     )
@@ -164,7 +167,7 @@ def understand_page(
         _apply_fields(content, entry)
         return content
 
-    content = _analyze_page(content, client, prompt, page)
+    content = _analyze_page(content, client, prompt, path)
     # Errors are never cached, so a failed page is retried next run.
     if not content.error:
         cache.save_json(ns, name, key, _page_fields(content))
@@ -176,10 +179,10 @@ def _analyze_page(
     content: PageContent,
     client: LLMClient,
     prompt: str,
-    page: PageImage,
+    path: Path,
 ) -> PageContent:
     try:
-        reply = client.chat(prompt, image_path=Path(page.path))
+        reply = client.chat(prompt, image_path=path)
         fields = extract_json(reply)
     except (LLMError, ValueError) as exc:
         content.error = str(exc)
@@ -219,7 +222,7 @@ def understand_book(
     *,
     cache: Cache | None = None,
     workers: int = 1,
-    on_page: Callable[[PageImage, PageContent, float], None] | None = None,
+    on_page: Callable[[Page, PageContent, float], None] | None = None,
 ) -> BookContent:
     """Read every page of a book and collect the results."""
     assert workers >= 1
@@ -227,15 +230,21 @@ def understand_book(
     content = BookContent(
         id=book.id,
         title=book.title,
-        source=book.source,
+        source=book.directory,
     )
 
     ns = f"understand/{book.id}"
 
     # A bad page only sets PageContent.error, so other pages keep going.
-    def run(page: PageImage) -> PageContent:
+    def run(page: Page) -> PageContent:
         started = time.perf_counter()
-        result = understand_page(page, client, cache=cache, ns=ns)
+        result = understand_page(
+            page,
+            client,
+            cache=cache,
+            ns=ns,
+            directory=book.directory,
+        )
         if on_page is not None:
             on_page(page, result, time.perf_counter() - started)
         return result
@@ -251,6 +260,9 @@ def understand_book(
     return content
 
 
-def save_book(content: BookContent, root: str | Path | None = None) -> Path:
+def save_content(
+    content: BookContent,
+    root: str | Path | None = None,
+) -> Path:
     """Write the book content to <root>/<book_id>/book.json."""
     return write_json(content.id, "book", content.to_dict(), root)

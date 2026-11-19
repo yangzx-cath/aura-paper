@@ -1,13 +1,13 @@
 import json
 from pathlib import Path
 
-from aura_paper.book import Book, PageImage
+from aura_paper.book import Book, Page
 from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient, LLMError
 from aura_paper.understand import (
     BookContent,
     PageContent,
-    save_book,
+    save_content,
     understand_book,
     understand_page,
 )
@@ -53,19 +53,16 @@ class SequenceClient(FakeClient):
 
 
 def make_page(kind="portrait"):
-    return PageImage(
-        index=3,
-        filename="03.jpg",
-        path="page.jpg",
-        kind=kind,
-    )
+    width, height = (1700, 1200) if kind == "landscape" else (1200, 1700)
+    return Page(index=3, filename="03.jpg", width=width, height=height)
 
 
-def make_book(pages):
+def make_book(pages, directory="/tmp/chicken"):
     return Book(
         id="chicken",
         title="小鸡球球",
-        source="/tmp/chicken",
+        source="/tmp/chicken.pdf",
+        directory=directory,
         pages=pages,
     )
 
@@ -239,7 +236,18 @@ NS = "understand/book"
 def make_cached_page(tmp_path, data=b"image", index=3, name="03.jpg"):
     path = tmp_path / name
     path.write_bytes(data)
-    return PageImage(index=index, filename=name, path=str(path))
+    return Page(index=index, filename=name, width=1200, height=1700)
+
+
+# Read one page through the cache, with its image in tmp_path.
+def read_page(page, client, cache, tmp_path):
+    return understand_page(
+        page,
+        client,
+        cache=cache,
+        ns=NS,
+        directory=str(tmp_path),
+    )
 
 
 def test_cache_stores_successful_page(tmp_path):
@@ -247,7 +255,7 @@ def test_cache_stores_successful_page(tmp_path):
     client = FakeClient(json.dumps({"description": "草地"}))
 
     page = make_cached_page(tmp_path)
-    understand_page(page, client, cache=cache, ns=NS)
+    read_page(page, client, cache, tmp_path)
 
     stored = list((tmp_path / "cache" / NS).glob("*.json"))
     assert len(stored) == 1
@@ -258,10 +266,10 @@ def test_cache_reuses_stored_page(tmp_path):
     cache = Cache(tmp_path / "cache")
     page = make_cached_page(tmp_path)
     first = FakeClient(json.dumps({"description": "草地"}))
-    understand_page(page, first, cache=cache, ns=NS)
+    read_page(page, first, cache, tmp_path)
 
     second = FakeClient(json.dumps({"description": "更动"}))
-    content = understand_page(page, second, cache=cache, ns=NS)
+    content = read_page(page, second, cache, tmp_path)
 
     assert content.description == "草地"
     assert second.prompts == []
@@ -272,7 +280,13 @@ def test_cache_does_not_store_failed_page(tmp_path):
     cache = Cache(tmp_path / "cache")
     client = FakeClient(error=LLMError("boom"))
 
-    understand_page(make_cached_page(tmp_path), client, cache=cache, ns=NS)
+    understand_page(
+        make_cached_page(tmp_path),
+        client,
+        cache=cache,
+        ns=NS,
+        directory=str(tmp_path),
+    )
 
     assert not (tmp_path / "cache" / NS).exists()
 
@@ -281,10 +295,10 @@ def test_failed_page_is_retried(tmp_path):
     cache = Cache(tmp_path / "cache")
     page = make_cached_page(tmp_path)
     failing = FakeClient(error=LLMError("boom"))
-    understand_page(page, failing, cache=cache, ns=NS)
+    read_page(page, failing, cache, tmp_path)
 
     client = FakeClient(json.dumps({"description": "草地"}))
-    content = understand_page(page, client, cache=cache, ns=NS)
+    content = read_page(page, client, cache, tmp_path)
 
     assert content.description == "草地"
     assert len(client.prompts) == 1
@@ -294,11 +308,11 @@ def test_changed_image_is_a_miss(tmp_path):
     cache = Cache(tmp_path / "cache")
     first = FakeClient(json.dumps({"description": "一"}))
     page = make_cached_page(tmp_path, data=b"one")
-    understand_page(page, first, cache=cache, ns=NS)
+    read_page(page, first, cache, tmp_path)
 
     second = FakeClient(json.dumps({"description": "二"}))
     page = make_cached_page(tmp_path, data=b"two")
-    content = understand_page(page, second, cache=cache, ns=NS)
+    content = read_page(page, second, cache, tmp_path)
 
     assert content.description == "二"
     assert len(second.prompts) == 1
@@ -312,10 +326,18 @@ def test_cached_page_takes_filename_from_current_page(tmp_path):
         FakeClient(json.dumps({"description": "草地"})),
         cache=cache,
         ns=NS,
+        directory=str(tmp_path),
     )
 
-    renamed = PageImage(index=3, filename="renamed.jpg", path=page.path)
-    content = understand_page(renamed, FakeClient(), cache=cache, ns=NS)
+    # Same bytes under a new name must still hit the cache.
+    renamed = make_cached_page(tmp_path, name="renamed.jpg")
+    content = understand_page(
+        renamed,
+        FakeClient(),
+        cache=cache,
+        ns=NS,
+        directory=str(tmp_path),
+    )
 
     assert content.filename == "renamed.jpg"
     assert content.description == "草地"
@@ -334,9 +356,9 @@ def test_cache_keeps_every_page_field(tmp_path):
             "mood_detail": "有一点期待",
         }
     )
-    understand_page(page, FakeClient(reply), cache=cache, ns=NS)
+    read_page(page, FakeClient(reply), cache, tmp_path)
 
-    content = understand_page(page, FakeClient(), cache=cache, ns=NS)
+    content = read_page(page, FakeClient(), cache, tmp_path)
 
     assert content.role == "cover"
     assert content.page_text == "小蝴蝶，你好。"
@@ -353,7 +375,7 @@ def make_cached_book(tmp_path, count=3):
         data = f"p{index}".encode()
         page = make_cached_page(tmp_path, data=data, index=index, name=name)
         pages.append(page)
-    return make_book(pages)
+    return make_book(pages, directory=str(tmp_path))
 
 
 def test_book_caches_each_page(tmp_path):
@@ -406,7 +428,7 @@ def test_namespaces_are_isolated_per_book(tmp_path):
     client = FakeClient(json.dumps({"description": "一"}))
     understand_book(first, client, cache=cache)
 
-    other = Book(id="other", pages=first.pages)
+    other = Book(id="other", directory=str(tmp_path), pages=first.pages)
     second = FakeClient(json.dumps({"description": "二"}))
     content = understand_book(other, second, cache=cache)
 
@@ -419,28 +441,28 @@ def test_disabled_cache_calls_the_model_every_time(tmp_path):
     page = make_cached_page(tmp_path)
     client = FakeClient(json.dumps({"description": "草地"}))
 
-    understand_page(page, client, cache=cache, ns=NS)
-    understand_page(page, client, cache=cache, ns=NS)
+    read_page(page, client, cache, tmp_path)
+    read_page(page, client, cache, tmp_path)
 
     assert len(client.prompts) == 2
     assert not (tmp_path / "cache").exists()
 
 
-def test_save_book_writes_book_json(tmp_path):
+def test_save_content_writes_book_json(tmp_path):
     book = BookContent(id="demo", title="示例", source="/src")
 
-    path = save_book(book, tmp_path)
+    path = save_content(book, tmp_path)
 
     assert path == tmp_path / "demo" / "book.json"
     assert path.is_file()
 
 
-def test_save_book_writes_the_page_fields(tmp_path):
+def test_save_content_writes_the_page_fields(tmp_path):
     page = PageContent(index=2, filename="03.jpg", description="草地")
     book = BookContent(id="demo", title="示例", source="/src")
     book.pages.append(page)
 
-    path = save_book(book, tmp_path)
+    path = save_content(book, tmp_path)
 
     data = json.loads(path.read_text(encoding="utf-8"))
     assert data["page_count"] == 1
