@@ -1,7 +1,5 @@
 """Prompt that reads one page into structured content."""
 
-from .layout import reading_note
-
 # A closed set keeps mood usable for music and tone mapping.
 MOOD_WORDS = (
     "好奇、欢快、兴奋、惊喜、温暖、平静、期待、担忧、害怕、生气、失落、悲伤"
@@ -37,11 +35,9 @@ TEMPLATE = """你是一名儿童绘本内容理解助手。
 8. 画面中看不到的信息不要编造。只出现手、脚、背影等局部时，不要判断是谁，也不要
    写角色名或"我"；写清可见的部位、肤色、衣袖、饰品、动作、物品和位置，留给后续
    结合上下文判断。局部有机器结构、明显服装等特征时照实写出来，但不要替它命名。
-9. __LAYOUT__
 """
 
 
-def page_prompt(kind: str = "portrait") -> str:
-    """Build the prompt for one page, aware of the page shape."""
-    prompt = TEMPLATE.replace("__LAYOUT__", reading_note(kind))
-    return prompt.replace("__MOODS__", MOOD_WORDS)
+def page_prompt() -> str:
+    """Build the prompt for one page."""
+    return TEMPLATE.replace("__MOODS__", MOOD_WORDS)
