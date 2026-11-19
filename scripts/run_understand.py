@@ -93,6 +93,7 @@ def main() -> int:
     print()
     print(f"pages   {content.page_count}")
     print(f"failed  {content.failed_count}")
+    print(f"title   {content.cover.title or '-'}")
     print(f"total   {time.perf_counter() - started:.1f}s")
     print(f"stats   {cache.stats()}")
     print(f"output  {path}")
