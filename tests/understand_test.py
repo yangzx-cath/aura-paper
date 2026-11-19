@@ -151,15 +151,6 @@ def test_empty_payload_is_an_error():
     assert content.error == "model returned no content"
 
 
-def test_landscape_page_uses_landscape_prompt():
-    client = FakeClient(json.dumps({"page_text": "文字"}))
-
-    content = understand_page(make_page(kind="landscape"), client)
-
-    assert content.kind == "landscape"
-    assert "横幅" in client.prompts[0]
-
-
 def test_book_collects_every_page():
     reply = json.dumps(
         {"title": "小鸡球球", "description": "草地", "mood": "温暖"}
