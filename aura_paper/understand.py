@@ -14,10 +14,34 @@ from .book import Book, Page
 from .cache import Cache, file_fingerprint, fingerprint
 from .llm import LLMClient, LLMError
 from .output import write_json
-from .prompts import page_prompt
+from .prompts import cover_prompt, page_prompt
 from .utils import extract_json, now_iso
 
-PAGE_ROLES = ("cover", "story", "end")
+
+@dataclass
+class CoverContent:
+    """The book details read from the cover."""
+
+    title: str = ""
+    author: str = ""
+    illustrator: str = ""
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this cover."""
+        return {
+            "title": self.title,
+            "author": self.author,
+            "illustrator": self.illustrator,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> CoverContent:
+        """Build a cover from its external JSON shape."""
+        return cls(
+            title=str(data.get("title") or ""),
+            author=str(data.get("author") or ""),
+            illustrator=str(data.get("illustrator") or ""),
+        )
 
 
 @dataclass
@@ -27,7 +51,6 @@ class PageContent:
     index: int
     filename: str
     kind: str = "portrait"
-    role: str = "story"
     page_text: str = ""
     footer: str = ""
     description: str = ""
@@ -42,7 +65,6 @@ class PageContent:
             "index": self.index,
             "filename": self.filename,
             "kind": self.kind,
-            "role": self.role,
             "model": self.model,
             "generated_at": now_iso(),
             "page_text": self.page_text,
@@ -60,7 +82,6 @@ class PageContent:
             index=int(data.get("index") or 0),
             filename=str(data.get("filename") or ""),
             kind=str(data.get("kind") or "portrait"),
-            role=_role(data.get("role")),
             page_text=str(data.get("page_text") or ""),
             footer=str(data.get("footer") or ""),
             description=str(data.get("description") or ""),
@@ -71,38 +92,43 @@ class PageContent:
         )
 
 
-# Keep a page role inside the supported set, defaulting to a story page.
-def _role(value: object) -> str:
-    text = str(value or "").strip().lower()
-    return text if text in PAGE_ROLES else "story"
-
-
 @dataclass
 class BookContent:
     """Structured content of a whole book."""
 
     id: str
-    title: str
     source: str
+    cover: CoverContent = field(default_factory=CoverContent)
     pages: list[PageContent] = field(default_factory=list)
 
     @property
+    def title(self) -> str:
+        """Return the title printed on the cover."""
+        return self.cover.title
+
+    @property
     def page_count(self) -> int:
+        """Return the number of pages, the cover included."""
         return len(self.pages)
 
     @property
     def failed_count(self) -> int:
+        """Return how many pages failed, the cover included."""
         return sum(1 for page in self.pages if page.error)
 
-    # Pages that carry the story, or every page when none is marked "story".
+    @property
+    def cover_page(self) -> PageContent | None:
+        """Return the first page, which is the cover."""
+        return self.pages[0] if self.pages else None
+
     @property
     def story_pages(self) -> list[PageContent]:
-        pages = [page for page in self.pages if page.role == "story"]
-        return pages or list(self.pages)
+        """Return the pages after the cover, which carry the story."""
+        return self.pages[1:]
 
-    # Language the pages are printed in, so narration can stay in it.
     @property
     def language(self) -> str:
+        """Return the language printed on the pages, so narration uses it."""
         text = "".join(page.page_text for page in self.pages)
         letters = [char for char in text if char.isalpha()]
         english = sum(1 for char in letters if char.isascii())
@@ -117,6 +143,7 @@ class BookContent:
             "generated_at": now_iso(),
             "page_count": self.page_count,
             "failed_count": self.failed_count,
+            "cover": self.cover.to_dict(),
             "pages": [page.to_dict() for page in self.pages],
         }
 
@@ -125,12 +152,96 @@ class BookContent:
         """Build a book from its external JSON shape."""
         return cls(
             id=str(data.get("id") or ""),
-            title=str(data.get("title") or ""),
             source=str(data.get("source") or ""),
+            cover=CoverContent.from_dict(data.get("cover") or {}),
             pages=[
                 PageContent.from_dict(page) for page in data.get("pages") or []
             ],
         )
+
+
+def understand_cover(
+    page: Page,
+    client: LLMClient,
+    *,
+    cache: Cache | None = None,
+    ns: str = "understand",
+    directory: str = "",
+) -> tuple[PageContent, CoverContent]:
+    """Read the cover and return its page content plus the book metadata."""
+    kind = "landscape" if page.width > page.height else "portrait"
+    content = PageContent(
+        index=page.index,
+        filename=page.filename,
+        kind=kind,
+        model=client.model,
+    )
+    cover = CoverContent()
+    prompt = cover_prompt(kind)
+    path = Path(directory) / page.filename
+
+    if cache is None:
+        return _analyze_cover(content, cover, client, prompt, path)
+
+    key = fingerprint(
+        file_fingerprint(path),
+        prompt,
+        *client.signature,
+    )
+
+    entry = cache.load_json(ns, "cover", key)
+    if entry is not None:
+        _apply_cover(content, cover, entry)
+        return content, cover
+
+    content, cover = _analyze_cover(content, cover, client, prompt, path)
+    # Errors are never cached, so a failed cover is retried next run.
+    if not content.error:
+        cache.save_json(ns, "cover", key, _cover_fields(content, cover))
+    return content, cover
+
+
+# Call the model for the cover and fill the page content and book details.
+def _analyze_cover(
+    content: PageContent,
+    cover: CoverContent,
+    client: LLMClient,
+    prompt: str,
+    path: Path,
+) -> tuple[PageContent, CoverContent]:
+    try:
+        reply = client.chat(prompt, image_path=path)
+        fields = extract_json(reply)
+    except (LLMError, ValueError) as exc:
+        content.error = str(exc)
+        return content, cover
+
+    _apply_cover(content, cover, fields)
+    if not cover.title and not content.description:
+        content.error = "model returned no content"
+    return content, cover
+
+
+# Copy the cover fields, turning missing or null values into empty strings.
+def _apply_cover(
+    content: PageContent,
+    cover: CoverContent,
+    fields: dict,
+) -> None:
+    content.description = str(fields.get("description") or "")
+    cover.title = str(fields.get("title") or "")
+    cover.author = str(fields.get("author") or "")
+    cover.illustrator = str(fields.get("illustrator") or "")
+
+
+# Keep only what the model produced, so the cache holds no page identity.
+def _cover_fields(content: PageContent, cover: CoverContent) -> dict:
+    return {
+        "title": cover.title,
+        "author": cover.author,
+        "illustrator": cover.illustrator,
+        "description": content.description,
+    }
 
 
 def understand_page(
@@ -196,7 +307,6 @@ def _analyze_page(
 
 # Copy the model fields, turning missing or null values into empty strings.
 def _apply_fields(content: PageContent, fields: dict) -> None:
-    content.role = _role(fields.get("role"))
     content.page_text = str(fields.get("page_text") or "")
     content.footer = str(fields.get("footer") or "")
     content.description = str(fields.get("description") or "")
@@ -207,7 +317,6 @@ def _apply_fields(content: PageContent, fields: dict) -> None:
 # Keep only what the model produced, so page identity stays current.
 def _page_fields(content: PageContent) -> dict:
     return {
-        "role": content.role,
         "page_text": content.page_text,
         "footer": content.footer,
         "description": content.description,
@@ -229,13 +338,13 @@ def understand_book(
 
     content = BookContent(
         id=book.id,
-        title=book.title,
         source=book.directory,
     )
 
     ns = f"understand/{book.id}"
+    pages = book.pages
 
-    # A bad page only sets PageContent.error, so other pages keep going.
+    # A bad page only sets its error, so other pages keep going.
     def run(page: Page) -> PageContent:
         started = time.perf_counter()
         result = understand_page(
@@ -249,12 +358,36 @@ def understand_book(
             on_page(page, result, time.perf_counter() - started)
         return result
 
+    def run_cover(page: Page) -> tuple[PageContent, CoverContent]:
+        started = time.perf_counter()
+        result, cover = understand_cover(
+            page,
+            client,
+            cache=cache,
+            ns=ns,
+            directory=book.directory,
+        )
+        if on_page is not None:
+            on_page(page, result, time.perf_counter() - started)
+        return result, cover
+
+    if not pages:
+        return content
+
+    cover_page = pages[0]
+    story = pages[1:]
+
     if workers == 1:
-        results = [run(page) for page in book.pages]
+        cover_content, content.cover = run_cover(cover_page)
+        results = [cover_content] + [run(page) for page in story]
     else:
-        # pool.map() keeps the input order, so results stay in book order.
+        # The cover feeds no page, so it runs beside them instead of first.
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            results = list(pool.map(run, book.pages))
+            cover_future = pool.submit(run_cover, cover_page)
+            # pool.map() keeps the input order, so pages stay in book order.
+            story_results = list(pool.map(run, story))
+            cover_content, content.cover = cover_future.result()
+        results = [cover_content] + story_results
 
     content.pages = results
     return content
