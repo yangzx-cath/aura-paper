@@ -51,14 +51,19 @@ class LLMClient:
         )
 
     @classmethod
-    def from_env(cls) -> LLMClient:
-        """Build a client from the LLM_* environment variables."""
+    def from_env(cls, effort: str = "") -> LLMClient:
+        """Build a client from the LLM_* environment variables.
+
+        The effort argument overrides LLM_REASONING_EFFORT.
+        """
         return cls(
             base_url=os.environ.get("LLM_BASE_URL", ""),
             api_key=os.environ.get("LLM_API_KEY", ""),
             model=os.environ.get("LLM_MODEL", ""),
             timeout=float(os.environ.get("LLM_TIMEOUT", "120")),
-            reasoning_effort=os.environ.get("LLM_REASONING_EFFORT", ""),
+            reasoning_effort=(
+                effort or os.environ.get("LLM_REASONING_EFFORT", "")
+            ),
         )
 
     def missing_settings(self) -> list[str]:
@@ -101,8 +106,6 @@ class LLMClient:
         payload = {"model": self.model, "messages": messages}
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
-        # A scene is short, so capping the hidden thinking saves most of
-        # the wall time without changing what comes back.
         if self.reasoning_effort:
             payload["reasoning_effort"] = self.reasoning_effort
 
