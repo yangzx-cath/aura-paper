@@ -1,7 +1,5 @@
 """Prompt that reads the book details off the cover."""
 
-from .layout import reading_note
-
 TEMPLATE = """你是一名儿童绘本编辑。
 
 请阅读这本书的封面，严格按下面的 JSON 结构输出：
@@ -16,15 +14,16 @@ TEMPLATE = """你是一名儿童绘本编辑。
 要求：
 1. 只输出 JSON，不要解释文字，不要使用代码块，四个字段都要出现。
 2. description 使用中文；title、author、illustrator 保留封面上的原文，不要翻译。
-3. title 取封面上最大最显眼的字，去掉书名号和引号。
-4. author、illustrator 按封面上的"文/著/图/绘/译"等标注区分；
-   封面没写的留空字符串，不要从画面或正文推断。
+3. title 取封面上最大最显眼的字，去掉书名号和引号；书名分行时连成一行，
+   有副标题时用冒号接在主标题后面。
+4. author、illustrator 按封面上的"文/著/图/绘/译"等标注区分，只写标注前的名字，
+   不要带上"著""图"这类字；封面没写的留空字符串，不要从画面或正文推断。
 5. 画面上的人物名字不是作者，封面上写的才是。
-6. 画面中看不到的信息不要编造。
-7. __LAYOUT__
+6. 出版社、丛书名、品牌标识、定价、条形码都不是书名，也不是作者或绘者。
+7. 画面中看不到的信息不要编造。
 """
 
 
-def cover_prompt(kind: str = "portrait") -> str:
+def cover_prompt() -> str:
     """Build the prompt that reads the book metadata off the cover."""
-    return TEMPLATE.replace("__LAYOUT__", reading_note(kind))
+    return TEMPLATE
