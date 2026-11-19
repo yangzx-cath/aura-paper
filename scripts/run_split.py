@@ -2,7 +2,7 @@
 
 Reads out/<book>/book.json from the PDF stage, asks the model which pages
 hold two pages side by side, cuts those pages in half, and writes
-split.json for the understanding stage.
+pages.json for the understanding stage.
 
 Usage:
     export LLM_API_KEY=sk-xxx
@@ -20,7 +20,7 @@ from aura_paper.book import Book, Page
 from aura_paper.cache import Cache
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.llm import LLMClient
-from aura_paper.split import Spread, save_split, split_book
+from aura_paper.split import Layout, save_split, split_book
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -74,14 +74,14 @@ def main() -> int:
     print(f"cache   {cache.root}  enabled={cache.enabled}")
     print(f"workers {args.workers}")
     print()
-    print("Checking every page for a two-page spread", flush=True)
+    print("Checking every image for two pages side by side", flush=True)
 
     started = time.perf_counter()
     lock = Lock()
 
-    def show(page: Page, spread: Spread, elapsed: float) -> None:
+    def show(page: Page, layout: Layout, elapsed: float) -> None:
         with lock:
-            print(_line(page, spread, elapsed), flush=True)
+            print(_line(page, layout, elapsed), flush=True)
 
     split = split_book(
         book,
@@ -94,7 +94,7 @@ def main() -> int:
     path = save_split(split)
     print()
     print(f"pages   {split.book.page_count}")
-    print(f"spreads {split.spread_count}")
+    print(f"pairs   {split.two_page_count}")
     print(f"failed  {split.failed_count}")
     print(f"total   {time.perf_counter() - started:.1f}s")
     print(f"stats   {cache.stats()}")
@@ -103,9 +103,9 @@ def main() -> int:
 
 
 # One line per page, so a long run still reads as a progress log.
-def _line(page: Page, spread: Spread, elapsed: float) -> str:
+def _line(page: Page, layout: Layout, elapsed: float) -> str:
     size = f"{page.width}x{page.height}"
-    status = spread.error or ("spread" if spread.spread else "single")
+    status = layout.error or ("two pages" if layout.two_pages else "one page")
     return f"{page.filename}  {size:<11} {elapsed:6.1f}s  {status}"
 
 
