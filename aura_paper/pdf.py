@@ -20,6 +20,8 @@ MIN_DPI = 72
 MAX_DPI = 600
 
 IMAGE_QUALITY = 92
+MIN_QUALITY = 1
+MAX_QUALITY = 100
 
 # Numbered from zero: the first page of a picture book is its cover.
 PAGE_TEMPLATE = "page_{number:03d}.jpg"
@@ -38,6 +40,11 @@ def render_pdf(
     on_page: Callable[[Page, float], None] | None = None,
 ) -> Book:
     """Render every page of a PDF into out_dir, returning the book."""
+    if not MIN_QUALITY <= quality <= MAX_QUALITY:
+        raise ValueError(
+            f"quality must be {MIN_QUALITY}-{MAX_QUALITY}: {quality}"
+        )
+
     source = Path(pdf_path).expanduser().resolve()
     target = Path(out_dir).expanduser().resolve()
     target.mkdir(parents=True, exist_ok=True)
