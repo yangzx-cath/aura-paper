@@ -1,4 +1,4 @@
-"""Cut two-page spreads into single pages before they are understood."""
+"""Cut images that hold two pages into one page each."""
 
 from __future__ import annotations
 
@@ -19,18 +19,18 @@ from .pdf import IMAGE_QUALITY
 from .prompts import split_prompt
 from .utils import extract_json
 
-# A spread is about twice as wide as the narrowest page of its book.
-SPREAD_RATIO = 1.6
+# Two pages side by side are about twice as wide as one page.
+TWO_PAGE_RATIO = 1.6
 
 # The copy sent with the layout question fits in this box.
 THUMBNAIL_BOX = (1024, 1024)
 
 
 @dataclass
-class Spread:
-    """The spread decision of one page."""
+class Layout:
+    """Whether one image holds two pages side by side."""
 
-    spread: bool = False
+    two_pages: bool = False
     reason: str = ""
     error: str = ""
 
@@ -40,20 +40,20 @@ class Split:
     """The cut pages of one book and the decisions behind them."""
 
     book: Book
-    decisions: list[Spread] = field(default_factory=list)
+    decisions: list[Layout] = field(default_factory=list)
 
     @property
-    def spread_count(self) -> int:
-        """Return how many pages held two pages side by side."""
-        return sum(1 for decision in self.decisions if decision.spread)
+    def two_page_count(self) -> int:
+        """Return how many images held two pages."""
+        return sum(1 for decision in self.decisions if decision.two_pages)
 
     @property
     def failed_count(self) -> int:
-        """Return how many pages the model could not classify."""
+        """Return how many images the model could not classify."""
         return sum(1 for decision in self.decisions if decision.error)
 
 
-def detect_spread(
+def detect_layout(
     page: Page,
     client: LLMClient,
     *,
@@ -61,16 +61,16 @@ def detect_spread(
     ns: str = "split",
     directory: str = "",
     base_width: int = 0,
-) -> Spread:
-    """Decide whether one page holds two pages side by side."""
+) -> Layout:
+    """Decide whether one image holds two pages side by side."""
     if not _is_candidate(page, base_width):
-        return Spread()
+        return Layout()
 
     path = Path(directory) / page.filename
     prompt = split_prompt()
 
     if cache is None:
-        return _ask_spread(client, prompt, path)
+        return _ask_layout(client, prompt, path)
 
     key = fingerprint(
         file_fingerprint(path),
@@ -81,42 +81,42 @@ def detect_spread(
     name = Path(page.filename).stem
     entry = cache.load_json(ns, name, key)
     if entry is not None:
-        return Spread(
-            spread=_as_bool(entry.get("spread")),
+        return Layout(
+            two_pages=_as_bool(entry.get("two_pages")),
             reason=str(entry.get("reason") or ""),
         )
 
-    result = _ask_spread(client, prompt, path)
-    # Errors are never cached, so a failed page is retried next run.
+    result = _ask_layout(client, prompt, path)
+    # Errors are never cached, so a failed image is retried next run.
     if not result.error:
-        cache.save_json(ns, name, key, _spread_fields(result))
+        cache.save_json(ns, name, key, _layout_fields(result))
     return result
 
 
-# Only a page about twice as wide as one page can hold two pages.
+# Only an image about twice as wide as one page can hold two pages.
 def _is_candidate(page: Page, base_width: int) -> bool:
-    wide = base_width > 0 and page.width >= base_width * SPREAD_RATIO
-    flat = page.height > 0 and page.width >= page.height * SPREAD_RATIO
+    wide = base_width > 0 and page.width >= base_width * TWO_PAGE_RATIO
+    flat = page.height > 0 and page.width >= page.height * TWO_PAGE_RATIO
     return wide or flat
 
 
-# Ask the model with a downscaled copy of the page.
-def _ask_spread(client: LLMClient, prompt: str, path: Path) -> Spread:
+# Ask the model with a downscaled copy of the image.
+def _ask_layout(client: LLMClient, prompt: str, path: Path) -> Layout:
     try:
         with tempfile.TemporaryDirectory() as folder:
             thumb = _thumbnail(path, Path(folder))
             reply = client.chat(prompt, image_path=thumb)
         fields = extract_json(reply)
     except (LLMError, ValueError, OSError) as exc:
-        return Spread(error=str(exc))
+        return Layout(error=str(exc))
 
-    return Spread(
-        spread=_as_bool(fields.get("spread")),
+    return Layout(
+        two_pages=_as_bool(fields.get("two_pages")),
         reason=str(fields.get("reason") or ""),
     )
 
 
-# Shrink one page, keeping its shape so the gutter still shows.
+# Shrink one image, keeping its shape so the gutter still shows.
 def _thumbnail(path: Path, folder: Path) -> Path:
     target = folder / path.name
     with Image.open(path) as image:
@@ -133,8 +133,8 @@ def _as_bool(value: object) -> bool:
     return bool(value)
 
 
-def _spread_fields(spread: Spread) -> dict:
-    return {"spread": spread.spread, "reason": spread.reason}
+def _layout_fields(layout: Layout) -> dict:
+    return {"two_pages": layout.two_pages, "reason": layout.reason}
 
 
 def split_book(
@@ -143,17 +143,17 @@ def split_book(
     *,
     cache: Cache | None = None,
     workers: int = 1,
-    on_page: Callable[[Page, Spread, float], None] | None = None,
+    on_page: Callable[[Page, Layout, float], None] | None = None,
 ) -> Split:
-    """Cut every two-page spread in half and renumber the pages."""
+    """Cut every image that holds two pages and renumber the pages."""
     assert workers >= 1
 
     ns = f"split/{book.id}"
     base = _base_width(book.pages)
 
-    def run(page: Page) -> tuple[Page, Spread, float]:
+    def run(page: Page) -> tuple[Page, Layout, float]:
         started = time.perf_counter()
-        spread = detect_spread(
+        layout = detect_layout(
             page,
             client,
             cache=cache,
@@ -161,7 +161,7 @@ def split_book(
             directory=book.directory,
             base_width=base,
         )
-        return page, spread, time.perf_counter() - started
+        return page, layout, time.perf_counter() - started
 
     if workers == 1:
         results = [run(page) for page in book.pages]
@@ -179,33 +179,35 @@ def split_book(
             title=book.title,
         )
     )
-    for page, spread, elapsed in results:
-        split.decisions.append(spread)
-        # One spread becomes two pages, so every index is set here.
-        first = len(split.book.pages)
-        split.book.pages.extend(_cut(page, spread, book.directory, first))
+    for page, layout, elapsed in results:
+        split.decisions.append(layout)
+        # An image adds one page or two, so numbering continues from here.
+        start_index = len(split.book.pages)
+        split.book.pages.extend(
+            _cut(page, layout, book.directory, start_index)
+        )
         if on_page is not None:
-            on_page(page, spread, elapsed)
+            on_page(page, layout, elapsed)
     return split
 
 
-# The narrowest page is the one page of the book, so a spread is twice it.
+# The narrowest image holds one page, so two pages are twice as wide.
 def _base_width(pages: list[Page]) -> int:
     widths = [page.width for page in pages if page.width]
     return min(widths) if widths else 0
 
 
-# Cut one page down the middle, or keep it whole when it holds one page.
+# Cut one image down the middle, or keep it whole when it holds one page.
 def _cut(
     page: Page,
-    spread: Spread,
+    layout: Layout,
     directory: str,
-    start: int,
+    start_index: int,
 ) -> list[Page]:
-    if not spread.spread:
+    if not layout.two_pages:
         return [
             Page(
-                index=start,
+                index=start_index,
                 filename=page.filename,
                 width=page.width,
                 height=page.height,
@@ -223,10 +225,10 @@ def _cut(
             target = source.with_name(f"{source.stem}{'ab'[offset]}.jpg")
             piece = image.convert("RGB").crop(box)
             piece.save(target, "JPEG", quality=IMAGE_QUALITY)
-            # The text layer covers the whole spread, not one half of it.
+            # The text layer covers the whole image, not one half of it.
             pages.append(
                 Page(
-                    index=start + offset,
+                    index=start_index + offset,
                     filename=target.name,
                     width=piece.width,
                     height=piece.height,
