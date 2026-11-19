@@ -311,6 +311,20 @@ def test_cache_reuses_stored_page(tmp_path):
     assert cache.stats() == {"hit": 1, "miss": 1}
 
 
+def test_a_client_with_another_effort_is_a_cache_miss(tmp_path):
+    cache = Cache(tmp_path / "cache")
+    page = make_cached_page(tmp_path)
+    quick = FakeClient(json.dumps({"description": "草地"}))
+    quick.reasoning_effort = "low"
+    read_page(page, quick, cache, tmp_path)
+
+    full = FakeClient(json.dumps({"description": "更动"}))
+    content = read_page(page, full, cache, tmp_path)
+
+    assert content.description == "更动"
+    assert len(full.prompts) == 1
+
+
 def test_cache_does_not_store_failed_page(tmp_path):
     cache = Cache(tmp_path / "cache")
     client = FakeClient(error=LLMError("boom"))
