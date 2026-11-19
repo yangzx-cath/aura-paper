@@ -79,7 +79,8 @@ def _render_page(
     try:
         # PDF user units are points, 72 to an inch, so the scale turns dpi
         # into that unit.
-        image = page.render(scale=dpi / 72).to_pil().copy()
+        scale = dpi / 72
+        image = page.render(scale=scale).to_pil().copy()  # pyright: ignore
         text = _page_text(page)
     finally:
         page.close()
