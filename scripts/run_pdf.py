@@ -1,11 +1,11 @@
-"""Manual smoke test for the PDF stage.
+"""Run the PDF stage from the command line.
 
-Renders a PDF into an image directory, reads whatever text layer it has,
-and loads the result with Book so the handoff is visible.
+Renders a PDF into page images, reads whatever text layer it has, and
+writes book.json for the next stage.
 
 Usage:
-    python scripts/smoke_pdf.py <book.pdf>
-    python scripts/smoke_pdf.py <book.pdf> --dpi 150 --quality 90
+    python scripts/run_pdf.py <book.pdf>
+    python scripts/run_pdf.py <book.pdf> --dpi 150 --quality 90
 """
 
 import argparse

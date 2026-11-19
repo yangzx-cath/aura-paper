@@ -1,14 +1,14 @@
-"""Manual smoke test for one page video.
+"""Run the video stage from the command line.
 
 Reads out/<book>/content.json, story.json and screenplay.json, generates one
 page clip and writes it to out/<book>/clips/page_XX.mp4.
 
 Usage:
     export MINIMAX_API_KEY=sk-xxx
-    python scripts/smoke_video.py <book_id>
-    python scripts/smoke_video.py <book_id> --page 2
-    python scripts/smoke_video.py <book_id> --duration 8
-    python scripts/smoke_video.py <book_id> --dump-prompt
+    python scripts/run_video.py <book_id>
+    python scripts/run_video.py <book_id> --page 2
+    python scripts/run_video.py <book_id> --duration 8
+    python scripts/run_video.py <book_id> --dump-prompt
 """
 
 import argparse
@@ -61,8 +61,8 @@ def main() -> int:
         if not path.is_file():
             print(f"missing {path}", file=sys.stderr)
             print(
-                "run smoke_understand.py, smoke_story.py and "
-                "smoke_screenplay.py first",
+                "start with run_understand.py, run_story.py and "
+                "run_screenplay.py",
                 file=sys.stderr,
             )
             return 2
@@ -128,7 +128,8 @@ def main() -> int:
         f"wait    poll={client.poll_interval:.0f}s  "
         f"max={client.max_wait:.0f}s"
     )
-    print("asking MiniMax for one clip", flush=True)
+    print()
+    print("Asking MiniMax for one clip", flush=True)
 
     started = time.perf_counter()
     clip = generate_clip(

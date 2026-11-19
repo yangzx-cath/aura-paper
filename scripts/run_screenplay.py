@@ -1,13 +1,13 @@
-"""Manual smoke test for the screenplay stage.
+"""Run the screenplay stage from the command line.
 
 Reads out/<book>/content.json and story.json, writes the beat and lines of
 every story page to screenplay.json.
 
 Usage:
     export LLM_API_KEY=sk-xxx
-    python scripts/smoke_screenplay.py <book_id>
-    python scripts/smoke_screenplay.py <book_id> --workers 4
-    python scripts/smoke_screenplay.py <book_id> --dump-prompt 12 > prompt.txt
+    python scripts/run_screenplay.py <book_id>
+    python scripts/run_screenplay.py <book_id> --workers 4
+    python scripts/run_screenplay.py <book_id> --dump-prompt 12 > prompt.txt
 """
 
 import argparse
@@ -59,7 +59,7 @@ def main() -> int:
         if not path.is_file():
             print(f"missing {path}", file=sys.stderr)
             print(
-                "run smoke_understand.py and smoke_story.py first",
+                "start with run_understand.py and run_story.py",
                 file=sys.stderr,
             )
             return 2
@@ -88,7 +88,8 @@ def main() -> int:
     print(f"model   {client.model}  timeout={client.timeout:.0f}s")
     print(f"cache   {cache.root}  enabled={cache.enabled}")
     print(f"workers {args.workers}")
-    print("writing the beat and lines of every page", flush=True)
+    print()
+    print("Writing the beat and lines of every page", flush=True)
 
     started = time.perf_counter()
     lock = Lock()

@@ -1,24 +1,24 @@
-"""Manual smoke test for the whole understanding pipeline.
+"""Run the understanding stage from the command line.
 
-Reads a picture book directory, runs every page through the vision model,
-and writes the result to the output directory. A second run reuses the
-cache and skips the model calls.
+Reads out/<book>/book.json from the PDF stage, runs every page through the
+vision model, and writes the result to content.json. A second run reuses
+the cache and skips the model calls.
 
 Usage:
     export LLM_API_KEY=sk-xxx
-    python scripts/smoke_understand.py <book_dir> [--book-id ID]
-        [--no-cache] [--workers N]
+    python scripts/run_understand.py <book_id> [--no-cache] [--workers N]
 """
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
 from threading import Lock
 
-from aura_paper.book import Page, load_book_from_images
+from aura_paper.book import Book, Page
 from aura_paper.cache import Cache
-from aura_paper.config import cache_root, load_env
+from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.llm import LLMClient
 from aura_paper.understand import (
     PageContent,
@@ -33,12 +33,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run the understanding pipeline."
     )
-    parser.add_argument("book", help="directory holding the page images")
-    parser.add_argument(
-        "--book-id",
-        default="",
-        help="book id; defaults to the directory name",
-    )
+    parser.add_argument("book", help="book id under the output directory")
     parser.add_argument(
         "--no-cache",
         action="store_true",
@@ -54,12 +49,13 @@ def main() -> int:
 
     load_env(ROOT / ".env")
 
-    source = Path(args.book)
-    if not source.is_dir():
-        print(f"not a book directory: {source}", file=sys.stderr)
+    book_path = out_root() / args.book / "book.json"
+    if not book_path.is_file():
+        print(f"missing {book_path}", file=sys.stderr)
+        print("start with run_pdf.py", file=sys.stderr)
         return 2
 
-    book = load_book_from_images(source, book_id=args.book_id)
+    book = Book.from_dict(json.loads(book_path.read_text(encoding="utf-8")))
 
     client = LLMClient.from_env()
     missing = client.missing_settings()
@@ -101,8 +97,9 @@ def main() -> int:
 
 # One line per page, so a long run still reads as a progress log.
 def _line(page: Page, result: PageContent, elapsed: float) -> str:
+    size = f"{page.width}x{page.height}"
     status = result.error or result.mood or "-"
-    return f"{page.filename}  {page.kind:<9} {elapsed:6.1f}s  {status}"
+    return f"{page.filename}  {size:<11} {elapsed:6.1f}s  {status}"
 
 
 if __name__ == "__main__":
