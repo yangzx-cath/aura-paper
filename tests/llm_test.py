@@ -2,6 +2,7 @@ import io
 import time
 import urllib.error
 import urllib.request
+from email.message import Message
 
 import pytest
 
@@ -98,6 +99,30 @@ def test_chat_omits_an_unset_reasoning_effort(monkeypatch):
     assert "reasoning_effort" not in captured
 
 
+def test_from_env_uses_the_env_effort(monkeypatch):
+    monkeypatch.setenv("LLM_REASONING_EFFORT", "high")
+
+    client = LLMClient.from_env()
+
+    assert client.reasoning_effort == "high"
+
+
+def test_the_argument_wins_over_the_env_effort(monkeypatch):
+    monkeypatch.setenv("LLM_REASONING_EFFORT", "high")
+
+    client = LLMClient.from_env("low")
+
+    assert client.reasoning_effort == "low"
+
+
+def test_from_env_leaves_the_effort_empty(monkeypatch):
+    monkeypatch.delenv("LLM_REASONING_EFFORT", raising=False)
+
+    client = LLMClient.from_env()
+
+    assert client.reasoning_effort == ""
+
+
 class FakeResponse:
     def __init__(self, body):
         self.body = body.encode("utf-8")
@@ -123,7 +148,7 @@ def fake_urlopen(monkeypatch, replies):
                 request.full_url,
                 reply,
                 "error",
-                {},
+                Message(),
                 io.BytesIO(b'{"error": "failed"}'),
             )
         return FakeResponse(reply)
