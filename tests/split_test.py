@@ -5,7 +5,7 @@ from PIL import Image
 from aura_paper.book import Book, Page
 from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient, LLMError
-from aura_paper.split import detect_spread, save_split, split_book
+from aura_paper.split import detect_layout, save_split, split_book
 
 
 class FakeClient(LLMClient):
@@ -55,39 +55,41 @@ def test_a_portrait_page_is_never_asked(tmp_path):
     client = FakeClient("{}")
     page = make_page(tmp_path, size=(800, 1000))
 
-    spread = detect_spread(page, client, directory=str(tmp_path))
+    layout = detect_layout(page, client, directory=str(tmp_path))
 
-    assert spread.spread is False
+    assert layout.two_pages is False
     assert client.prompts == []
 
 
-def test_a_spread_page_asks_the_model(tmp_path):
-    client = FakeClient(json.dumps({"spread": True, "reason": "两半各自成页"}))
+def test_a_two_page_image_asks_the_model(tmp_path):
+    client = FakeClient(
+        json.dumps({"two_pages": True, "reason": "两半各自成页"})
+    )
     page = make_page(tmp_path)
 
-    spread = detect_spread(page, client, directory=str(tmp_path))
+    layout = detect_layout(page, client, directory=str(tmp_path))
 
-    assert spread.spread is True
-    assert spread.reason == "两半各自成页"
-    assert "跨页" in client.prompts[0]
+    assert layout.two_pages is True
+    assert layout.reason == "两半各自成页"
+    assert "two_pages" in client.prompts[0]
 
 
 def test_the_model_gets_a_small_copy(tmp_path):
-    client = FakeClient(json.dumps({"spread": True}))
+    client = FakeClient(json.dumps({"two_pages": True}))
     page = make_page(tmp_path, size=(3600, 1800))
 
-    detect_spread(page, client, directory=str(tmp_path))
+    detect_layout(page, client, directory=str(tmp_path))
 
     assert client.sizes == [(1024, 512)]
 
 
 def test_a_string_answer_is_read_as_a_bool(tmp_path):
-    client = FakeClient(json.dumps({"spread": "false"}))
+    client = FakeClient(json.dumps({"two_pages": "false"}))
     page = make_page(tmp_path)
 
-    spread = detect_spread(page, client, directory=str(tmp_path))
+    layout = detect_layout(page, client, directory=str(tmp_path))
 
-    assert spread.spread is False
+    assert layout.two_pages is False
 
 
 def test_a_failed_page_is_kept_whole(tmp_path):
@@ -100,8 +102,8 @@ def test_a_failed_page_is_kept_whole(tmp_path):
     assert [page.filename for page in split.book.pages] == ["00.jpg"]
 
 
-def test_a_spread_becomes_two_pages(tmp_path):
-    client = FakeClient(json.dumps({"spread": True}))
+def test_two_pages_become_two_images(tmp_path):
+    client = FakeClient(json.dumps({"two_pages": True}))
     pages = [
         make_page(tmp_path, size=(800, 800), index=0, name="00.jpg"),
         make_page(tmp_path, size=(1600, 800), index=1, name="01.jpg"),
@@ -109,7 +111,7 @@ def test_a_spread_becomes_two_pages(tmp_path):
 
     split = split_book(make_book(pages, tmp_path), client)
 
-    assert split.spread_count == 1
+    assert split.two_page_count == 1
     assert [page.filename for page in split.book.pages] == [
         "00.jpg",
         "01a.jpg",
@@ -125,7 +127,7 @@ def test_the_cut_follows_the_middle_of_the_image(tmp_path):
     image.paste("blue", (800, 0, 1600, 800))
     image.save(path)
     page = Page(index=0, filename="01.jpg", width=1600, height=800)
-    client = FakeClient(json.dumps({"spread": True}))
+    client = FakeClient(json.dumps({"two_pages": True}))
 
     split_book(make_book([page], tmp_path), client)
 
@@ -139,7 +141,7 @@ def test_second_run_hits_the_cache(tmp_path):
     cache = Cache(tmp_path / "cache")
     page = make_page(tmp_path, size=(1600, 800))
     book = make_book([page], tmp_path)
-    first = FakeClient(json.dumps({"spread": True}))
+    first = FakeClient(json.dumps({"two_pages": True}))
     split_book(book, first, cache=cache)
 
     second = FakeClient("")
@@ -153,7 +155,7 @@ def test_a_failed_page_is_not_cached(tmp_path):
     cache = Cache(tmp_path / "cache")
     page = make_page(tmp_path, size=(1600, 800))
 
-    detect_spread(
+    detect_layout(
         page,
         FakeClient(error=LLMError("boom")),
         cache=cache,
@@ -163,7 +165,7 @@ def test_a_failed_page_is_not_cached(tmp_path):
     assert not (tmp_path / "cache" / "split").exists()
 
 
-def test_save_split_writes_split_json(tmp_path):
+def test_save_split_writes_pages_json(tmp_path):
     split = split_book(
         make_book([make_page(tmp_path, size=(800, 800))], tmp_path),
         FakeClient("{}"),
@@ -171,5 +173,5 @@ def test_save_split_writes_split_json(tmp_path):
 
     path = save_split(split, tmp_path)
 
-    assert path == tmp_path / "chicken" / "split.json"
+    assert path == tmp_path / "chicken" / "pages.json"
     assert path.is_file()
