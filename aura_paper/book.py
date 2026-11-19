@@ -1,12 +1,14 @@
 """The source pages of one book, before they are understood."""
 
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from PIL import Image
 
-from .utils import IMAGE_SUFFIXES
+from .utils import IMAGE_SUFFIXES, now_iso
 
 
 @dataclass
@@ -18,6 +20,27 @@ class Page:
     width: int = 0
     height: int = 0
     text: str = ""  # Printed text read from the PDF text layer.
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this page."""
+        return {
+            "index": self.index,
+            "filename": self.filename,
+            "width": self.width,
+            "height": self.height,
+            "text": self.text,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Page:
+        """Build a page from its external JSON shape."""
+        return cls(
+            index=int(data.get("index") or 0),
+            filename=str(data.get("filename") or ""),
+            width=int(data.get("width") or 0),
+            height=int(data.get("height") or 0),
+            text=str(data.get("text") or ""),
+        )
 
 
 @dataclass
@@ -34,6 +57,37 @@ class Book:
     @property
     def page_count(self) -> int:
         return len(self.pages)
+
+    # Pages whose source carried printed text, for cross-checking.
+    @property
+    def text_pages(self) -> int:
+        return sum(1 for page in self.pages if page.text)
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this book."""
+        return {
+            "id": self.id,
+            "source": self.source,
+            "directory": self.directory,
+            "generated_at": now_iso(),
+            "dpi": self.dpi,
+            "title": self.title,
+            "page_count": self.page_count,
+            "text_pages": self.text_pages,
+            "pages": [page.to_dict() for page in self.pages],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Book:
+        """Build a book from its external JSON shape."""
+        return cls(
+            id=str(data.get("id") or ""),
+            source=str(data.get("source") or ""),
+            directory=str(data.get("directory") or ""),
+            dpi=int(data.get("dpi") or 0),
+            title=str(data.get("title") or ""),
+            pages=[Page.from_dict(page) for page in data.get("pages") or []],
+        )
 
 
 def load_images(

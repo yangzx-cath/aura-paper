@@ -13,12 +13,11 @@ import sys
 import time
 from pathlib import Path
 
-from aura_paper.book import load_book
+from aura_paper.book import Page
 from aura_paper.config import load_env, out_root
 from aura_paper.pdf import (
     DEFAULT_DPI,
     IMAGE_QUALITY,
-    PdfPage,
     render_pdf,
     save_pages,
 )
@@ -58,7 +57,7 @@ def main() -> int:
     print("rendering every page", flush=True)
 
     started = time.perf_counter()
-    content = render_pdf(
+    book = render_pdf(
         source,
         target,
         dpi=args.dpi,
@@ -66,21 +65,18 @@ def main() -> int:
         on_page=show,
     )
     elapsed = time.perf_counter() - started
-    path = save_pages(content)
-
-    book = load_book(content.directory, book_id=content.id)
+    path = save_pages(book)
 
     print()
-    print(f"pages   {content.page_count}")
-    print(f"text    {content.text_pages}")
-    print(f"book    {book.page_count} pages loaded from the directory")
+    print(f"pages   {book.page_count}")
+    print(f"text    {book.text_pages}")
     print(f"total   {elapsed:.1f}s")
     print(f"file    {path}")
     return 0
 
 
 # One line per page, so a long run still reads as a progress log.
-def show(page: PdfPage, elapsed: float) -> None:
+def show(page: Page, elapsed: float) -> None:
     size = f"{page.width}x{page.height}"
     head = f"{page.index:02d}  {elapsed:5.1f}s  {size:<12}"
     print(f"{head} text={len(page.text)}", flush=True)
