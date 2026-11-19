@@ -145,6 +145,23 @@ def test_null_field_becomes_empty():
     assert content.error == ""
 
 
+def test_uncertain_copes_with_a_malformed_reply():
+    not_a_list = json.dumps(
+        {"description": "草地", "uncertain": "红衣孩子身份不明"}
+    )
+    with_junk = json.dumps(
+        {
+            "description": "草地",
+            "uncertain": [{"x": 1}, [], "  ", "说话人未标明"],
+        }
+    )
+
+    assert understand_page(make_page(), FakeClient(not_a_list)).uncertain == []
+    assert understand_page(make_page(), FakeClient(with_junk)).uncertain == [
+        "说话人未标明"
+    ]
+
+
 def test_empty_payload_is_an_error():
     content = understand_page(make_page(), FakeClient("{}"))
 
@@ -393,6 +410,7 @@ def test_cache_keeps_every_page_field(tmp_path):
             "description": "封面",
             "mood": "温暖",
             "mood_detail": "有一点期待",
+            "uncertain": ["红衣孩子身份不明"],
         }
     )
     read_page(page, FakeClient(reply), cache, tmp_path)
@@ -404,6 +422,7 @@ def test_cache_keeps_every_page_field(tmp_path):
     assert content.description == "封面"
     assert content.mood == "温暖"
     assert content.mood_detail == "有一点期待"
+    assert content.uncertain == ["红衣孩子身份不明"]
 
 
 def make_cached_book(tmp_path, count=3):
