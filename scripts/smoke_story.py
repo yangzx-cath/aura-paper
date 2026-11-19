@@ -1,6 +1,6 @@
 """Manual smoke test for the story stage.
 
-Reads out/<book>/book.json, derives the story context and writes
+Reads out/<book>/content.json, derives the story context and writes
 story.json next to it.
 
 Usage:
@@ -37,7 +37,7 @@ def main() -> int:
 
     load_env(ROOT / ".env")
 
-    source = out_root() / args.book / "book.json"
+    source = out_root() / args.book / "content.json"
     if not source.is_file():
         print(f"missing {source}", file=sys.stderr)
         print("run smoke_understand.py first", file=sys.stderr)

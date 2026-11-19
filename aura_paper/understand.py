@@ -264,5 +264,5 @@ def save_content(
     content: BookContent,
     root: str | Path | None = None,
 ) -> Path:
-    """Write the book content to <root>/<book_id>/book.json."""
-    return write_json(content.id, "book", content.to_dict(), root)
+    """Write the book content to <root>/<book_id>/content.json."""
+    return write_json(content.id, "content", content.to_dict(), root)

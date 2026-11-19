@@ -1,6 +1,6 @@
 """Manual smoke test for one page video.
 
-Reads out/<book>/book.json, story.json and screenplay.json, generates one
+Reads out/<book>/content.json, story.json and screenplay.json, generates one
 page clip and writes it to out/<book>/clips/page_XX.mp4.
 
 Usage:
@@ -54,7 +54,7 @@ def main() -> int:
     load_env(ROOT / ".env")
 
     book_dir = out_root() / args.book
-    book_path = book_dir / "book.json"
+    book_path = book_dir / "content.json"
     story_path = book_dir / "story.json"
     screenplay_path = book_dir / "screenplay.json"
     for path in (book_path, story_path, screenplay_path):

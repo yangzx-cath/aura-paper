@@ -166,7 +166,7 @@ def build_screenplay(
     screenplay = Screenplay(id=content.id, model=client.model)
     pages = content.story_pages
     # Each page takes the previous page's text and description as context.
-    # Both are already in book.json, so no page depends on another one.
+    # Both are already in content.json, so no page depends on another one.
     # They can run in parallel and cache on their own.
     before = [""] + [_previous_context(page) for page in pages[:-1]]
     tasks = list(zip(pages, before))

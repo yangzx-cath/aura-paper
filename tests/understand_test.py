@@ -448,12 +448,12 @@ def test_disabled_cache_calls_the_model_every_time(tmp_path):
     assert not (tmp_path / "cache").exists()
 
 
-def test_save_content_writes_book_json(tmp_path):
+def test_save_content_writes_content_json(tmp_path):
     book = BookContent(id="demo", title="示例", source="/src")
 
     path = save_content(book, tmp_path)
 
-    assert path == tmp_path / "demo" / "book.json"
+    assert path == tmp_path / "demo" / "content.json"
     assert path.is_file()
 
 

@@ -1,6 +1,6 @@
 """Manual smoke test for the screenplay stage.
 
-Reads out/<book>/book.json and story.json, writes the beat and lines of
+Reads out/<book>/content.json and story.json, writes the beat and lines of
 every story page to screenplay.json.
 
 Usage:
@@ -53,7 +53,7 @@ def main() -> int:
     load_env(ROOT / ".env")
 
     folder = out_root() / args.book
-    book_path = folder / "book.json"
+    book_path = folder / "content.json"
     story_path = folder / "story.json"
     for path in (book_path, story_path):
         if not path.is_file():
