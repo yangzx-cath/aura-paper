@@ -53,7 +53,7 @@ def main() -> int:
     load_env(ROOT / ".env")
 
     # The splitting stage rewrites the page list, so prefer its output.
-    book_path = out_root() / args.book / "split.json"
+    book_path = out_root() / args.book / "pages.json"
     if not book_path.is_file():
         book_path = out_root() / args.book / "book.json"
     if not book_path.is_file():
