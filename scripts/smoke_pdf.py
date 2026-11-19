@@ -18,6 +18,10 @@ from aura_paper.config import load_env, out_root
 from aura_paper.pdf import (
     DEFAULT_DPI,
     IMAGE_QUALITY,
+    MAX_DPI,
+    MAX_QUALITY,
+    MIN_DPI,
+    MIN_QUALITY,
     render_pdf,
 )
 
@@ -31,13 +35,15 @@ def main() -> int:
         "--dpi",
         type=int,
         default=DEFAULT_DPI,
-        help=f"render resolution (default={DEFAULT_DPI})",
+        help=f"render dpi, {MIN_DPI}-{MAX_DPI}, clamped to that range "
+        f"(default={DEFAULT_DPI})",
     )
     parser.add_argument(
         "--quality",
         type=int,
         default=IMAGE_QUALITY,
-        help=f"jpeg quality (default={IMAGE_QUALITY})",
+        help=f"jpeg quality, {MIN_QUALITY}-{MAX_QUALITY} "
+        f"(default={IMAGE_QUALITY})",
     )
     args = parser.parse_args()
 
@@ -48,12 +54,20 @@ def main() -> int:
         print(f"not a PDF file: {source}", file=sys.stderr)
         return 2
 
+    if not MIN_QUALITY <= args.quality <= MAX_QUALITY:
+        print(
+            f"quality must be {MIN_QUALITY}-{MAX_QUALITY}: {args.quality}",
+            file=sys.stderr,
+        )
+        return 2
+
     target = out_root() / source.stem / "pages"
 
     print(f"book    {source}")
     print(f"output  {target}")
     print(f"dpi     {args.dpi}  quality={args.quality}")
-    print("rendering every page", flush=True)
+    print()
+    print("Rendering every page", flush=True)
 
     started = time.perf_counter()
     book = render_pdf(
