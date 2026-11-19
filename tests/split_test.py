@@ -5,11 +5,7 @@ from PIL import Image
 from aura_paper.book import Book, Page
 from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient, LLMError
-from aura_paper.split import (
-    detect_spread,
-    save_split,
-    split_book,
-)
+from aura_paper.split import detect_spread, save_split, split_book
 
 
 class FakeClient(LLMClient):

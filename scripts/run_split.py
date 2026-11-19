@@ -24,6 +24,9 @@ from aura_paper.split import Spread, save_split, split_book
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# A layout verdict needs no deep thinking, so cap the hidden tokens.
+EFFORT = "low"
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -56,7 +59,7 @@ def main() -> int:
 
     book = Book.from_dict(json.loads(book_path.read_text(encoding="utf-8")))
 
-    client = LLMClient.from_env()
+    client = LLMClient.from_env(EFFORT)
     missing = client.missing_settings()
     if missing:
         print("missing config: " + ", ".join(missing), file=sys.stderr)
@@ -64,11 +67,14 @@ def main() -> int:
 
     cache = Cache(cache_root(), enabled=not args.no_cache)
     print(f"book    {book.id}  pages={book.page_count}")
-    print(f"model   {client.model}")
+    print(
+        f"model   {client.model}  effort={client.reasoning_effort or '-'}"
+        f"  timeout={client.timeout:.0f}s"
+    )
     print(f"cache   {cache.root}  enabled={cache.enabled}")
     print(f"workers {args.workers}")
     print()
-    print("Looking at every page", flush=True)
+    print("Checking every page for a two-page spread", flush=True)
 
     started = time.perf_counter()
     lock = Lock()
