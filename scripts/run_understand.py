@@ -31,9 +31,12 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Run the understanding pipeline."
+        description="Run the understanding stage."
     )
-    parser.add_argument("book", help="book id under the output directory")
+    parser.add_argument(
+        "book",
+        help="book id from run_pdf.py, the PDF name without suffix",
+    )
     parser.add_argument(
         "--no-cache",
         action="store_true",
