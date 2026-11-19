@@ -72,6 +72,7 @@ def main() -> int:
     print(f"cache   {cache.root}  enabled={cache.enabled}")
     print(f"workers {args.workers}")
     print()
+    print("Reading every page", flush=True)
 
     started = time.perf_counter()
     lock = Lock()
