@@ -13,7 +13,6 @@ from typing import Callable
 import pypdfium2 as pdfium
 
 from .book import Book, Page
-from .output import write_json
 
 # 200 dpi keeps printed text sharp for the vision model.
 DEFAULT_DPI = 200
@@ -130,11 +129,3 @@ def _save_jpg(image, path: Path, quality: int) -> None:
         os.replace(temp_name, path)
     finally:
         Path(temp_name).unlink(missing_ok=True)
-
-
-def save_pages(
-    book: Book,
-    root: str | Path | None = None,
-) -> Path:
-    """Write the rendered pages to <root>/<id>/pages.json."""
-    return write_json(book.id, "pages", book.to_dict(), root)

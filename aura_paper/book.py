@@ -8,6 +8,7 @@ from pathlib import Path
 
 from PIL import Image
 
+from .output import write_json
 from .utils import IMAGE_SUFFIXES, now_iso
 
 
@@ -149,3 +150,8 @@ def _natural_key(name: str) -> tuple:
 def _image_size(path: Path) -> tuple[int, int]:
     with Image.open(path) as image:
         return image.size
+
+
+def save_book(book: Book, root: str | Path | None = None) -> Path:
+    """Write the book to <root>/<id>/book.json."""
+    return write_json(book.id, "book", book.to_dict(), root)

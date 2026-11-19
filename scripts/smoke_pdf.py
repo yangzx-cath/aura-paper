@@ -13,13 +13,12 @@ import sys
 import time
 from pathlib import Path
 
-from aura_paper.book import Page
+from aura_paper.book import Page, save_book
 from aura_paper.config import load_env, out_root
 from aura_paper.pdf import (
     DEFAULT_DPI,
     IMAGE_QUALITY,
     render_pdf,
-    save_pages,
 )
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -65,7 +64,7 @@ def main() -> int:
         on_page=show,
     )
     elapsed = time.perf_counter() - started
-    path = save_pages(book)
+    path = save_book(book)
 
     print()
     print(f"pages   {book.page_count}")
