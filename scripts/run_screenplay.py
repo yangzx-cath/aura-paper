@@ -88,7 +88,10 @@ def main() -> int:
     cache = Cache(cache_root(), enabled=not args.no_cache)
     print(f"book    {content.id}  story pages={len(content.story_pages)}")
     print(f"language {content.language}")
-    print(f"model   {client.model}  timeout={client.timeout:.0f}s")
+    print(
+        f"model   {client.model}  effort={client.reasoning_effort or '-'}"
+        f"  timeout={client.timeout:.0f}s"
+    )
     print(f"cache   {cache.root}  enabled={cache.enabled}")
     print(f"workers {args.workers}")
     print()

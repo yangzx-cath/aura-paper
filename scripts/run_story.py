@@ -63,7 +63,10 @@ def main() -> int:
 
     cache = Cache(cache_root())
     print(f"book    {content.id}  pages={content.page_count}")
-    print(f"model   {client.model}  timeout={client.timeout:.0f}s")
+    print(
+        f"model   {client.model}  effort={client.reasoning_effort or '-'}"
+        f"  timeout={client.timeout:.0f}s"
+    )
     print(f"cache   {cache.root}  enabled={cache.enabled}")
     print()
     print("Asking the model for the story context", flush=True)

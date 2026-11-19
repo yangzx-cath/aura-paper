@@ -52,7 +52,10 @@ def main() -> int:
 
     load_env(ROOT / ".env")
 
-    book_path = out_root() / args.book / "book.json"
+    # The splitting stage rewrites the page list, so prefer its output.
+    book_path = out_root() / args.book / "split.json"
+    if not book_path.is_file():
+        book_path = out_root() / args.book / "book.json"
     if not book_path.is_file():
         print(f"missing {book_path}", file=sys.stderr)
         print("start with run_pdf.py", file=sys.stderr)
@@ -68,7 +71,10 @@ def main() -> int:
 
     cache = Cache(cache_root(), enabled=not args.no_cache)
     print(f"book    {book.id}  pages={book.page_count}")
-    print(f"model   {client.model}")
+    print(
+        f"model   {client.model}  effort={client.reasoning_effort or '-'}"
+        f"  timeout={client.timeout:.0f}s"
+    )
     print(f"cache   {cache.root}  enabled={cache.enabled}")
     print(f"workers {args.workers}")
     print()
