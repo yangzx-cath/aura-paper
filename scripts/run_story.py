@@ -6,6 +6,7 @@ story.json next to it.
 Usage:
     export LLM_API_KEY=sk-xxx
     python scripts/run_story.py <book_id>
+    python scripts/run_story.py <book_id> --no-cache
     python scripts/run_story.py <book_id> --dump-prompt > prompt.txt
 """
 
@@ -32,6 +33,11 @@ def main() -> int:
         help="book id from run_pdf.py, the PDF name without suffix",
     )
     parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="ignore the cache and do not write it",
+    )
+    parser.add_argument(
         "--dump-prompt",
         action="store_true",
         help="print the prompt and exit without calling the model",
@@ -49,6 +55,11 @@ def main() -> int:
     data = json.loads(source.read_text(encoding="utf-8"))
     content = BookContent.from_dict(data)
 
+    if not content.story_pages:
+        print("no story pages in content.json", file=sys.stderr)
+        print("check the split and understand stages", file=sys.stderr)
+        return 2
+
     if args.dump_prompt:
         prompt = story_prompt(content)
         print(f"prompt length: {len(prompt)}", file=sys.stderr)
@@ -61,8 +72,9 @@ def main() -> int:
         print("missing config: " + ", ".join(missing), file=sys.stderr)
         return 2
 
-    cache = Cache(cache_root())
-    print(f"book    {content.id}  pages={content.page_count}")
+    cache = Cache(cache_root(), enabled=not args.no_cache)
+    print(f"book    {content.id}  story pages={len(content.story_pages)}")
+    print(f"title   {content.cover.title or '-'}")
     print(
         f"model   {client.model}  effort={client.reasoning_effort or '-'}"
         f"  timeout={client.timeout:.0f}s"
@@ -82,9 +94,11 @@ def main() -> int:
     path = save_story(story)
     print(f"time    {elapsed:.1f}s")
     print(f"stats   {cache.stats()}")
-    print(f"chars   {'、'.join(story.characters)}")
-    print(f"setting {story.setting}")
-    print(f"style   {story.style}")
+    print(f"chars      {'、'.join(story.characters)}")
+    print(f"setting    {story.setting}")
+    print(f"style      {story.style}")
+    print(f"resolved   {len(story.resolved)}")
+    print(f"unresolved {len(story.unresolved)}")
     print()
     print("summary")
     print(story.summary)
