@@ -135,6 +135,18 @@ def test_leaves_cover_pages_out_of_the_prompt():
     assert "共 3 页" in prompt
 
 
+def test_prompt_requests_resolved_and_unresolved_items():
+    content = make_content()
+    content.pages[1].uncertain = ["手的主人"]
+    prompt = story_prompt(content)
+
+    assert '"resolved"' in prompt
+    assert '"unresolved"' in prompt
+    assert "第 1 页" in prompt
+    assert "索引：1" in prompt
+    assert "uncertain：手的主人" in prompt
+
+
 def test_missing_summary_is_an_error():
     reply = make_reply(summary="")
 
