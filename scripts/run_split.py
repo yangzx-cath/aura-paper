@@ -86,6 +86,7 @@ def main() -> int:
     split = split_book(
         book,
         client,
+        target=out_root() / book.id / "pages_split",
         cache=cache,
         workers=args.workers,
         on_page=show,
@@ -98,6 +99,7 @@ def main() -> int:
     print(f"failed  {split.failed_count}")
     print(f"total   {time.perf_counter() - started:.1f}s")
     print(f"stats   {cache.stats()}")
+    print(f"images  {split.book.directory}")
     print(f"output  {path}")
     return 0 if split.failed_count == 0 else 1
 
