@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -17,7 +18,7 @@ from .llm import LLMClient, LLMError
 from .output import write_json
 from .pdf import IMAGE_QUALITY
 from .prompts import split_prompt
-from .utils import extract_json
+from .utils import IMAGE_SUFFIXES, extract_json
 
 # Two pages side by side are about twice as wide as one page.
 TWO_PAGE_RATIO = 1.6
@@ -141,15 +142,21 @@ def split_book(
     book: Book,
     client: LLMClient,
     *,
+    target: str | Path,
     cache: Cache | None = None,
     workers: int = 1,
     on_page: Callable[[Page, Layout, float], None] | None = None,
 ) -> Split:
-    """Cut every image that holds two pages and renumber the pages."""
+    """Cut every image that holds two pages into the target folder."""
     assert workers >= 1
 
     ns = f"split/{book.id}"
     base = _base_width(book.pages)
+    source = Path(book.directory)
+    folder = Path(target)
+    folder.mkdir(parents=True, exist_ok=True)
+    # The page set is rebuilt every run, so old halves cannot linger.
+    _clear_images(folder)
 
     def run(page: Page) -> tuple[Page, Layout, float]:
         started = time.perf_counter()
@@ -174,7 +181,7 @@ def split_book(
         book=Book(
             id=book.id,
             source=book.source,
-            directory=book.directory,
+            directory=str(folder),
             dpi=book.dpi,
             title=book.title,
         )
@@ -184,7 +191,7 @@ def split_book(
         # An image adds one page or two, so numbering continues from here.
         start_index = len(split.book.pages)
         split.book.pages.extend(
-            _cut(page, layout, book.directory, start_index)
+            _cut(page, layout, source, folder, start_index)
         )
         if on_page is not None:
             on_page(page, layout, elapsed)
@@ -197,14 +204,23 @@ def _base_width(pages: list[Page]) -> int:
     return min(widths) if widths else 0
 
 
-# Cut one image down the middle, or keep it whole when it holds one page.
+# Remove images left by an earlier run, so the folder matches the page list.
+def _clear_images(folder: Path) -> None:
+    for entry in folder.iterdir():
+        if entry.is_file() and entry.suffix.lower() in IMAGE_SUFFIXES:
+            entry.unlink()
+
+
+# Cut one image down the middle, or copy it whole when it holds one page.
 def _cut(
     page: Page,
     layout: Layout,
-    directory: str,
+    source: Path,
+    target: Path,
     start_index: int,
 ) -> list[Page]:
     if not layout.two_pages:
+        shutil.copyfile(source / page.filename, target / page.filename)
         return [
             Page(
                 index=start_index,
@@ -215,21 +231,20 @@ def _cut(
             )
         ]
 
-    source = Path(directory) / page.filename
     pages = []
-    with Image.open(source) as image:
+    with Image.open(source / page.filename) as image:
         width, height = image.size
         middle = width // 2
         boxes = ((0, 0, middle, height), (middle, 0, width, height))
         for offset, box in enumerate(boxes):
-            target = source.with_name(f"{source.stem}{'ab'[offset]}.jpg")
+            name = f"{Path(page.filename).stem}{'ab'[offset]}.jpg"
             piece = image.convert("RGB").crop(box)
-            piece.save(target, "JPEG", quality=IMAGE_QUALITY)
+            piece.save(target / name, "JPEG", quality=IMAGE_QUALITY)
             # The text layer covers the whole image, not one half of it.
             pages.append(
                 Page(
                     index=start_index + offset,
-                    filename=target.name,
+                    filename=name,
                     width=piece.width,
                     height=piece.height,
                 )
