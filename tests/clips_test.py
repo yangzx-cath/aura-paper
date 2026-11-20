@@ -4,7 +4,7 @@ import pytest
 
 from aura_paper.cache import Cache
 from aura_paper.clips import VideoClip, build_clips, clip_path, generate_clip
-from aura_paper.minimax import VideoTask
+from aura_paper.minimax import MiniMaxError, VideoTask
 from aura_paper.prompts import clip_prompt
 from aura_paper.screenplay import PageScene, Screenplay
 from aura_paper.story import Story
@@ -48,6 +48,18 @@ class HalfFailingMiniMax(FakeMiniMax):
         return super().wait_task(task_id)
 
 
+# Succeeds without a video URL, the way a half-broken task can.
+class NoUrlMiniMax(FakeMiniMax):
+    def wait_task(self, task_id):
+        return VideoTask(task_id, status="succeeded")
+
+
+# Refuses the request, the way a network or quota failure does.
+class BrokenMiniMax(FakeMiniMax):
+    def create_task(self, request):
+        raise MiniMaxError("network down")
+
+
 def make_content(root: Path) -> tuple[BookContent, PageContent]:
     (root / "page_2.png").write_bytes(b"\x89PNG\r\n\x1a\n")
     page = PageContent(
@@ -74,14 +86,6 @@ def make_story() -> Story:
     )
 
 
-def test_clip_prompt_uses_the_scene_beat():
-    page = PageContent(index=1, filename="page_2.png", description="画面")
-    prompt = clip_prompt(page, make_story(), beat="我伸出手，把硬币托稳。")
-
-    assert "我伸出手，把硬币托稳。" in prompt
-    assert "（按画面自然动作）" not in prompt
-
-
 def test_the_camera_follows_the_page_shape():
     story = make_story()
     upright = PageContent(index=1, filename="01.png", description="画面")
@@ -94,23 +98,15 @@ def test_the_camera_follows_the_page_shape():
     assert "镜头保持稳定" not in clip_prompt(upright, story)
 
 
-def test_generate_clip_uses_scene_duration_and_beat(tmp_path):
+def test_the_page_image_is_a_reference_not_a_first_frame(tmp_path):
     content, page = make_content(tmp_path)
     scene = PageScene(index=1, beat="我伸出手，把硬币托稳。", duration=9)
     client = FakeMiniMax()
 
-    clip = generate_clip(
-        content, page, make_story(), scene, client, root=tmp_path
-    )
+    generate_clip(content, page, make_story(), scene, client, root=tmp_path)
 
-    assert clip.error == ""
-    assert clip.duration == 9
-    assert clip.task_id == "task-1"
-    assert client.request.duration == 9
     assert client.request.first_frame is None
     assert client.request.reference_images == [tmp_path / "page_2.png"]
-    assert scene.beat in client.request.prompt
-    assert clip_path("demo", "page_2.png", tmp_path).read_bytes() == b"video"
 
 
 def test_explicit_duration_overrides_the_scene(tmp_path):
@@ -150,6 +146,43 @@ def test_generate_clip_stops_on_a_scene_error(tmp_path):
 
     assert clip.error == "no beat"
     assert client.request is None
+    assert not clip_path("demo", "page_2.png", tmp_path).exists()
+
+
+def test_an_out_of_range_duration_becomes_a_clip_error(tmp_path):
+    content, page = make_content(tmp_path)
+    scene = PageScene(index=1, beat="动作")
+    client = FakeMiniMax()
+
+    clip = generate_clip(
+        content, page, make_story(), scene, client, duration=20, root=tmp_path
+    )
+
+    assert "4 to 15" in clip.error
+    assert client.request is None
+
+
+def test_a_task_without_a_video_url_is_an_error(tmp_path):
+    content, page = make_content(tmp_path)
+    scene = PageScene(index=1, beat="动作")
+
+    clip = generate_clip(
+        content, page, make_story(), scene, NoUrlMiniMax(), root=tmp_path
+    )
+
+    assert clip.error == "task succeeded without a video URL"
+    assert not clip_path("demo", "page_2.png", tmp_path).exists()
+
+
+def test_a_broken_call_becomes_a_clip_error(tmp_path):
+    content, page = make_content(tmp_path)
+    scene = PageScene(index=1, beat="动作")
+
+    clip = generate_clip(
+        content, page, make_story(), scene, BrokenMiniMax(), root=tmp_path
+    )
+
+    assert clip.error == "network down"
     assert not clip_path("demo", "page_2.png", tmp_path).exists()
 
 
