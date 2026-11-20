@@ -101,7 +101,7 @@ class BookClips:
 
     @classmethod
     def from_dict(cls, data: dict) -> BookClips:
-        """Build a book video from its external JSON shape."""
+        """Build a clip set from its external JSON shape."""
         return cls(
             id=str(data.get("id") or ""),
             title=str(data.get("title") or ""),
@@ -257,7 +257,7 @@ def _one_clip(
     root: str | Path | None,
     resolution: str,
 ) -> VideoClip:
-    ns = f"video/{content.id}"
+    ns = f"clips/{content.id}"
     name = Path(page.filename).stem
     key = ""
 
