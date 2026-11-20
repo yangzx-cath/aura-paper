@@ -207,8 +207,17 @@ def _build_scene(
     cache: Cache | None,
 ) -> PageScene:
     scene = PageScene(index=page.index, model=client.model)
+    resolved = [item for item in story.resolved if item.index == page.index]
+    unresolved = [
+        item for item in story.unresolved if item.index == page.index
+    ]
     prompt = screenplay_prompt(
-        page, story, previous=previous, language=content.language
+        page,
+        story,
+        previous=previous,
+        language=content.language,
+        resolved=resolved,
+        unresolved=unresolved,
     )
 
     if cache is None:
