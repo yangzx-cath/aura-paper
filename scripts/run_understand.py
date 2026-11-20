@@ -7,6 +7,8 @@ run reuses the cache and skips the model calls.
 Usage:
     export LLM_API_KEY=sk-xxx
     python scripts/run_understand.py <book_id> [--no-cache] [--workers N]
+    python scripts/run_understand.py <book_id> --dump-prompt 0
+    python scripts/run_understand.py <book_id> --dump-prompt 1
 """
 
 import argparse
@@ -20,6 +22,7 @@ from aura_paper.book import Book, Page
 from aura_paper.cache import Cache
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.llm import LLMClient
+from aura_paper.prompts import cover_prompt, page_prompt
 from aura_paper.understand import (
     PageContent,
     save_content,
@@ -48,6 +51,12 @@ def main() -> int:
         default=1,
         help="number of pages to run in parallel (default=1)",
     )
+    parser.add_argument(
+        "--dump-prompt",
+        type=int,
+        metavar="INDEX",
+        help="print one page's prompt by 0-based index; 0 is the cover",
+    )
     args = parser.parse_args()
 
     load_env(ROOT / ".env")
@@ -59,6 +68,9 @@ def main() -> int:
         return 2
 
     book = Book.from_dict(json.loads(book_path.read_text(encoding="utf-8")))
+
+    if args.dump_prompt is not None:
+        return _dump_prompt(book, args.dump_prompt)
 
     client = LLMClient.from_env()
     missing = client.missing_settings()
@@ -101,6 +113,24 @@ def main() -> int:
     print(f"stats   {cache.stats()}")
     print(f"output  {path}")
     return 0 if content.failed_count == 0 else 1
+
+
+# Print the prompt the model would receive, without spending a call.
+def _dump_prompt(book: Book, index: int) -> int:
+    if not 0 <= index < book.page_count:
+        print(f"page index out of range: {index}", file=sys.stderr)
+        return 2
+
+    page = book.pages[index]
+    prompt = cover_prompt() if index == 0 else page_prompt()
+    image = Path(book.directory) / page.filename
+
+    print(f"index   {index}  {page.filename}", file=sys.stderr)
+    print(f"kind    {'cover' if index == 0 else 'page'}", file=sys.stderr)
+    print(f"image   {image}", file=sys.stderr)
+    print(f"prompt length: {len(prompt)}", file=sys.stderr)
+    print(prompt)
+    return 0
 
 
 # One line per page, so a long run still reads as a progress log.
