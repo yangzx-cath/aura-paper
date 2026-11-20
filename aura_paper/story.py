@@ -34,6 +34,38 @@ class Cast:
 
 
 @dataclass
+class Resolution:
+    """One page uncertainty resolved or left open by the story stage."""
+
+    index: int
+    issue: str
+    answer: str = ""
+    evidence: str = ""
+    reason: str = ""
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this resolution."""
+        return {
+            "index": self.index,
+            "issue": self.issue,
+            "answer": self.answer,
+            "evidence": self.evidence,
+            "reason": self.reason,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Resolution:
+        """Build a resolution from its external JSON shape."""
+        return cls(
+            index=int(data.get("index") or 0),
+            issue=str(data.get("issue") or ""),
+            answer=str(data.get("answer") or ""),
+            evidence=str(data.get("evidence") or ""),
+            reason=str(data.get("reason") or ""),
+        )
+
+
+@dataclass
 class Story:
     """Story context shared by every page."""
 
@@ -43,6 +75,8 @@ class Story:
     setting: str = ""
     style: str = ""
     summary: str = ""
+    resolved: list[Resolution] = field(default_factory=list)
+    unresolved: list[Resolution] = field(default_factory=list)
     model: str = ""
     error: str = ""
 
@@ -57,6 +91,8 @@ class Story:
             "setting": self.setting,
             "style": self.style,
             "summary": self.summary,
+            "resolved": [item.to_dict() for item in self.resolved],
+            "unresolved": [item.to_dict() for item in self.unresolved],
             "error": self.error,
         }
 
@@ -70,6 +106,8 @@ class Story:
             setting=str(data.get("setting") or ""),
             style=str(data.get("style") or ""),
             summary=str(data.get("summary") or ""),
+            resolved=_resolution_list(data.get("resolved")),
+            unresolved=_resolution_list(data.get("unresolved")),
             model=str(data.get("model") or ""),
             error=str(data.get("error") or ""),
         )
@@ -90,6 +128,16 @@ def _cast_list(value: object) -> list[Cast]:
         Cast.from_dict(item) for item in value if isinstance(item, dict)
     ]
     return [member for member in members if member.name]
+
+
+# Read resolution entries, dropping entries that carry no issue.
+def _resolution_list(value: object) -> list[Resolution]:
+    if not isinstance(value, list):
+        return []
+    items = [
+        Resolution.from_dict(item) for item in value if isinstance(item, dict)
+    ]
+    return [item for item in items if item.issue]
 
 
 def build_story(
@@ -146,6 +194,8 @@ def _apply_story(story: Story, fields: dict) -> None:
     story.setting = str(fields.get("setting") or "")
     story.style = str(fields.get("style") or "")
     story.summary = str(fields.get("summary") or "")
+    story.resolved = _resolution_list(fields.get("resolved"))
+    story.unresolved = _resolution_list(fields.get("unresolved"))
 
 
 # Keep only what the model produced, so the cache holds no book identity.
@@ -156,6 +206,8 @@ def _story_fields(story: Story) -> dict:
         "setting": story.setting,
         "style": story.style,
         "summary": story.summary,
+        "resolved": [item.to_dict() for item in story.resolved],
+        "unresolved": [item.to_dict() for item in story.unresolved],
     }
 
 
