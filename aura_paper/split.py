@@ -121,7 +121,7 @@ def _thumbnail(path: Path, folder: Path) -> Path:
     target = folder / path.name
     with Image.open(path) as image:
         copy = image.convert("RGB")
-        copy.thumbnail(THUMBNAIL_BOX, Image.LANCZOS)
+        copy.thumbnail(THUMBNAIL_BOX, Image.Resampling.LANCZOS)
         copy.save(target, "JPEG", quality=IMAGE_QUALITY)
     return target
 
