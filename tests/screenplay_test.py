@@ -3,7 +3,7 @@ import json
 from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient
 from aura_paper.screenplay import Line, PageScene, Screenplay, build_screenplay
-from aura_paper.story import Cast, Story
+from aura_paper.story import Cast, Resolution, Story
 from aura_paper.understand import BookContent, PageContent
 
 
@@ -100,6 +100,41 @@ def test_gives_each_page_the_text_of_the_one_before():
     assert "（这是第一页）" in client.prompts[0]
     assert "第 2 页原文" in client.prompts[1]
     assert "第 1 页原文" not in client.prompts[1]
+
+
+def test_uses_story_page_index():
+    client = FakeClient(make_reply())
+
+    build_screenplay(make_content(1), make_story(), client)
+
+    assert "故事页：第 1 页" in client.prompts[0]
+
+
+def test_includes_page_scoped_resolution_context():
+    content = make_content(2)
+    content.pages[1].uncertain = ["手的主人"]
+    story = make_story()
+    story.resolved = [
+        Resolution(1, "手的主人", "我", "第18页文字依据"),
+        Resolution(2, "说话人", "Kuan", "第19页文字依据"),
+    ]
+    story.unresolved = [
+        Resolution(1, "女孩身份", reason="缺少文字依据"),
+    ]
+    client = FakeClient(make_reply())
+
+    build_screenplay(content, story, client)
+
+    first = client.prompts[0]
+    assert "uncertain：\n- 手的主人" in first
+    assert "结论：我" in first
+    assert "依据：第18页文字依据" in first
+    assert "原因：缺少文字依据" in first
+    assert "结论：Kuan" not in first
+
+    second = client.prompts[1]
+    assert "结论：Kuan" in second
+    assert "结论：我" not in second
 
 
 def test_tells_the_model_how_each_character_looks():
