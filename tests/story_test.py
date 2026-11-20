@@ -4,7 +4,7 @@ from pathlib import Path
 from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient, LLMError
 from aura_paper.prompts import story_prompt
-from aura_paper.story import Cast, Story, build_story, save_story
+from aura_paper.story import Cast, Resolution, Story, build_story, save_story
 from aura_paper.understand import BookContent, PageContent
 
 
@@ -64,7 +64,55 @@ def test_builds_story_fields():
     assert story.setting == "春天的小山坡"
     assert story.style.startswith("手绘水彩")
     assert story.summary.startswith("小鸡球球")
+    assert story.resolved == []
+    assert story.unresolved == []
     assert story.error == ""
+
+
+def test_reads_resolved_and_unresolved_items():
+    reply = make_reply(
+        resolved=[
+            {
+                "index": 18,
+                "issue": "手的主人",
+                "answer": "我",
+                "evidence": "第18页文字提到 Kuan and I",
+            }
+        ],
+        unresolved=[
+            {
+                "index": 26,
+                "issue": "画面中的女孩是谁",
+                "reason": "全书没有直接称呼",
+            }
+        ],
+    )
+
+    story = build_story(make_content(), FakeClient(reply))
+
+    assert story.resolved == [
+        Resolution(
+            18,
+            "手的主人",
+            "我",
+            "第18页文字提到 Kuan and I",
+        )
+    ]
+    assert story.unresolved == [
+        Resolution(26, "画面中的女孩是谁", reason="全书没有直接称呼")
+    ]
+
+
+def test_resolution_lists_ignore_malformed_items():
+    reply = make_reply(
+        resolved="不是数组",
+        unresolved=[None, {}, {"index": 1, "issue": "说话人"}],
+    )
+
+    story = build_story(make_content(), FakeClient(reply))
+
+    assert story.resolved == []
+    assert story.unresolved == [Resolution(1, "说话人")]
 
 
 def test_sends_the_story_prompt():
@@ -164,6 +212,8 @@ def test_save_story_writes_the_story_fields(tmp_path):
     assert data["characters"] == ["小鸡球球", "向日葵"]
     assert data["cast"][0]["look"] == "圆滚滚的黄色小鸡"
     assert data["summary"].startswith("小鸡球球")
+    assert data["resolved"] == []
+    assert data["unresolved"] == []
 
 
 def test_story_dict_round_trip():
@@ -174,6 +224,8 @@ def test_story_dict_round_trip():
         setting="春天的小山坡",
         style="手绘水彩",
         summary="种下向日葵并守护它长大。",
+        resolved=[Resolution(18, "手的主人", "我", "文字依据")],
+        unresolved=[Resolution(26, "女孩身份", reason="缺少文字依据")],
         model="m",
     )
 
