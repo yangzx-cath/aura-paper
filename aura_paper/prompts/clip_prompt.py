@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .layout import shot_note
-
 if TYPE_CHECKING:
     from ..story import Story
     from ..understand import PageContent
@@ -33,11 +31,10 @@ TEMPLATE = """你是一名儿童绘本动画分镜师。
 3. 动作自然、幅度适中，适合儿童观看，避免剧烈晃动、快速变焦和恐怖画面。
 4. 镜头运动克制，不切换场景；竖幅使用 [Push in] 缓慢推进，横幅从左到右缓慢平移。
 5. 剧情提示只表现本页画面里的动作；不添加原文没有的情节，不描述画面外的内容。
-6. __LAYOUT__
 """
 
 
-def shot_prompt(
+def clip_prompt(
     page: PageContent,
     story: Story,
     *,
@@ -50,10 +47,9 @@ def shot_prompt(
     prompt = prompt.replace("__SETTING__", story.setting or "（未提供）")
     prompt = prompt.replace("__STYLE__", story.style or "（未提供）")
     prompt = prompt.replace("__SUMMARY__", story.summary or "（未提供）")
-    prompt = prompt.replace("__INDEX__", str(page.index + 1))
+    prompt = prompt.replace("__INDEX__", str(page.index))
     prompt = prompt.replace("__BEAT__", beat.strip() or "（按画面自然动作）")
     prompt = prompt.replace(
         "__DESCRIPTION__", page.description or "（未提供）"
     )
-    prompt = prompt.replace("__MOOD__", page.mood or "（未提供）")
-    return prompt.replace("__LAYOUT__", shot_note(page.kind))
+    return prompt.replace("__MOOD__", page.mood or "（未提供）")
