@@ -10,6 +10,11 @@ dynamic = ["version"]
 dependencies = ["pillow>=11.0", "pypdfium2>=5.15"]
 
 [project.optional-dependencies]
+web = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+]
 dev = ["pytest>=8.4"]
 
 [tool.hatch.version]
