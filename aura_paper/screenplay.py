@@ -225,7 +225,7 @@ def _build_scene(
         return _finish_scene(scene)
 
     ns = f"screenplay/{content.id}"
-    name = f"page_{page.index:02d}"
+    name = Path(page.filename).stem
     key = fingerprint(prompt, *client.signature)
 
     entry = cache.load_json(ns, name, key)
