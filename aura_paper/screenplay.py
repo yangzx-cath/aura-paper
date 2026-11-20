@@ -69,7 +69,7 @@ class PageScene:
     index: int
     beat: str = ""
     lines: list[Line] = field(default_factory=list)
-    duration: int = DEFAULT_DURATION  # Estimated from the lines.
+    duration: int = DEFAULT_DURATION  # Clip length asked for by the model.
     transition: str = "cut"
     model: str = ""
     error: str = ""
@@ -263,7 +263,18 @@ def _request_scene(
 # Copy the scene fields, ignoring missing or malformed values.
 def _apply_scene(scene: PageScene, fields: dict) -> None:
     scene.beat = str(fields.get("beat") or "")
+    scene.duration = _duration_value(fields.get("duration")) or scene.duration
     scene.lines = _line_list(fields.get("lines"))
+
+
+# Read the clip length the model asked for, or 0 when it gave none.
+def _duration_value(value: object) -> int:
+    if not isinstance(value, (int, float, str)):
+        return 0
+    try:
+        return int(value)
+    except ValueError:
+        return 0
 
 
 # Estimate the clip length, refusing pages that no single clip can hold.
@@ -276,7 +287,10 @@ def _finish_scene(scene: PageScene) -> PageScene:
         scene.error = f"needs {seconds}s, over the {MAX_DURATION}s limit"
         return scene
 
-    scene.duration = min(MAX_DURATION, max(MIN_DURATION, seconds + 1))
+    # The lines set a floor; the model may ask for more room to act.
+    scene.duration = min(
+        MAX_DURATION, max(MIN_DURATION, seconds + 1, scene.duration)
+    )
     return scene
 
 
@@ -302,6 +316,7 @@ def _speech_seconds(lines: list[Line]) -> float:
 def _scene_fields(scene: PageScene) -> dict:
     return {
         "beat": scene.beat,
+        "duration": scene.duration,
         "lines": [line.to_dict() for line in scene.lines],
     }
 
