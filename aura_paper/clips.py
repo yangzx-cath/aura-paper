@@ -163,14 +163,14 @@ def generate_clip(
         clip.error = scene.error
         return clip
 
-    request = VideoRequest(
-        prompt=prompt,
-        reference_images=[_page_path(content, page)],
-        duration=seconds,
-        resolution=resolution,
-    )
-
     try:
+        # VideoRequest checks the length, so it belongs inside the guard.
+        request = VideoRequest(
+            prompt=prompt,
+            reference_images=[_page_path(content, page)],
+            duration=seconds,
+            resolution=resolution,
+        )
         task = client.create_task(request)
         clip.task_id = task.task_id
         task = client.wait_task(task.task_id)
