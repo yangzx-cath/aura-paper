@@ -186,13 +186,14 @@ def understand_cover(
     if cache is None:
         return _analyze_cover(content, cover, client, prompt, path)
 
+    name = Path(page.filename).stem
     key = fingerprint(
         file_fingerprint(path),
         prompt,
         *client.signature,
     )
 
-    entry = cache.load_json(ns, "cover", key)
+    entry = cache.load_json(ns, name, key)
     if entry is not None:
         _apply_cover(content, cover, entry)
         return content, cover
@@ -200,7 +201,7 @@ def understand_cover(
     content, cover = _analyze_cover(content, cover, client, prompt, path)
     # Errors are never cached, so a failed cover is retried next run.
     if not content.error:
-        cache.save_json(ns, "cover", key, _cover_fields(content, cover))
+        cache.save_json(ns, name, key, _cover_fields(content, cover))
     return content, cover
 
 
@@ -269,7 +270,7 @@ def understand_page(
     if cache is None:
         return _analyze_page(content, client, prompt, path)
 
-    name = f"page_{page.index:02d}"
+    name = Path(page.filename).stem
     key = fingerprint(
         file_fingerprint(path),
         prompt,

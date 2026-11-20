@@ -375,31 +375,6 @@ def test_changed_image_is_a_miss(tmp_path):
     assert len(second.prompts) == 1
 
 
-def test_cached_page_takes_filename_from_current_page(tmp_path):
-    cache = Cache(tmp_path / "cache")
-    page = make_cached_page(tmp_path)
-    understand_page(
-        page,
-        FakeClient(json.dumps({"description": "草地"})),
-        cache=cache,
-        ns=NS,
-        directory=str(tmp_path),
-    )
-
-    # Same bytes under a new name must still hit the cache.
-    renamed = make_cached_page(tmp_path, name="renamed.jpg")
-    content = understand_page(
-        renamed,
-        FakeClient(),
-        cache=cache,
-        ns=NS,
-        directory=str(tmp_path),
-    )
-
-    assert content.filename == "renamed.jpg"
-    assert content.description == "草地"
-
-
 def test_cache_keeps_every_page_field(tmp_path):
     cache = Cache(tmp_path / "cache")
     page = make_cached_page(tmp_path)
