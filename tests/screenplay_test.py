@@ -112,7 +112,6 @@ def test_uses_story_page_index():
 
 def test_includes_page_scoped_resolution_context():
     content = make_content(2)
-    content.pages[1].uncertain = ["手的主人"]
     story = make_story()
     story.resolved = [
         Resolution(1, "手的主人", "我", "第18页文字依据"),
@@ -126,7 +125,6 @@ def test_includes_page_scoped_resolution_context():
     build_screenplay(content, story, client)
 
     first = client.prompts[0]
-    assert "uncertain：\n- 手的主人" in first
     assert "结论：我" in first
     assert "依据：第18页文字依据" in first
     assert "原因：缺少文字依据" in first
@@ -159,7 +157,34 @@ def test_a_silent_page_is_not_an_error():
     screenplay = build_screenplay(make_content(1), make_story(), client)
 
     assert screenplay.pages[0].error == ""
-    assert screenplay.pages[0].duration == 4
+    assert screenplay.pages[0].duration == 6
+
+
+def test_the_model_can_ask_for_a_longer_clip():
+    client = FakeClient(make_reply(duration=11))
+
+    screenplay = build_screenplay(make_content(1), make_story(), client)
+
+    assert screenplay.pages[0].duration == 11
+
+
+def test_the_lines_set_a_floor_under_the_model_duration():
+    text = "这一页要念一小会儿才能念完。" * 3
+    reply = make_reply(duration=4, lines=[{"kind": "narration", "text": text}])
+
+    screenplay = build_screenplay(
+        make_content(1), make_story(), FakeClient(reply)
+    )
+
+    assert screenplay.pages[0].duration == 12
+
+
+def test_a_wild_duration_is_pulled_back_into_range():
+    client = FakeClient(make_reply(duration=90))
+
+    screenplay = build_screenplay(make_content(1), make_story(), client)
+
+    assert screenplay.pages[0].duration == 15
 
 
 def test_missing_beat_is_an_error():
@@ -195,7 +220,9 @@ def test_duration_is_computed_again_on_a_cache_hit(tmp_path):
     cache = Cache(tmp_path / "cache")
     content = make_content(1)
     text = "这是一句很长的旁白，念出来要好几秒钟才不会显得急促。"
-    reply = make_reply(lines=[{"kind": "narration", "text": text}])
+    reply = make_reply(
+        duration=12, lines=[{"kind": "narration", "text": text}]
+    )
     first = build_screenplay(
         content, make_story(), FakeClient(reply), cache=cache
     )
@@ -204,5 +231,5 @@ def test_duration_is_computed_again_on_a_cache_hit(tmp_path):
     screenplay = build_screenplay(content, make_story(), second, cache=cache)
 
     assert second.prompts == []
-    assert first.pages[0].duration > 6
+    assert first.pages[0].duration == 12
     assert screenplay.pages[0].duration == first.pages[0].duration
