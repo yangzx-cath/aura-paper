@@ -27,18 +27,16 @@ __PREVIOUS__
 - 画面：__DESCRIPTION__
 - 情绪：__MOOD__
 
-本页 uncertain：
-__UNCERTAIN__
-
 本页 resolved：
 __RESOLVED__
 
 本页 unresolved：
 __UNRESOLVED__
 
-只输出 JSON，不要解释，不要用代码块；两个字段都要有：
+只输出 JSON，不要解释，不要用代码块；三个字段都要有：
 {
   "beat": "这一页看得见的新变化，20-30 字",
+  "duration": "整数秒，取值见规则 1",
   "lines": [
     {"kind": "narration", "speaker": "", "text": "旁白"},
     {"kind": "dialogue", "speaker": "角色名", "text": "对白"}
@@ -46,31 +44,36 @@ __UNRESOLVED__
 }
 
 规则：
-1. beat 用中文，写“谁做了什么、结果或情绪怎么变”，20-30 字。不要写镜头运动、
-   转场，也不要写“铺垫、承接、形成结尾”等编辑语；写动作和变化，不要只复述画面。
-   画面没有明显动作时，写角色最明显的动作或反应，不编新情节。
+beat 和 duration 用来生成视频画面，不会被念出来；lines 会被念出来。画面的事写进
+beat，声音的事写进 lines。
+
+1. beat 用中文，写“谁做了什么、结果或情绪怎么变”，20-30 字。要写这一页新增的
+   变化，不是把画面重说一遍；不写镜头运动、转场，也不写“铺垫、承接、形成结尾”
+   这类编辑语。画面没有明显动作时，写角色最明显的反应，不编新情节。
+   duration 是整数秒，按 beat 里的动作量估，不看台词长短：一个动作 4-6 秒，
+   连续动作或情绪停顿 7-10 秒，几个动作接连发生 11-15 秒。
 2. lines 用__LANGUAGE__，按播放顺序排列。每条要完整自然、能单独听懂；可把一句
-   原文拆成几条短句，但不要把两句合并。用 4-12 岁孩子听得懂的话，避免长从句、
-   插入语和连续重复的句式。
-3. kind 只用 narration 或 dialogue。只有“文字”中引号里的原话才是 dialogue；
-   引号外的第一人称、心理活动和普通叙述都是 narration，speaker 留空。
-4. dialogue 必须照抄引号里的原话，去掉引号和“他说、她问、I say、he says, smiling”
-   等说明文字；说明文字需要时另写 narration。
-   例：原文 “Kuan can buy it,” he says, smiling. → dialogue 为 Kuan can buy it，
-   speaker 为 Dad。
-5. narration 用来读“文字”里的叙述句，或连接页面、交代画面里看得见的动作；
-   无字页可返回空 lines。不编原文没有的情节、关系、身份或姓名；画面里未被文字
-   提到的人，只写动作，不给称呼。
-6. 局部画面例外：画面只描述手、脚、背影时，结合 resolved、全书角色、外形和
-   上一页内容判断是谁；能判断就用角色名或“我”，不能判断就只写动作，不硬猜。
-7. speaker 只用全书角色或“我”；说话人不在角色表里时不要猜名字，把原话写成
-   narration。叙述者是“我”时，旁白用 I，不要写 the child、the boy、the girl。
-8. 不要重复上一页的 beat 或台词，角色称呼前后一致。
-9. 只输出能确定的内容。resolved 的结论可以直接使用；unresolved，以及 uncertain
-   中没有 resolved 结论的项，都不要写进 beat 或 lines，也不要猜。信息不足时只写
-   看得见的动作，必要时返回空 lines。
-10. 输出前自检：beat 无镜头/编辑语；dialogue 只来自引号；引号外第一人称都是
-    narration；每条 line 自然完整；没有把 unresolved 写成确定内容。
+   原话拆成几条短句，但不要把两句合并。用 4-12 岁孩子听得懂的话，避免长从句、
+   插入语和连续重复的句式。单个镜头最长 15 秒，所以全页朗读不超过 12 秒：中文约
+   50 字，英文约 30 个词（不超过 144 个字母）。超了先删旁白，保留引号里的原话。
+3. kind 只有 narration 和 dialogue。dialogue 只能是“文字”里引号内的原话，照抄，
+   去掉引号和“他说、她问、he says, smiling”这类说明文字，说明文字需要时另写
+   narration。例：“Kuan can buy it,” he says, smiling. → 原话 Kuan can buy it。
+4. 引号外的话都是 narration，speaker 留空。narration 只留画面说不出的内容：书上
+   的拟声词照原字念（阿嚏、哎哟），不改写成“打了个喷嚏”这类描述；再加上心理
+   活动、时间推移、前因后果。原文的叙述句也按这条筛，画面已经呈现的动作、神态、
+   表情、场景一律不读。筛完没剩下什么就返回空 lines，不要为了填满而读画面。
+   不编原文没有的情节、关系、身份或姓名。
+5. speaker 只用全书角色或“我”。画面只露手、脚、背影时，结合 resolved、角色表、
+   外形和上一页内容判断是谁；判断不出就不写这个人，不硬猜。说话人不在角色表里
+   时不要猜名字，把原话写成 narration。叙述者是“我”时，旁白用 I，不写 the
+   child、the boy、the girl。
+6. 不要重复上一页的 beat 或台词，角色称呼前后一致。
+7. 只输出能确定的内容。resolved 里已给结论的，按结论写；unresolved 的每一条都
+   不要写进 beat 或 lines，也不要猜。
+8. 输出前自检：beat 有新增变化，且无镜头语和编辑语；duration 与动作量相称；
+   dialogue 只来自引号；引号外的话都是 narration；narration 没有复述画面里看得见
+   的内容；每条 line 自然完整；没有把 unresolved 写成确定内容。
 """
 
 
@@ -94,7 +97,6 @@ def screenplay_prompt(
     prompt = prompt.replace("__PREVIOUS__", previous or "（这是第一页）")
     prompt = prompt.replace("__INDEX__", str(page.index))
     prompt = prompt.replace("__PAGE_TEXT__", page.page_text or "（无字）")
-    prompt = prompt.replace("__UNCERTAIN__", _uncertain_text(page))
     prompt = prompt.replace(
         "__RESOLVED__", _resolution_text(resolved or [], "（无）")
     )
@@ -105,11 +107,6 @@ def screenplay_prompt(
         "__DESCRIPTION__", page.description or "（未提供）"
     )
     return prompt.replace("__MOOD__", page.mood or "（未提供）")
-
-
-# Render the page uncertainty list, or a placeholder when there is none.
-def _uncertain_text(page: PageContent) -> str:
-    return "\n".join(f"- {item}" for item in page.uncertain) or "（无）"
 
 
 # Render resolved or unresolved items with their evidence or reason.
