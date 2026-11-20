@@ -7,6 +7,9 @@ from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient, LLMError
 from aura_paper.split import detect_layout, save_split, split_book
 
+# The folder the cut pages land in, kept apart from the source images.
+TARGET = "split"
+
 
 class FakeClient(LLMClient):
     def __init__(self, reply="", error=None):
@@ -96,7 +99,7 @@ def test_a_failed_page_is_kept_whole(tmp_path):
     client = FakeClient(error=LLMError("boom"))
     book = make_book([make_page(tmp_path, name="00.jpg")], tmp_path)
 
-    split = split_book(book, client)
+    split = split_book(book, client, target=tmp_path / TARGET)
 
     assert split.failed_count == 1
     assert [page.filename for page in split.book.pages] == ["00.jpg"]
@@ -109,7 +112,9 @@ def test_two_pages_become_two_images(tmp_path):
         make_page(tmp_path, size=(1600, 800), index=1, name="01.jpg"),
     ]
 
-    split = split_book(make_book(pages, tmp_path), client)
+    split = split_book(
+        make_book(pages, tmp_path), client, target=tmp_path / TARGET
+    )
 
     assert split.two_page_count == 1
     assert [page.filename for page in split.book.pages] == [
@@ -129,12 +134,14 @@ def test_the_cut_follows_the_middle_of_the_image(tmp_path):
     page = Page(index=0, filename="01.jpg", width=1600, height=800)
     client = FakeClient(json.dumps({"two_pages": True}))
 
-    split_book(make_book([page], tmp_path), client)
+    split_book(make_book([page], tmp_path), client, target=tmp_path / TARGET)
 
-    with Image.open(tmp_path / "01a.jpg") as left:
-        assert left.getpixel((10, 10))[0] > 200
-    with Image.open(tmp_path / "01b.jpg") as right:
-        assert right.getpixel((10, 10))[2] > 200
+    with Image.open(tmp_path / TARGET / "01a.jpg") as left:
+        pixel = left.getpixel((10, 10))
+        assert isinstance(pixel, tuple) and pixel[0] > 200
+    with Image.open(tmp_path / TARGET / "01b.jpg") as right:
+        pixel = right.getpixel((10, 10))
+        assert isinstance(pixel, tuple) and pixel[2] > 200
 
 
 def test_second_run_hits_the_cache(tmp_path):
@@ -142,10 +149,10 @@ def test_second_run_hits_the_cache(tmp_path):
     page = make_page(tmp_path, size=(1600, 800))
     book = make_book([page], tmp_path)
     first = FakeClient(json.dumps({"two_pages": True}))
-    split_book(book, first, cache=cache)
+    split_book(book, first, target=tmp_path / TARGET, cache=cache)
 
     second = FakeClient("")
-    split_book(book, second, cache=cache)
+    split_book(book, second, target=tmp_path / TARGET, cache=cache)
 
     assert second.prompts == []
     assert cache.stats() == {"hit": 1, "miss": 1}
@@ -169,9 +176,29 @@ def test_save_split_writes_pages_json(tmp_path):
     split = split_book(
         make_book([make_page(tmp_path, size=(800, 800))], tmp_path),
         FakeClient("{}"),
+        target=tmp_path / TARGET,
     )
 
     path = save_split(split, tmp_path)
 
     assert path == tmp_path / "chicken" / "pages.json"
     assert path.is_file()
+
+
+# A page judged single again must not leave its old halves behind.
+def test_old_halves_are_cleared_on_the_next_run(tmp_path):
+    page = make_page(tmp_path, size=(1600, 800))
+    book = make_book([page], tmp_path)
+    split_book(
+        book,
+        FakeClient(json.dumps({"two_pages": True})),
+        target=tmp_path / TARGET,
+    )
+
+    split_book(
+        book,
+        FakeClient(json.dumps({"two_pages": False})),
+        target=tmp_path / TARGET,
+    )
+
+    assert sorted(p.name for p in (tmp_path / TARGET).iterdir()) == ["01.jpg"]
