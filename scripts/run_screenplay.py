@@ -7,7 +7,7 @@ Usage:
     export LLM_API_KEY=sk-xxx
     python scripts/run_screenplay.py <book_id>
     python scripts/run_screenplay.py <book_id> --workers 4
-    python scripts/run_screenplay.py <book_id> --dump-prompt 12 > prompt.txt
+    python scripts/run_screenplay.py <book_id> --dump-prompt 1 > prompt.txt
 """
 
 import argparse
@@ -48,8 +48,8 @@ def main() -> int:
     parser.add_argument(
         "--dump-prompt",
         type=int,
-        metavar="PAGE",
-        help="print one page's prompt and exit without calling the model",
+        metavar="INDEX",
+        help="print one page's prompt by 0-based index; 0 is the cover",
     )
     args = parser.parse_args()
 
@@ -71,6 +71,11 @@ def main() -> int:
         json.loads(book_path.read_text(encoding="utf-8"))
     )
     story = Story.from_dict(json.loads(story_path.read_text(encoding="utf-8")))
+
+    if not content.story_pages:
+        print("no story pages in content.json", file=sys.stderr)
+        print("check the split and understand stages", file=sys.stderr)
+        return 2
 
     if story.error:
         print(f"story error: {story.error}", file=sys.stderr)
@@ -128,31 +133,42 @@ def main() -> int:
         _show(scene)
 
     for scene in failed:
-        page = scene.index + 1
-        print(f"error   page {page}: {scene.error}", file=sys.stderr)
+        print(f"error   index {scene.index}: {scene.error}", file=sys.stderr)
     return 0 if not failed else 1
 
 
 # Print the prompt the model would receive, without spending a call.
-def _dump_prompt(content: BookContent, story: Story, number: int) -> int:
+def _dump_prompt(content: BookContent, story: Story, index: int) -> int:
     pages = content.story_pages
-    if not 1 <= number <= content.page_count:
-        print(f"page out of range: {number}", file=sys.stderr)
+    if not 0 <= index < content.page_count:
+        print(f"page index out of range: {index}", file=sys.stderr)
         return 2
 
-    page = content.pages[number - 1]
+    page = content.pages[index]
     if page not in pages:
-        print(f"page {number} is not a story page", file=sys.stderr)
+        print(f"page index {index} is not a story page", file=sys.stderr)
         return 2
 
     previous = ""
     position = pages.index(page)
     if position > 0:
         before = pages[position - 1]
-        previous = before.page_text or before.description
+        previous = (
+            f"文字：{before.page_text or '（无字）'}\n"
+            f"画面：{before.description or '（未提供）'}"
+        )
 
+    resolved = [item for item in story.resolved if item.index == page.index]
+    unresolved = [
+        item for item in story.unresolved if item.index == page.index
+    ]
     prompt = screenplay_prompt(
-        page, story, previous=previous, language=content.language
+        page,
+        story,
+        previous=previous,
+        language=content.language,
+        resolved=resolved,
+        unresolved=unresolved,
     )
     print(f"prompt length: {len(prompt)}", file=sys.stderr)
     print(prompt)
@@ -162,13 +178,13 @@ def _dump_prompt(content: BookContent, story: Story, number: int) -> int:
 # One line per page, so a long run still reads as a progress log.
 def _line(page: PageContent, scene: PageScene, elapsed: float) -> str:
     status = scene.error or f"{scene.duration}s"
-    return f"{page.index + 1:02d}  {elapsed:6.1f}s  {status}  {scene.beat}"
+    return f"{page.index:02d}  {elapsed:6.1f}s  {status}  {scene.beat}"
 
 
 # Keep one scene to a few lines, so a long book still fits one screen.
 def _show(scene: PageScene) -> None:
     status = f"{scene.duration}s" if not scene.error else scene.error
-    print(f"{scene.index + 1:02d}  {status}")
+    print(f"{scene.index:02d}  {status}")
     print(f"    beat  {scene.beat}")
     for line in scene.lines:
         who = line.speaker or "-"
