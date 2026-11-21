@@ -6,7 +6,7 @@ from aura_paper.llm import LLMClient, LLMError
 from aura_paper.prompts import story_prompt
 from aura_paper.story import (
     Cast,
-    Identity,
+    PageCast,
     Reference,
     Resolution,
     Story,
@@ -250,23 +250,18 @@ def test_references_must_point_at_a_real_figure():
     assert story.references == []
 
 
-def test_identified_figures_keep_known_names_only():
+def test_on_page_keeps_known_names_only():
     content = make_content()
-    content.pages[2].figures = [
-        Figure(index=0, name=""),
-        Figure(index=1, name=""),
-    ]
     reply = make_reply(
-        identified=[
-            {"page": 2, "figure": 1, "name": "向日葵", "evidence": "花瓣一致"},
-            {"page": 2, "figure": 0, "name": "路人", "evidence": "不在角色表"},
-            {"page": 2, "figure": 7, "name": "小鸡球球"},
+        on_page=[
+            {"page": 1, "names": ["向日葵", "路人", "向日葵"]},
+            {"page": 2, "names": ["不存在的名字"]},
         ]
     )
 
     story = build_story(content, FakeClient(reply))
 
-    assert story.identified == [Identity(2, 1, "向日葵", "花瓣一致")]
+    assert story.on_page == [PageCast(1, ["向日葵"])]
 
 
 def test_prompt_lists_figures_for_the_reference_choice():

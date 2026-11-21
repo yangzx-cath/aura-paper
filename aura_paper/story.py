@@ -63,31 +63,22 @@ class Reference:
 
 
 @dataclass
-class Identity:
-    """One unnamed figure the story stage matched to a cast member."""
+class PageCast:
+    """The cast members the story stage placed on one page."""
 
     page: int
-    figure: int
-    name: str
-    evidence: str = ""
+    names: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        """Return the external JSON shape of this identity."""
-        return {
-            "page": self.page,
-            "figure": self.figure,
-            "name": self.name,
-            "evidence": self.evidence,
-        }
+        """Return the external JSON shape of this page cast."""
+        return {"page": self.page, "names": self.names}
 
     @classmethod
-    def from_dict(cls, data: dict) -> Identity:
-        """Build an identity from its external JSON shape."""
+    def from_dict(cls, data: dict) -> PageCast:
+        """Build a page cast from its external JSON shape."""
         return cls(
             page=_int_value(data.get("page"), 0),
-            figure=_int_value(data.get("figure"), -1),
-            name=str(data.get("name") or ""),
-            evidence=str(data.get("evidence") or ""),
+            names=_text_list(data.get("names")),
         )
 
 
@@ -130,7 +121,7 @@ class Story:
     id: str = ""
     characters: list[str] = field(default_factory=list)
     cast: list[Cast] = field(default_factory=list)
-    identified: list[Identity] = field(default_factory=list)
+    on_page: list[PageCast] = field(default_factory=list)
     references: list[Reference] = field(default_factory=list)
     setting: str = ""
     style: str = ""
@@ -148,7 +139,7 @@ class Story:
             "model": self.model,
             "characters": self.characters,
             "cast": [member.to_dict() for member in self.cast],
-            "identified": [item.to_dict() for item in self.identified],
+            "on_page": [item.to_dict() for item in self.on_page],
             "references": [item.to_dict() for item in self.references],
             "setting": self.setting,
             "style": self.style,
@@ -165,7 +156,7 @@ class Story:
             id=str(data.get("id") or ""),
             characters=_text_list(data.get("characters")),
             cast=_cast_list(data.get("cast")),
-            identified=_identity_list(data.get("identified")),
+            on_page=_page_list(data.get("on_page")),
             references=_reference_list(data.get("references")),
             setting=str(data.get("setting") or ""),
             style=str(data.get("style") or ""),
@@ -216,17 +207,18 @@ def _reference_list(value: object) -> list[Reference]:
     return list(picked.values())
 
 
-# Read identity entries, keeping the first name given to each figure.
-def _identity_list(value: object) -> list[Identity]:
+# Read page cast entries, keeping the first entry for each page.
+def _page_list(value: object) -> list[PageCast]:
     if not isinstance(value, list):
         return []
-    items = [
-        Identity.from_dict(item) for item in value if isinstance(item, dict)
-    ]
-    picked: dict[tuple[int, int], Identity] = {}
-    for item in items:
-        if item.name and item.page > 0 and item.figure >= 0:
-            picked.setdefault((item.page, item.figure), item)
+    picked: dict[int, PageCast] = {}
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        entry = PageCast.from_dict(item)
+        names = list(dict.fromkeys(name for name in entry.names if name))
+        if names and entry.page > 0:
+            picked.setdefault(entry.page, PageCast(entry.page, names))
     return list(picked.values())
 
 
@@ -271,11 +263,7 @@ def build_story(
 # Drop page and figure pointers that the book cannot satisfy.
 def _keep_known(story: Story, content: BookContent) -> Story:
     pages = {page.index: page for page in content.pages}
-    story.identified = [
-        item
-        for item in story.identified
-        if _has_figure(pages, item.page, item.figure)
-    ]
+    story.on_page = [item for item in story.on_page if item.page in pages]
     story.references = [
         item
         for item in story.references
@@ -313,11 +301,11 @@ def _request_story(
 def _apply_story(story: Story, fields: dict) -> None:
     story.characters = _text_list(fields.get("characters"))
     story.cast = _cast_list(fields.get("cast"))
-    story.identified = [
-        item
-        for item in _identity_list(fields.get("identified"))
-        if item.name in story.characters
+    story.on_page = [
+        PageCast(item.page, [n for n in item.names if n in story.characters])
+        for item in _page_list(fields.get("on_page"))
     ]
+    story.on_page = [item for item in story.on_page if item.names]
     story.references = [
         item
         for item in _reference_list(fields.get("references"))
@@ -335,7 +323,7 @@ def _story_fields(story: Story) -> dict:
     return {
         "characters": story.characters,
         "cast": [member.to_dict() for member in story.cast],
-        "identified": [item.to_dict() for item in story.identified],
+        "on_page": [item.to_dict() for item in story.on_page],
         "references": [item.to_dict() for item in story.references],
         "setting": story.setting,
         "style": story.style,
