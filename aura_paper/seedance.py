@@ -21,6 +21,7 @@ from .video_types import VideoError, VideoRequest, VideoTask
 
 DEFAULT_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
 DEFAULT_MODEL = "doubao-seedance-2-0-fast-260128"
+DEFAULT_RESOLUTION = "720p"
 
 # Request limits from the video endpoint.
 _MAX_IMAGE_BYTES = 30 * 1024 * 1024
@@ -183,7 +184,9 @@ class SeedanceClient:
             "model": self.model,
             "content": content,
             "duration": request.duration,
-            "resolution": _resolution(request.resolution),
+            "resolution": _resolution(
+                request.resolution or DEFAULT_RESOLUTION
+            ),
         }
         if request.ratio is not None:
             payload["ratio"] = request.ratio
