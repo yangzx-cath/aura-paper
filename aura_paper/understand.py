@@ -48,6 +48,7 @@ class CoverContent:
 class Figure:
     """One figure on one page, which may or may not be a cast member."""
 
+    index: int = 0
     name: str = ""
     species: str = ""
     body: str = ""
@@ -60,6 +61,7 @@ class Figure:
     def to_dict(self) -> dict:
         """Return the external JSON shape of this figure."""
         return {
+            "index": self.index,
             "name": self.name,
             "species": self.species,
             "body": self.body,
@@ -74,6 +76,7 @@ class Figure:
     def from_dict(cls, data: dict) -> Figure:
         """Build a figure from its external JSON shape."""
         return cls(
+            index=int(data.get("index") or 0),
             name=str(data.get("name") or ""),
             species=str(data.get("species") or ""),
             body=str(data.get("body") or ""),
@@ -371,11 +374,16 @@ def _box_value(value: object) -> list[float] | None:
     return numbers
 
 
-# Read the figure list, skipping entries that are not objects.
+# Read the figure list, numbering the entries by their order on the page.
 def _figure_list(value: object) -> list[Figure]:
     if not isinstance(value, list):
         return []
-    return [Figure.from_dict(item) for item in value if isinstance(item, dict)]
+    figures = [
+        Figure.from_dict(item) for item in value if isinstance(item, dict)
+    ]
+    for index, figure in enumerate(figures):
+        figure.index = index
+    return figures
 
 
 # Read the note list, keeping one line per text entry.

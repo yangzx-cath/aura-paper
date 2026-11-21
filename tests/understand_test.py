@@ -555,3 +555,20 @@ def test_book_dict_round_trip():
     )
 
     assert BookContent.from_dict(book.to_dict()) == book
+
+
+def test_figures_are_numbered_by_position():
+    reply = json.dumps(
+        {
+            "page_text": "你好",
+            "description": "草地",
+            "figures": [
+                {"name": "花花", "box": [0.1, 0.1, 0.2, 0.2]},
+                {"name": "小满", "box": [0.3, 0.1, 0.4, 0.2]},
+            ],
+        }
+    )
+
+    content = understand_page(make_page(), FakeClient(reply))
+
+    assert [figure.index for figure in content.figures] == [0, 1]
