@@ -12,7 +12,7 @@ from typing import Callable
 from .cache import Cache, fingerprint
 from .llm import LLMClient, LLMError
 from .output import write_json
-from .prompts import screenplay_prompt
+from .prompts import page_characters, screenplay_prompt
 from .story import Story
 from .understand import BookContent, PageContent
 from .utils import extract_json, now_iso
@@ -69,6 +69,7 @@ class PageScene:
     index: int
     beat: str = ""
     lines: list[Line] = field(default_factory=list)
+    characters: list[str] = field(default_factory=list)
     duration: int = DEFAULT_DURATION  # Clip length asked for by the model.
     transition: str = "cut"
     model: str = ""
@@ -80,6 +81,7 @@ class PageScene:
             "index": self.index,
             "beat": self.beat,
             "lines": [line.to_dict() for line in self.lines],
+            "characters": self.characters,
             "duration": self.duration,
             "transition": self.transition,
             "model": self.model,
@@ -93,6 +95,7 @@ class PageScene:
             index=int(data.get("index") or 0),
             beat=str(data.get("beat") or ""),
             lines=_line_list(data.get("lines")),
+            characters=_name_list(data.get("characters")),
             duration=int(data.get("duration") or DEFAULT_DURATION),
             transition=str(data.get("transition") or "cut"),
             model=str(data.get("model") or ""),
@@ -105,6 +108,13 @@ def _line_list(value: object) -> list[Line]:
     if not isinstance(value, list):
         return []
     return [Line.from_dict(item) for item in value if isinstance(item, dict)]
+
+
+# Read a list of character names, dropping empty entries.
+def _name_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if item]
 
 
 @dataclass
@@ -165,60 +175,36 @@ def build_screenplay(
 
     screenplay = Screenplay(id=content.id, model=client.model)
     pages = content.story_pages
-    # Each page takes the previous page's text and description as context.
-    # Both are already in content.json, so no page depends on another one.
-    # They can run in parallel and cache on their own.
-    before = [""] + [_previous_context(page) for page in pages[:-1]]
-    tasks = list(zip(pages, before))
 
-    def run(task: tuple[PageContent, str]) -> PageScene:
-        page, previous = task
+    def run(page: PageContent) -> PageScene:
         started = time.perf_counter()
-        scene = _build_scene(page, previous, content, story, client, cache)
+        scene = _build_scene(page, content, story, client, cache)
         if on_page is not None:
             on_page(page, scene, time.perf_counter() - started)
         return scene
 
     if workers == 1:
-        scenes = [run(task) for task in tasks]
+        scenes = [run(page) for page in pages]
     else:
         # pool.map() keeps the input order, so scenes line up with the pages.
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            scenes = list(pool.map(run, tasks))
+            scenes = list(pool.map(run, pages))
 
     screenplay.pages = scenes
     return screenplay
 
 
-# Text and picture of one page that the next page reads as context.
-def _previous_context(page: PageContent) -> str:
-    text = page.page_text or "（无字）"
-    description = page.description or "（未提供）"
-    return f"文字：{text}\n画面：{description}"
-
-
 # Ask the model for one page, reusing the cache when its prompt is unchanged.
 def _build_scene(
     page: PageContent,
-    previous: str,
     content: BookContent,
     story: Story,
     client: LLMClient,
     cache: Cache | None,
 ) -> PageScene:
     scene = PageScene(index=page.index, model=client.model)
-    resolved = [item for item in story.resolved if item.index == page.index]
-    unresolved = [
-        item for item in story.unresolved if item.index == page.index
-    ]
-    prompt = screenplay_prompt(
-        page,
-        story,
-        previous=previous,
-        language=content.language,
-        resolved=resolved,
-        unresolved=unresolved,
-    )
+    scene.characters = page_characters(page, story)
+    prompt = screenplay_prompt(page, content, story)
 
     if cache is None:
         scene = _request_scene(scene, client, prompt)

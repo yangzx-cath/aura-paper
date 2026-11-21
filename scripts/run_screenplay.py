@@ -145,37 +145,16 @@ def main() -> int:
 
 # Print the prompt the model would receive, without spending a call.
 def _dump_prompt(content: BookContent, story: Story, index: int) -> int:
-    pages = content.story_pages
     if not 0 <= index < content.page_count:
         print(f"page index out of range: {index}", file=sys.stderr)
         return 2
 
     page = content.pages[index]
-    if page not in pages:
+    if page not in content.story_pages:
         print(f"page index {index} is not a story page", file=sys.stderr)
         return 2
 
-    previous = ""
-    position = pages.index(page)
-    if position > 0:
-        before = pages[position - 1]
-        previous = (
-            f"文字：{before.page_text or '（无字）'}\n"
-            f"画面：{before.description or '（未提供）'}"
-        )
-
-    resolved = [item for item in story.resolved if item.index == page.index]
-    unresolved = [
-        item for item in story.unresolved if item.index == page.index
-    ]
-    prompt = screenplay_prompt(
-        page,
-        story,
-        previous=previous,
-        language=content.language,
-        resolved=resolved,
-        unresolved=unresolved,
-    )
+    prompt = screenplay_prompt(page, content, story)
     print(f"prompt length: {len(prompt)}", file=sys.stderr)
     print(prompt)
     return 0
