@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..story import Resolution, Story
-    from ..understand import PageContent
+    from ..understand import BookContent, PageContent
 
 TEMPLATE = """你是一名儿童绘本编剧。请根据全书设定和本页内容，写出这一页的分镜提示和朗读台词。
 
@@ -24,7 +24,7 @@ __PREVIOUS__
 本页内容：
 - 故事页：第 __INDEX__ 页
 - 文字：__PAGE_TEXT__
-- 画面：__DESCRIPTION__
+- 画面：__DESCRIPTION____ON_PAGE__
 
 本页 resolved：
 __RESOLVED__
@@ -63,11 +63,11 @@ beat 和 duration，声音的事写进 lines。
    五块，积木城堡没有倒”）就留——数量、过程、结果，画面说不准。拟声词照原字
    念（阿嚏、哎哟），不改写成“打了个喷嚏”这类描述；心理活动、时间推移、前因
    后果可以留。筛完没剩下什么就返回空 lines，不编原文没有的情节、关系或姓名。
-5. speaker 只用角色表里的角色或“我”。多人说法（“我们”“咱们”“we”）仍写成
-   dialogue，挑本页在场的一个角色，优先主要人物——这只是选谁来念，不算猜。
-   画面只露手、脚、背影时，结合 resolved、角色表和外形判断是谁；判断不出就不写
-   这个人。说话人不在角色表里时，把原话写成 narration。叙述者是“我”时，旁白用
-   I，不写 the child、the boy、the girl。
+5. speaker 只用角色表里的角色或“我”，并且必须是本页人物之一；本页人物里没有的
+   角色，即使文字提到了也不要写。本页人物为空时按角色表挑。
+   多人说法（“我们”“咱们”“we”）仍写成 dialogue，挑本页人物里的一个，优先主要
+   人物——这只是选谁来念，不算猜；挑不出来就写成 narration。
+   叙述者是“我”时，旁白用 I，不写 the child、the boy、the girl。
 6. 只输出能确定的内容：resolved 的结论直接用；unresolved 的每一项都不写进 beat，
    也不要据此编台词。但引号内的原话必须保留，说话人按规则 5 选——原话照念，
    不因为说话人没定就丢掉。
@@ -79,31 +79,70 @@ beat 和 duration，声音的事写进 lines。
 
 def screenplay_prompt(
     page: PageContent,
+    content: BookContent,
     story: Story,
-    *,
-    previous: str = "",
-    language: str = "",
-    resolved: list[Resolution] | None = None,
-    unresolved: list[Resolution] | None = None,
 ) -> str:
     """Build the prompt that plans one page as a scene."""
-    characters = "、".join(story.characters) or "（未提供）"
-    prompt = TEMPLATE.replace("__CHARACTERS__", characters)
-    prompt = prompt.replace("__LANGUAGE__", language or "原文的语言")
+    resolved = [item for item in story.resolved if item.index == page.index]
+    unresolved = [
+        item for item in story.unresolved if item.index == page.index
+    ]
+
+    prompt = TEMPLATE.replace("__LANGUAGE__", content.language or "原文的语言")
+    prompt = prompt.replace(
+        "__CHARACTERS__", "、".join(story.characters) or "（未提供）"
+    )
     prompt = prompt.replace("__CAST__", _cast_text(story))
     prompt = prompt.replace("__SETTING__", story.setting or "（未提供）")
     prompt = prompt.replace("__STYLE__", story.style or "（未提供）")
     prompt = prompt.replace("__SUMMARY__", story.summary or "（未提供）")
-    prompt = prompt.replace("__PREVIOUS__", previous or "（这是第一页）")
+    prompt = prompt.replace(
+        "__PREVIOUS__", _previous_text(page, content) or "（这是第一页）"
+    )
     prompt = prompt.replace("__INDEX__", str(page.index))
     prompt = prompt.replace("__PAGE_TEXT__", page.page_text or "（无字）")
     prompt = prompt.replace(
-        "__RESOLVED__", _resolution_text(resolved or [], "（无）")
+        "__ON_PAGE__", _on_page_text(page_characters(page, story))
     )
     prompt = prompt.replace(
-        "__UNRESOLVED__", _resolution_text(unresolved or [], "（无）")
+        "__RESOLVED__", _resolution_text(resolved, "（无）")
+    )
+    prompt = prompt.replace(
+        "__UNRESOLVED__", _resolution_text(unresolved, "（无）")
     )
     return prompt.replace("__DESCRIPTION__", page.description or "（未提供）")
+
+
+def page_characters(page: PageContent, story: Story) -> list[str]:
+    """Return the cast members this page shows, in figure order."""
+    found = {(item.page, item.figure): item.name for item in story.identified}
+    names: list[str] = []
+    for figure in page.figures:
+        name = figure.name or found.get((page.index, figure.index), "")
+        if name in story.characters and name not in names:
+            names.append(name)
+    return names
+
+
+# Text and picture of the page before this one, or nothing on the first.
+def _previous_text(page: PageContent, content: BookContent) -> str:
+    pages = content.story_pages
+    position = next(
+        (i for i, item in enumerate(pages) if item.index == page.index), 0
+    )
+    if position == 0:
+        return ""
+    before = pages[position - 1]
+    text = before.page_text or "（无字）"
+    description = before.description or "（未提供）"
+    return f"文字：{text}\n画面：{description}"
+
+
+# Render the names known to be on this page, or nothing when none is known.
+def _on_page_text(names: list[str]) -> str:
+    if not names:
+        return ""
+    return "\n- 本页人物：" + "、".join(names)
 
 
 # Render resolved or unresolved items with their evidence or reason.
