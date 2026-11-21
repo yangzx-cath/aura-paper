@@ -95,6 +95,7 @@ def main() -> int:
     print(f"time    {elapsed:.1f}s")
     print(f"stats   {cache.stats()}")
     print(f"chars      {'、'.join(story.characters)}")
+    print(f"refs       {len(story.references)}")
     print(f"setting    {story.setting}")
     print(f"style      {story.style}")
     print(f"resolved   {len(story.resolved)}")
@@ -103,6 +104,10 @@ def main() -> int:
     print("summary")
     print(story.summary)
     print()
+    for item in story.references:
+        print(f"ref  p{item.page:<3} {item.name}  {item.why}")
+    if story.references:
+        print()
     print(f"output  {path}")
     return 0
 
