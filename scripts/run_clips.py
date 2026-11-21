@@ -4,7 +4,8 @@ Reads out/<book>/content.json, story.json and screenplay.json, generates one
 clip per page into out/<book>/clips/, and records the set in clips.json.
 
 Usage:
-    export MINIMAX_API_KEY=sk-xxx
+    export AURA_VIDEO_PROVIDER=seedance
+    export ARK_API_KEY=...
     python scripts/run_clips.py <book_id>
     python scripts/run_clips.py <book_id> --page 1
     python scripts/run_clips.py <book_id> --duration 8
@@ -22,8 +23,8 @@ from threading import Lock
 from aura_paper.cache import Cache
 from aura_paper.clips import VideoClip, build_clips, save_clips
 from aura_paper.config import cache_root, load_env, out_root
-from aura_paper.minimax import MiniMaxClient
 from aura_paper.prompts import clip_prompt
+from aura_paper.providers import make_video_client
 from aura_paper.references import reference_path
 from aura_paper.screenplay import Screenplay
 from aura_paper.story import Story
@@ -50,7 +51,17 @@ def main() -> int:
         default=None,
         help="override the screenplay scene duration",
     )
-    parser.add_argument("--resolution", default="768P")
+    parser.add_argument(
+        "--resolution",
+        default=None,
+        help="provider resolution preset; default is the provider's own",
+    )
+    parser.add_argument(
+        "--provider",
+        choices=("seedance", "minimax"),
+        default=None,
+        help="video provider; overrides AURA_VIDEO_PROVIDER",
+    )
     parser.add_argument(
         "--workers",
         type=int,
@@ -112,7 +123,7 @@ def main() -> int:
     if plan is None:
         return 2
 
-    client = MiniMaxClient.from_env()
+    client = make_video_client(args.provider)
     missing = client.missing_settings()
     if missing:
         print("missing config: " + ", ".join(missing), file=sys.stderr)
@@ -120,8 +131,8 @@ def main() -> int:
 
     cache = Cache(cache_root(), enabled=not args.no_cache)
     print(f"book    {content.id}  pages={content.page_count}")
-    print(f"model   {client.model}  timeout={client.timeout:.0f}s")
-    print(f"size    {args.resolution}")
+    print(f"client  {type(client).__name__}  model={client.model}")
+    print(f"size    {args.resolution or 'provider default'}")
     print(f"cache   {cache.root}  enabled={cache.enabled}")
     print(f"workers {args.workers}")
     print()

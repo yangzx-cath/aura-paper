@@ -10,7 +10,6 @@ from typing import Callable
 
 from .cache import Cache, file_fingerprint, fingerprint
 from .config import out_root
-from .minimax import MiniMaxClient, MiniMaxError, VideoRequest
 from .output import write_json
 from .prompts import clip_prompt
 from .references import reference_path
@@ -18,6 +17,10 @@ from .screenplay import PageScene, Screenplay
 from .story import Story
 from .understand import BookContent, PageContent
 from .utils import now_iso
+from .video_types import VideoClient, VideoError, VideoRequest
+
+# Every clip shares one shape, so single pages and spreads cut together.
+DEFAULT_RATIO = "4:3"
 
 
 @dataclass
@@ -30,7 +33,7 @@ class VideoClip:
     task_id: str = ""
     model: str = ""
     duration: int = 6
-    resolution: str = "768P"
+    resolution: str = ""
     path: str = ""
     error: str = ""
 
@@ -59,7 +62,7 @@ class VideoClip:
             task_id=str(data.get("task_id") or ""),
             model=str(data.get("model") or ""),
             duration=int(data.get("duration") or 6),
-            resolution=str(data.get("resolution") or "768P"),
+            resolution=str(data.get("resolution") or ""),
             path=str(data.get("path") or ""),
             error=str(data.get("error") or ""),
         )
@@ -137,11 +140,11 @@ def generate_clip(
     page: PageContent,
     story: Story,
     scene: PageScene,
-    client: MiniMaxClient,
+    client: VideoClient,
     *,
     root: str | Path | None = None,
     duration: int | None = None,
-    resolution: str = "768P",
+    resolution: str | None = None,
 ) -> VideoClip:
     """Generate one page clip and return its metadata."""
     assert scene.index == page.index
@@ -158,7 +161,7 @@ def generate_clip(
         prompt=prompt,
         model=client.model,
         duration=seconds,
-        resolution=resolution,
+        resolution=resolution or "",
         path=str(target.relative_to(_book_dir(content.id, root))),
     )
 
@@ -174,6 +177,7 @@ def generate_clip(
             + [path for _, path in refs],
             duration=seconds,
             resolution=resolution,
+            ratio=DEFAULT_RATIO,
         )
         task = client.create_task(request)
         clip.task_id = task.task_id
@@ -185,12 +189,12 @@ def generate_clip(
             clip.error = "task succeeded without a video URL"
             return clip
         client.download(task.video_url, target)
-    except (MiniMaxError, ValueError) as exc:
+    except (VideoError, ValueError) as exc:
         clip.error = str(exc)
         return clip
 
     clip.duration = task.duration or seconds
-    clip.resolution = task.resolution or resolution
+    clip.resolution = task.resolution or resolution or ""
     return clip
 
 
@@ -217,11 +221,11 @@ def build_clips(
     content: BookContent,
     story: Story,
     screenplay: Screenplay,
-    client: MiniMaxClient,
+    client: VideoClient,
     *,
     cache: Cache | None = None,
     root: str | Path | None = None,
-    resolution: str = "768P",
+    resolution: str | None = None,
     workers: int = 1,
     on_page: Callable[[PageContent, VideoClip, float], None] | None = None,
 ) -> BookClips:
@@ -270,10 +274,10 @@ def _one_clip(
     page: PageContent,
     story: Story,
     scene: PageScene,
-    client: MiniMaxClient,
+    client: VideoClient,
     cache: Cache | None,
     root: str | Path | None,
-    resolution: str,
+    resolution: str | None,
 ) -> VideoClip:
     ns = f"clips/{content.id}"
     name = Path(page.filename).stem
@@ -316,8 +320,8 @@ def _clip_key(
     page: PageContent,
     story: Story,
     scene: PageScene,
-    client: MiniMaxClient,
-    resolution: str,
+    client: VideoClient,
+    resolution: str | None,
     root: str | Path | None,
 ) -> str:
     refs = _reference_images(content, scene, root)
@@ -329,7 +333,8 @@ def _clip_key(
         file_fingerprint(_page_path(content, page)),
         *[file_fingerprint(path) for _, path in refs],
         str(scene.duration),
-        resolution,
+        resolution or "",
+        DEFAULT_RATIO,
         client.model,
     )
 
