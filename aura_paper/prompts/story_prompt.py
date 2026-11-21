@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..understand import BookContent
+    from ..understand import BookContent, Figure
 
 TEMPLATE = """你是一名儿童绘本的编剧助手。
 
@@ -20,6 +20,9 @@ __PAGES__
   "cast": [
     {"name": "角色名，和 characters 完全一致", "look": "外形，不超过 20 字"}
   ],
+  "references": [
+    {"name": "角色名，和 characters 完全一致", "page": 12, "why": "选择理由"}
+  ],
   "setting": "故事发生的地点与环境，不超过 20 字",
   "style": "画面风格关键词，不超过 20 字",
   "summary": "全书主线，100-200 字",
@@ -32,7 +35,7 @@ __PAGES__
 }
 
 要求：
-1. 只输出 JSON，不要解释文字，不要使用代码块，七个字段都要出现；
+1. 只输出 JSON，不要解释文字，不要使用代码块，八个字段都要出现；
    resolved 和 unresolved 没有内容时写空数组。
 2. 所有内容使用中文，角色名除外。
 3. characters 用书中最正式的称呼，例如"小鸡球球"而不是"小鸡"或"球球"。
@@ -43,11 +46,15 @@ __PAGES__
 6. 角色的身份要有文字依据：书里写到某个称呼的那几页，画面里对应的人物才是他。
    文字没提到的画面人物，不写进 characters 和 cast，也不要给他起名字或猜关系；
    他们留在画面描述里。只有手、脚、背影等局部时，不要当成新角色，也不要猜是谁。
-7. 叙述者从头到尾没有名字时，不要编名字，用"我"占位；"我"同样要写外形，按画面里
+7. references 给每个角色挑一张参考图，用来让后续分镜保持长相一致：挑最容易认出
+   这个角色的那一页，全身优先于半身，正面、斜侧优先于侧面、背面，无遮挡优先于
+   遮挡，占画面大的优先。每个角色只挑一张，page 写那一页的索引，why 写理由，
+   不超过 15 字。全书都看不清的角色不要列，也不要拿别的角色的图顶替。
+8. 叙述者从头到尾没有名字时，不要编名字，用"我"占位；"我"同样要写外形，按画面里
    反复出现的那个孩子来写。
-8. summary 概括全书主线，不添加原文没有的情节。
-9. setting 和 style 要能代表全书，用于统一后续的画面生成。
-10. 处理每页的 uncertain：
+9. summary 概括全书主线，不添加原文没有的情节。
+10. setting 和 style 要能代表全书，用于统一后续的画面生成。
+11. 处理每页的 uncertain：
     - 通读全书后能从文字、画面描述、前后页关系或角色外形确定的，放入 resolved。
       issue 尽量原样引用该页 uncertain 项；answer 写结论；evidence 写依据，
       必须包含索引或具体文字、画面、外形。
@@ -69,9 +76,37 @@ def story_prompt(content: BookContent) -> str:
             f"文字：{page.page_text or '（无字）'}\n"
             f"画面：{page.description}"
         )
+        if page.figures:
+            block += "\n人物：\n" + "\n".join(
+                _figure_line(figure) for figure in page.figures
+            )
         if page.uncertain:
             block += "\nuncertain：" + "；".join(page.uncertain)
         blocks.append(block)
 
     prompt = TEMPLATE.replace("__PAGES__", "\n\n".join(blocks))
     return prompt.replace("__COUNT__", str(len(pages)))
+
+
+# Render one figure as a single line of identity evidence.
+def _figure_line(figure: Figure) -> str:
+    parts = [
+        figure.name or "（未命名）",
+        figure.species or "-",
+        figure.view or "-",
+        figure.facing or "-",
+        f"遮挡{figure.occlusion or '-'}",
+        f"占画面 {_area_text(figure.box)}",
+        figure.body,
+    ]
+    if figure.outfit:
+        parts.append(figure.outfit)
+    return "    - " + "｜".join(part for part in parts if part)
+
+
+# Turn a crop box into the share of the page it covers.
+def _area_text(box: list[float] | None) -> str:
+    if not box:
+        return "-"
+    left, top, right, bottom = box
+    return f"{(right - left) * (bottom - top) * 100:.0f}%"
