@@ -9,8 +9,8 @@ from aura_paper.screenplay import (
     Screenplay,
     build_screenplay,
 )
-from aura_paper.story import Cast, Identity, Resolution, Story
-from aura_paper.understand import BookContent, Figure, PageContent
+from aura_paper.story import Cast, PageCast, Resolution, Story
+from aura_paper.understand import BookContent, PageContent
 
 
 class FakeClient(LLMClient):
@@ -217,18 +217,11 @@ def test_duration_is_computed_again_on_a_cache_hit(tmp_path):
 
 def test_scene_lists_the_characters_on_the_page():
     content = make_content()
-    content.pages[2].figures = [
-        Figure(index=0, name="Kuan"),
-        Figure(index=1),
-        Figure(index=2, name="路人"),
-        Figure(index=3, name="Kuan"),
-    ]
     story = make_story()
-    story.identified = [Identity(2, 1, "Kuan", "同一顶帽子")]
+    story.on_page = [PageCast(2, ["Kuan"])]
 
     screenplay = build_screenplay(content, story, FakeClient(make_reply()))
 
-    # Two figures resolve to Kuan, the stranger is not in the cast.
     assert screenplay.pages[1].characters == ["Kuan"]
 
 

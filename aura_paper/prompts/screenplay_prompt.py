@@ -63,10 +63,10 @@ beat 和 duration，声音的事写进 lines。
    五块，积木城堡没有倒”）就留——数量、过程、结果，画面说不准。拟声词照原字
    念（阿嚏、哎哟），不改写成“打了个喷嚏”这类描述；心理活动、时间推移、前因
    后果可以留。筛完没剩下什么就返回空 lines，不编原文没有的情节、关系或姓名。
-5. speaker 只用角色表里的角色或“我”，并且必须是本页人物之一；本页人物里没有的
-   角色，即使文字提到了也不要写。本页人物为空时按角色表挑。
+5. speaker 只用角色表里的角色或“我”，优先本页人物里有的。本页人物里都没有时，
+   按文字判断是谁说的；判断不出就写成 narration。
    多人说法（“我们”“咱们”“we”）仍写成 dialogue，挑本页人物里的一个，优先主要
-   人物——这只是选谁来念，不算猜；挑不出来就写成 narration。
+   人物——这只是选谁来念，不算猜。
    叙述者是“我”时，旁白用 I，不写 the child、the boy、the girl。
 6. 只输出能确定的内容：resolved 的结论直接用；unresolved 的每一项都不写进 beat，
    也不要据此编台词。但引号内的原话必须保留，说话人按规则 5 选——原话照念，
@@ -114,14 +114,11 @@ def screenplay_prompt(
 
 
 def page_characters(page: PageContent, story: Story) -> list[str]:
-    """Return the cast members this page shows, in figure order."""
-    found = {(item.page, item.figure): item.name for item in story.identified}
-    names: list[str] = []
-    for figure in page.figures:
-        name = figure.name or found.get((page.index, figure.index), "")
-        if name in story.characters and name not in names:
-            names.append(name)
-    return names
+    """Return the cast members this page shows."""
+    for item in story.on_page:
+        if item.page == page.index:
+            return list(item.names)
+    return []
 
 
 # Text and picture of the page before this one, or nothing on the first.
