@@ -22,7 +22,6 @@ TEMPLATE = """你是一名儿童绘本动画分镜师。
 - 页码：第 __INDEX__ 页
 - 剧情：__BEAT__
 - 画面：__DESCRIPTION__
-- 情绪：__MOOD__
 
 要求：
 1. 原图只用于参考角色造型、画风、配色和构图；只表现本页画面内容，不新增角色，
@@ -49,7 +48,4 @@ def clip_prompt(
     prompt = prompt.replace("__SUMMARY__", story.summary or "（未提供）")
     prompt = prompt.replace("__INDEX__", str(page.index))
     prompt = prompt.replace("__BEAT__", beat.strip() or "（按画面自然动作）")
-    prompt = prompt.replace(
-        "__DESCRIPTION__", page.description or "（未提供）"
-    )
-    return prompt.replace("__MOOD__", page.mood or "（未提供）")
+    return prompt.replace("__DESCRIPTION__", page.description or "（未提供）")

@@ -67,8 +67,7 @@ def story_prompt(content: BookContent) -> str:
             f"第 {number} 页\n"
             f"索引：{page.index}\n"
             f"文字：{page.page_text or '（无字）'}\n"
-            f"画面：{page.description}\n"
-            f"情绪：{page.mood}"
+            f"画面：{page.description}"
         )
         if page.uncertain:
             block += "\nuncertain：" + "；".join(page.uncertain)

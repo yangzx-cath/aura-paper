@@ -66,7 +66,6 @@ def make_content(root: Path) -> tuple[BookContent, PageContent]:
         index=1,
         filename="page_2.png",
         description="一只蓝色机器人捧着钱。",
-        mood="期待",
     )
     content = BookContent(
         id="demo",

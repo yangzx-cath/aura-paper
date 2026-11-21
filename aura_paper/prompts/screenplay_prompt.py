@@ -25,7 +25,6 @@ __PREVIOUS__
 - 故事页：第 __INDEX__ 页
 - 文字：__PAGE_TEXT__
 - 画面：__DESCRIPTION__
-- 情绪：__MOOD__
 
 本页 resolved：
 __RESOLVED__
@@ -104,10 +103,7 @@ def screenplay_prompt(
     prompt = prompt.replace(
         "__UNRESOLVED__", _resolution_text(unresolved or [], "（无）")
     )
-    prompt = prompt.replace(
-        "__DESCRIPTION__", page.description or "（未提供）"
-    )
-    return prompt.replace("__MOOD__", page.mood or "（未提供）")
+    return prompt.replace("__DESCRIPTION__", page.description or "（未提供）")
 
 
 # Render resolved or unresolved items with their evidence or reason.
