@@ -15,6 +15,9 @@ from .understand import BookContent, Figure
 MARGIN = 0.04
 # A video model rejects a reference whose short side is below this.
 MIN_SIDE = 300
+# It also rejects one whose width/height falls outside this range.
+MIN_RATIO = 0.4
+MAX_RATIO = 2.5
 # Enlarging a small crop further than this only adds blur.
 MAX_ZOOM = 1.6
 # High enough for line art, small enough to keep the upload light.
@@ -105,6 +108,8 @@ def _crop(
         return None
 
     piece = page.crop(_padded(figure.box, page.size))
+    if not MIN_RATIO <= piece.width / piece.height <= MAX_RATIO:
+        return None
     if min(piece.size) < MIN_SIDE:
         zoom = min(MIN_SIDE / min(piece.size), MAX_ZOOM)
         size = (round(piece.width * zoom), round(piece.height * zoom))
