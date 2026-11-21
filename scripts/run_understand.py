@@ -136,7 +136,7 @@ def _dump_prompt(book: Book, index: int) -> int:
 # One line per page, so a long run still reads as a progress log.
 def _line(page: Page, result: PageContent, elapsed: float) -> str:
     size = f"{page.width}x{page.height}"
-    status = result.error or result.mood or "-"
+    status = result.error or "-"
     return f"{page.filename}  {size:<11} {elapsed:6.1f}s  {status}"
 
 
