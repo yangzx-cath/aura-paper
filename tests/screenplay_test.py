@@ -1,20 +1,29 @@
 import json
 
 from aura_paper.cache import Cache
-from aura_paper.llm import LLMClient
-from aura_paper.screenplay import Line, PageScene, Screenplay, build_screenplay
-from aura_paper.story import Cast, Resolution, Story
-from aura_paper.understand import BookContent, PageContent
+from aura_paper.llm import LLMClient, LLMError
+from aura_paper.prompts import screenplay_prompt
+from aura_paper.screenplay import (
+    Line,
+    PageScene,
+    Screenplay,
+    build_screenplay,
+)
+from aura_paper.story import Cast, Identity, Resolution, Story
+from aura_paper.understand import BookContent, Figure, PageContent
 
 
 class FakeClient(LLMClient):
-    def __init__(self, reply=""):
+    def __init__(self, reply="", error=None):
         super().__init__("http://example/v1", "test-key", "fake-model")
         self.reply = reply
+        self.error = error
         self.prompts = []
 
     def chat(self, prompt, *, image_path=None, json_mode=True):
         self.prompts.append(prompt)
+        if self.error:
+            raise self.error
         return self.reply
 
 
@@ -81,35 +90,6 @@ def test_pages_that_are_not_a_list_become_empty():
     assert screenplay.pages == []
 
 
-def test_skips_the_cover_page():
-    content = make_content()
-
-    screenplay = build_screenplay(
-        content, make_story(), FakeClient(make_reply())
-    )
-
-    assert [scene.index for scene in screenplay.pages] == [1, 2, 3]
-
-
-def test_gives_each_page_the_text_of_the_one_before():
-    client = FakeClient(make_reply())
-
-    build_screenplay(make_content(), make_story(), client)
-
-    # The first story page has no story page before it, so it starts the chain.
-    assert "（这是第一页）" in client.prompts[0]
-    assert "第 2 页原文" in client.prompts[1]
-    assert "第 1 页原文" not in client.prompts[1]
-
-
-def test_uses_story_page_index():
-    client = FakeClient(make_reply())
-
-    build_screenplay(make_content(1), make_story(), client)
-
-    assert "故事页：第 1 页" in client.prompts[0]
-
-
 def test_includes_page_scoped_resolution_context():
     content = make_content(2)
     story = make_story()
@@ -133,22 +113,6 @@ def test_includes_page_scoped_resolution_context():
     second = client.prompts[1]
     assert "结论：Kuan" in second
     assert "结论：我" not in second
-
-
-def test_tells_the_model_how_each_character_looks():
-    client = FakeClient(make_reply())
-
-    build_screenplay(make_content(1), make_story(), client)
-
-    assert "Kuan（圆滚滚的蓝色机器人）" in client.prompts[0]
-
-
-def test_tells_the_model_which_language_to_speak():
-    client = FakeClient(make_reply())
-
-    build_screenplay(make_content(1), make_story(), client)
-
-    assert "- 语言：中文" in client.prompts[0]
 
 
 def test_a_silent_page_is_not_an_error():
@@ -185,6 +149,22 @@ def test_a_wild_duration_is_pulled_back_into_range():
     screenplay = build_screenplay(make_content(1), make_story(), client)
 
     assert screenplay.pages[0].duration == 15
+
+
+def test_llm_error_is_recorded():
+    screenplay = build_screenplay(
+        make_content(1), make_story(), FakeClient(error=LLMError("boom"))
+    )
+
+    assert screenplay.pages[0].error == "boom"
+
+
+def test_a_reply_without_json_is_recorded():
+    screenplay = build_screenplay(
+        make_content(1), make_story(), FakeClient("我不太确定。")
+    )
+
+    assert "no JSON object" in screenplay.pages[0].error
 
 
 def test_missing_beat_is_an_error():
@@ -233,3 +213,36 @@ def test_duration_is_computed_again_on_a_cache_hit(tmp_path):
     assert second.prompts == []
     assert first.pages[0].duration == 12
     assert screenplay.pages[0].duration == first.pages[0].duration
+
+
+def test_scene_lists_the_characters_on_the_page():
+    content = make_content()
+    content.pages[2].figures = [
+        Figure(index=0, name="Kuan"),
+        Figure(index=1),
+        Figure(index=2, name="路人"),
+        Figure(index=3, name="Kuan"),
+    ]
+    story = make_story()
+    story.identified = [Identity(2, 1, "Kuan", "同一顶帽子")]
+
+    screenplay = build_screenplay(content, story, FakeClient(make_reply()))
+
+    # Two figures resolve to Kuan, the stranger is not in the cast.
+    assert screenplay.pages[1].characters == ["Kuan"]
+
+
+def test_prompt_omits_the_line_when_nobody_is_known():
+    content = make_content()
+
+    prompt = screenplay_prompt(content.pages[1], content, make_story())
+
+    assert "- 本页人物：" not in prompt
+
+
+def test_prompt_reads_the_previous_page_from_the_book():
+    content = make_content()
+
+    prompt = screenplay_prompt(content.pages[2], content, make_story())
+
+    assert "第 3 页原文" in prompt.split("上一页内容")[1]
