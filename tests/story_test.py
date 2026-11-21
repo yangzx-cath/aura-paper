@@ -279,7 +279,7 @@ def test_prompt_lists_figures_for_the_reference_choice():
             view="全身",
             facing="正面",
             occlusion="无",
-            box=[0.2, 0.2, 0.6, 0.8],
+            box=[20, 20, 60, 80],
         )
     ]
 

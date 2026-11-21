@@ -175,13 +175,13 @@ def test_figures_cope_with_a_malformed_reply():
 
 
 def test_a_bad_box_is_dropped():
-    good = Figure.from_dict({"box": [0.1, 0.2, 0.5, 0.9]})
-    clamped = Figure.from_dict({"box": [-0.5, 0.2, 1.5, 0.9]})
-    inverted = Figure.from_dict({"box": [0.5, 0.2, 0.1, 0.9]})
+    good = Figure.from_dict({"box": [10, 20, 50, 90]})
+    clamped = Figure.from_dict({"box": [-5, 20, 150, 90]})
+    inverted = Figure.from_dict({"box": [50, 20, 10, 90]})
 
-    assert good.box == [0.1, 0.2, 0.5, 0.9]
-    assert clamped.box == [0.0, 0.2, 1.0, 0.9]
-    assert Figure.from_dict({"box": [0.1, 0.2, 0.5]}).box is None
+    assert good.box == [10, 20, 50, 90]
+    assert clamped.box == [0, 20, 100, 90]
+    assert Figure.from_dict({"box": [10, 20, 50]}).box is None
     assert Figure.from_dict({"box": "左下角"}).box is None
     assert inverted.box is None
 
@@ -414,7 +414,7 @@ def test_cache_keeps_every_page_field(tmp_path):
                     "view": "全身",
                     "facing": "正面",
                     "occlusion": "无",
-                    "box": [0.1, 0.2, 0.5, 0.9],
+                    "box": [10, 20, 50, 90],
                 }
             ],
             "uncertain": ["红衣孩子身份不明"],
@@ -431,7 +431,7 @@ def test_cache_keeps_every_page_field(tmp_path):
     assert content.figures[0].species == "人类"
     assert content.figures[0].outfit == "粉条纹短裤"
     assert content.figures[0].view == "全身"
-    assert content.figures[0].box == [0.1, 0.2, 0.5, 0.9]
+    assert content.figures[0].box == [10, 20, 50, 90]
     assert content.uncertain == ["红衣孩子身份不明"]
 
 
@@ -563,8 +563,8 @@ def test_figures_are_numbered_by_position():
             "page_text": "你好",
             "description": "草地",
             "figures": [
-                {"name": "花花", "box": [0.1, 0.1, 0.2, 0.2]},
-                {"name": "小满", "box": [0.3, 0.1, 0.4, 0.2]},
+                {"name": "花花", "box": [10, 10, 20, 20]},
+                {"name": "小满", "box": [30, 10, 40, 20]},
             ],
         }
     )

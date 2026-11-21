@@ -56,7 +56,7 @@ class Figure:
     view: str = ""
     facing: str = ""
     occlusion: str = ""
-    box: list[float] | None = None  # [left, top, right, bottom], 0 to 1
+    box: list[int] | None = None  # [left, top, right, bottom], percent
 
     def to_dict(self) -> dict:
         """Return the external JSON shape of this figure."""
@@ -359,15 +359,15 @@ def _apply_fields(content: PageContent, fields: dict) -> None:
     content.uncertain = _text_list(fields.get("uncertain"))
 
 
-# Read a crop box as [left, top, right, bottom] in 0-1, or None when unusable.
-def _box_value(value: object) -> list[float] | None:
+# Read a crop box as [left, top, right, bottom] in percent, or None.
+def _box_value(value: object) -> list[int] | None:
     if not isinstance(value, (list, tuple)) or len(value) != 4:
         return None
     numbers = []
     for item in value:
         if not isinstance(item, (int, float)):
             return None
-        numbers.append(min(1.0, max(0.0, float(item))))
+        numbers.append(int(min(100, max(0, item))))
     left, top, right, bottom = numbers
     if right <= left or bottom <= top:
         return None

@@ -119,8 +119,8 @@ def _figure_line(figure: Figure) -> str:
 
 
 # Turn a crop box into the share of the page it covers.
-def _area_text(box: list[float] | None) -> str:
+def _area_text(box: list[int] | None) -> str:
     if not box:
         return "-"
     left, top, right, bottom = box
-    return f"{(right - left) * (bottom - top) * 100:.0f}%"
+    return f"{(right - left) * (bottom - top) / 100:.0f}%"
