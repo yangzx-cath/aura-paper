@@ -4,8 +4,15 @@ from pathlib import Path
 from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient, LLMError
 from aura_paper.prompts import story_prompt
-from aura_paper.story import Cast, Resolution, Story, build_story, save_story
-from aura_paper.understand import BookContent, PageContent
+from aura_paper.story import (
+    Cast,
+    Reference,
+    Resolution,
+    Story,
+    build_story,
+    save_story,
+)
+from aura_paper.understand import BookContent, Figure, PageContent
 
 
 class FakeClient(LLMClient):
@@ -214,6 +221,42 @@ def test_cast_entries_without_a_name_are_skipped():
     assert [member.name for member in story.cast] == ["小鸡球球"]
 
 
+def test_references_keep_only_known_characters_once():
+    reply = make_reply(
+        references=[
+            {"name": "小鸡球球", "page": 3, "why": "全身正面"},
+            {"name": "小鸡球球", "page": 5, "why": "重复"},
+            {"name": "路人", "page": 4, "why": "不在角色表里"},
+            {"name": "向日葵", "page": 0, "why": "缺页码"},
+        ]
+    )
+
+    story = build_story(make_content(), FakeClient(reply))
+
+    assert story.references == [Reference("小鸡球球", 3, "全身正面")]
+
+
+def test_prompt_lists_figures_for_the_reference_choice():
+    content = make_content()
+    content.pages[1].figures = [
+        Figure(
+            name="小鸡球球",
+            species="动物",
+            body="黄色绒毛、红色围巾",
+            view="全身",
+            facing="正面",
+            occlusion="无",
+            box=[0.2, 0.2, 0.6, 0.8],
+        )
+    ]
+
+    prompt = story_prompt(content)
+
+    assert "人物：" in prompt
+    assert "小鸡球球｜动物｜全身｜正面" in prompt
+    assert "占画面 24%" in prompt
+
+
 def test_save_story_writes_the_story_fields(tmp_path):
     story = build_story(make_content(), FakeClient(make_reply()))
 
@@ -238,6 +281,7 @@ def test_story_dict_round_trip():
         summary="种下向日葵并守护它长大。",
         resolved=[Resolution(18, "手的主人", "我", "文字依据")],
         unresolved=[Resolution(26, "女孩身份", reason="缺少文字依据")],
+        references=[Reference("小鸡球球", 3, "全身正面")],
         model="m",
     )
 

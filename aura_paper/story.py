@@ -34,6 +34,28 @@ class Cast:
 
 
 @dataclass
+class Reference:
+    """The page chosen to show one character's look."""
+
+    name: str
+    page: int
+    why: str = ""
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this reference."""
+        return {"name": self.name, "page": self.page, "why": self.why}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Reference:
+        """Build a reference from its external JSON shape."""
+        return cls(
+            name=str(data.get("name") or ""),
+            page=int(data.get("page") or 0),
+            why=str(data.get("why") or ""),
+        )
+
+
+@dataclass
 class Resolution:
     """One page uncertainty resolved or left open by the story stage."""
 
@@ -72,6 +94,7 @@ class Story:
     id: str = ""
     characters: list[str] = field(default_factory=list)
     cast: list[Cast] = field(default_factory=list)
+    references: list[Reference] = field(default_factory=list)
     setting: str = ""
     style: str = ""
     summary: str = ""
@@ -88,6 +111,7 @@ class Story:
             "model": self.model,
             "characters": self.characters,
             "cast": [member.to_dict() for member in self.cast],
+            "references": [item.to_dict() for item in self.references],
             "setting": self.setting,
             "style": self.style,
             "summary": self.summary,
@@ -103,6 +127,7 @@ class Story:
             id=str(data.get("id") or ""),
             characters=_text_list(data.get("characters")),
             cast=_cast_list(data.get("cast")),
+            references=_reference_list(data.get("references")),
             setting=str(data.get("setting") or ""),
             style=str(data.get("style") or ""),
             summary=str(data.get("summary") or ""),
@@ -128,6 +153,20 @@ def _cast_list(value: object) -> list[Cast]:
         Cast.from_dict(item) for item in value if isinstance(item, dict)
     ]
     return [member for member in members if member.name]
+
+
+# Read reference entries, keeping the first page chosen for each character.
+def _reference_list(value: object) -> list[Reference]:
+    if not isinstance(value, list):
+        return []
+    items = [
+        Reference.from_dict(item) for item in value if isinstance(item, dict)
+    ]
+    picked: dict[str, Reference] = {}
+    for item in items:
+        if item.name and item.page > 0 and item.name not in picked:
+            picked[item.name] = item
+    return list(picked.values())
 
 
 # Read resolution entries, dropping entries that carry no issue.
@@ -191,6 +230,11 @@ def _request_story(
 def _apply_story(story: Story, fields: dict) -> None:
     story.characters = _text_list(fields.get("characters"))
     story.cast = _cast_list(fields.get("cast"))
+    story.references = [
+        item
+        for item in _reference_list(fields.get("references"))
+        if item.name in story.characters
+    ]
     story.setting = str(fields.get("setting") or "")
     story.style = str(fields.get("style") or "")
     story.summary = str(fields.get("summary") or "")
@@ -203,6 +247,7 @@ def _story_fields(story: Story) -> dict:
     return {
         "characters": story.characters,
         "cast": [member.to_dict() for member in story.cast],
+        "references": [item.to_dict() for item in story.references],
         "setting": story.setting,
         "style": story.style,
         "summary": story.summary,
