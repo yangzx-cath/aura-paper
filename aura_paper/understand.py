@@ -96,8 +96,6 @@ class PageContent:
     footer: str = ""
     description: str = ""
     figures: list[Figure] = field(default_factory=list)
-    mood: str = ""
-    mood_detail: str = ""
     uncertain: list[str] = field(default_factory=list)
     model: str = ""
     error: str = ""
@@ -114,8 +112,6 @@ class PageContent:
             "footer": self.footer,
             "description": self.description,
             "figures": [figure.to_dict() for figure in self.figures],
-            "mood": self.mood,
-            "mood_detail": self.mood_detail,
             "uncertain": self.uncertain,
             "error": self.error,
         }
@@ -131,8 +127,6 @@ class PageContent:
             footer=str(data.get("footer") or ""),
             description=str(data.get("description") or ""),
             figures=_figure_list(data.get("figures")),
-            mood=str(data.get("mood") or ""),
-            mood_detail=str(data.get("mood_detail") or ""),
             uncertain=_text_list(data.get("uncertain")),
             model=str(data.get("model") or ""),
             error=str(data.get("error") or ""),
@@ -359,8 +353,6 @@ def _apply_fields(content: PageContent, fields: dict) -> None:
     content.footer = str(fields.get("footer") or "")
     content.description = str(fields.get("description") or "")
     content.figures = _figure_list(fields.get("figures"))
-    content.mood = str(fields.get("mood") or "")
-    content.mood_detail = str(fields.get("mood_detail") or "")
     content.uncertain = _text_list(fields.get("uncertain"))
 
 
@@ -407,8 +399,6 @@ def _page_fields(content: PageContent) -> dict:
         "footer": content.footer,
         "description": content.description,
         "figures": [figure.to_dict() for figure in content.figures],
-        "mood": content.mood,
-        "mood_detail": content.mood_detail,
         "uncertain": content.uncertain,
     }
 

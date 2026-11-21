@@ -105,9 +105,7 @@ def test_a_cover_without_a_title_is_an_error():
 
 
 def test_success():
-    reply = json.dumps(
-        {"page_text": "你好", "description": "草地", "mood": "温暖"}
-    )
+    reply = json.dumps({"page_text": "你好", "description": "草地"})
 
     content = understand_page(make_page(), FakeClient(reply))
 
@@ -117,7 +115,6 @@ def test_success():
     assert content.model == "fake-model"
     assert content.page_text == "你好"
     assert content.description == "草地"
-    assert content.mood == "温暖"
     assert content.error == ""
 
 
@@ -196,9 +193,7 @@ def test_empty_payload_is_an_error():
 
 
 def test_book_collects_every_page():
-    reply = json.dumps(
-        {"title": "小鸡球球", "description": "草地", "mood": "温暖"}
-    )
+    reply = json.dumps({"title": "小鸡球球", "description": "草地"})
     pages = [make_page(), make_page("landscape")]
 
     content = understand_book(make_book(pages), FakeClient(reply))
@@ -422,8 +417,6 @@ def test_cache_keeps_every_page_field(tmp_path):
                     "box": [0.1, 0.2, 0.5, 0.9],
                 }
             ],
-            "mood": "温暖",
-            "mood_detail": "有一点期待",
             "uncertain": ["红衣孩子身份不明"],
         }
     )
@@ -439,8 +432,6 @@ def test_cache_keeps_every_page_field(tmp_path):
     assert content.figures[0].outfit == "粉条纹短裤"
     assert content.figures[0].view == "全身"
     assert content.figures[0].box == [0.1, 0.2, 0.5, 0.9]
-    assert content.mood == "温暖"
-    assert content.mood_detail == "有一点期待"
     assert content.uncertain == ["红衣孩子身份不明"]
 
 
@@ -554,7 +545,6 @@ def test_book_dict_round_trip():
         page_text="文字",
         footer="定价：38.00 元",
         description="草地",
-        mood="温暖",
         model="m",
     )
     book = BookContent(
