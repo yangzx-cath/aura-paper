@@ -99,7 +99,8 @@ def _crop(
     page_path: Path,
     figure: Figure,
 ) -> Image.Image | None:
-    if not figure.box:
+    box = _box(figure.box)
+    if box is None:
         return None
     try:
         with Image.open(page_path) as image:
@@ -107,7 +108,9 @@ def _crop(
     except OSError:
         return None
 
-    piece = page.crop(_padded(figure.box, page.size))
+    piece = page.crop(_padded(box, page.size))
+    if piece.width <= 0 or piece.height <= 0:
+        return None
     if not MIN_RATIO <= piece.width / piece.height <= MAX_RATIO:
         return None
     if min(piece.size) < MIN_SIDE:
@@ -120,9 +123,23 @@ def _crop(
     return piece
 
 
-# Grow the box by MARGIN and keep it inside the page.
+# Read a box as four ordered integers, or None when it is unusable.
+# Box values are percentages of the page, normally between 0 and 100.
+def _box(box: list[int] | None) -> tuple[int, int, int, int] | None:
+    if not box or len(box) != 4:
+        return None
+    try:
+        left, top, right, bottom = (int(value) for value in box)
+    except (TypeError, ValueError):
+        return None
+    if right <= left or bottom <= top:
+        return None
+    return left, top, right, bottom
+
+
+# Grow the percentage box by MARGIN and keep it inside the page.
 def _padded(
-    box: list[int],
+    box: tuple[int, int, int, int],
     size: tuple[int, int],
 ) -> tuple[int, int, int, int]:
     width, height = size
@@ -130,8 +147,8 @@ def _padded(
     dx = (right - left) * MARGIN
     dy = (bottom - top) * MARGIN
     return (
-        max(0, round((left - dx) / 100 * width)),
-        max(0, round((top - dy) / 100 * height)),
-        min(width, round((right + dx) / 100 * width)),
-        min(height, round((bottom + dy) / 100 * height)),
+        min(width, max(0, round((left - dx) / 100 * width))),
+        min(height, max(0, round((top - dy) / 100 * height))),
+        min(width, max(0, round((right + dx) / 100 * width))),
+        min(height, max(0, round((bottom + dy) / 100 * height))),
     )
