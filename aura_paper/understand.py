@@ -45,6 +45,47 @@ class CoverContent:
 
 
 @dataclass
+class Figure:
+    """One figure on one page, which may or may not be a cast member."""
+
+    name: str = ""
+    species: str = ""
+    body: str = ""
+    outfit: str = ""
+    view: str = ""
+    facing: str = ""
+    occlusion: str = ""
+    box: list[float] | None = None  # [left, top, right, bottom], 0 to 1
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this figure."""
+        return {
+            "name": self.name,
+            "species": self.species,
+            "body": self.body,
+            "outfit": self.outfit,
+            "view": self.view,
+            "facing": self.facing,
+            "occlusion": self.occlusion,
+            "box": self.box,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Figure:
+        """Build a figure from its external JSON shape."""
+        return cls(
+            name=str(data.get("name") or ""),
+            species=str(data.get("species") or ""),
+            body=str(data.get("body") or ""),
+            outfit=str(data.get("outfit") or ""),
+            view=str(data.get("view") or ""),
+            facing=str(data.get("facing") or ""),
+            occlusion=str(data.get("occlusion") or ""),
+            box=_box_value(data.get("box")),
+        )
+
+
+@dataclass
 class PageContent:
     """Structured content of one page."""
 
@@ -54,6 +95,7 @@ class PageContent:
     page_text: str = ""
     footer: str = ""
     description: str = ""
+    figures: list[Figure] = field(default_factory=list)
     mood: str = ""
     mood_detail: str = ""
     uncertain: list[str] = field(default_factory=list)
@@ -71,6 +113,7 @@ class PageContent:
             "page_text": self.page_text,
             "footer": self.footer,
             "description": self.description,
+            "figures": [figure.to_dict() for figure in self.figures],
             "mood": self.mood,
             "mood_detail": self.mood_detail,
             "uncertain": self.uncertain,
@@ -87,6 +130,7 @@ class PageContent:
             page_text=str(data.get("page_text") or ""),
             footer=str(data.get("footer") or ""),
             description=str(data.get("description") or ""),
+            figures=_figure_list(data.get("figures")),
             mood=str(data.get("mood") or ""),
             mood_detail=str(data.get("mood_detail") or ""),
             uncertain=_text_list(data.get("uncertain")),
@@ -314,9 +358,32 @@ def _apply_fields(content: PageContent, fields: dict) -> None:
     content.page_text = str(fields.get("page_text") or "")
     content.footer = str(fields.get("footer") or "")
     content.description = str(fields.get("description") or "")
+    content.figures = _figure_list(fields.get("figures"))
     content.mood = str(fields.get("mood") or "")
     content.mood_detail = str(fields.get("mood_detail") or "")
     content.uncertain = _text_list(fields.get("uncertain"))
+
+
+# Read a crop box as [left, top, right, bottom] in 0-1, or None when unusable.
+def _box_value(value: object) -> list[float] | None:
+    if not isinstance(value, (list, tuple)) or len(value) != 4:
+        return None
+    numbers = []
+    for item in value:
+        if not isinstance(item, (int, float)):
+            return None
+        numbers.append(min(1.0, max(0.0, float(item))))
+    left, top, right, bottom = numbers
+    if right <= left or bottom <= top:
+        return None
+    return numbers
+
+
+# Read the figure list, skipping entries that are not objects.
+def _figure_list(value: object) -> list[Figure]:
+    if not isinstance(value, list):
+        return []
+    return [Figure.from_dict(item) for item in value if isinstance(item, dict)]
 
 
 # Read the note list, keeping one line per text entry.
@@ -339,6 +406,7 @@ def _page_fields(content: PageContent) -> dict:
         "page_text": content.page_text,
         "footer": content.footer,
         "description": content.description,
+        "figures": [figure.to_dict() for figure in content.figures],
         "mood": content.mood,
         "mood_detail": content.mood_detail,
         "uncertain": content.uncertain,
