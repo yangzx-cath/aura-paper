@@ -7,6 +7,7 @@ pages.json for the understanding stage.
 Usage:
     export LLM_API_KEY=sk-xxx
     python scripts/run_split.py <book_id> [--no-cache] [--workers N]
+    python scripts/run_split.py <book_id> --effort high
 """
 
 import argparse
@@ -23,9 +24,6 @@ from aura_paper.llm import LLMClient
 from aura_paper.split import Layout, save_split, split_book
 
 ROOT = Path(__file__).resolve().parent.parent
-
-# A layout verdict needs no deep thinking, so cap the hidden tokens.
-EFFORT = "low"
 
 
 def main() -> int:
@@ -47,6 +45,11 @@ def main() -> int:
         default=1,
         help="number of pages to run in parallel (default=1)",
     )
+    parser.add_argument(
+        "--effort",
+        default="low",
+        help="reasoning effort for the model (default=low)",
+    )
     args = parser.parse_args()
 
     load_env(ROOT / ".env")
@@ -59,7 +62,7 @@ def main() -> int:
 
     book = Book.from_dict(json.loads(book_path.read_text(encoding="utf-8")))
 
-    client = LLMClient.from_env(EFFORT)
+    client = LLMClient.from_env(args.effort)
     missing = client.missing_settings()
     if missing:
         print("missing config: " + ", ".join(missing), file=sys.stderr)

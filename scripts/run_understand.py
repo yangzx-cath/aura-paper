@@ -7,6 +7,7 @@ run reuses the cache and skips the model calls.
 Usage:
     export LLM_API_KEY=sk-xxx
     python scripts/run_understand.py <book_id> [--no-cache] [--workers N]
+    python scripts/run_understand.py <book_id> --effort high
     python scripts/run_understand.py <book_id> --dump-prompt 0
     python scripts/run_understand.py <book_id> --dump-prompt 1
 """
@@ -57,6 +58,11 @@ def main() -> int:
         metavar="INDEX",
         help="print one page's prompt by 0-based index; 0 is the cover",
     )
+    parser.add_argument(
+        "--effort",
+        default="",
+        help="reasoning effort for the model (default: from env)",
+    )
     args = parser.parse_args()
 
     load_env(ROOT / ".env")
@@ -72,7 +78,7 @@ def main() -> int:
     if args.dump_prompt is not None:
         return _dump_prompt(book, args.dump_prompt)
 
-    client = LLMClient.from_env()
+    client = LLMClient.from_env(args.effort)
     missing = client.missing_settings()
     if missing:
         print("missing config: " + ", ".join(missing), file=sys.stderr)

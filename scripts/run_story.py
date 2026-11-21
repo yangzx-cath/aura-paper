@@ -7,6 +7,7 @@ Usage:
     export LLM_API_KEY=sk-xxx
     python scripts/run_story.py <book_id>
     python scripts/run_story.py <book_id> --no-cache
+    python scripts/run_story.py <book_id> --effort high
     python scripts/run_story.py <book_id> --dump-prompt > prompt.txt
 """
 
@@ -42,6 +43,11 @@ def main() -> int:
         action="store_true",
         help="print the prompt and exit without calling the model",
     )
+    parser.add_argument(
+        "--effort",
+        default="",
+        help="reasoning effort for the model (default: from env)",
+    )
     args = parser.parse_args()
 
     load_env(ROOT / ".env")
@@ -66,7 +72,7 @@ def main() -> int:
         print(prompt)
         return 0
 
-    client = LLMClient.from_env()
+    client = LLMClient.from_env(args.effort)
     missing = client.missing_settings()
     if missing:
         print("missing config: " + ", ".join(missing), file=sys.stderr)
