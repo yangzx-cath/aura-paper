@@ -17,11 +17,13 @@ import sys
 import time
 from pathlib import Path
 
+from aura_paper.book import Book
 from aura_paper.cache import Cache
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.llm import LLMClient
 from aura_paper.prompts import story_prompt
-from aura_paper.story import build_story, save_story
+from aura_paper.references import ReferenceImage, save_references
+from aura_paper.story import Story, build_story, save_story
 from aura_paper.understand import BookContent
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -102,7 +104,7 @@ def main() -> int:
     print(f"stats   {cache.stats()}")
     print(f"chars      {'、'.join(story.characters)}")
     print(f"found      {len(story.identified)}")
-    print(f"refs       {len(story.references)}")
+    print(f"references {len(story.references)}")
     print(f"setting    {story.setting}")
     print(f"style      {story.style}")
     print(f"resolved   {len(story.resolved)}")
@@ -120,8 +122,31 @@ def main() -> int:
         print(f"ref  p{item.page:<3} #{item.figure} {item.name}  {item.why}")
     if story.references:
         print()
+
+    images = _crop_references(content, story)
+    cut = {item.name for item in images}
+    for item in images:
+        print(f"img  {item.name}  {item.width}x{item.height}")
+    for item in story.references:
+        if item.name not in cut:
+            print(f"skip {item.name}: no usable crop", file=sys.stderr)
+    if images:
+        print()
     print(f"output  {path}")
     return 0
+
+
+# Cut the chosen reference figures out of the page images.
+def _crop_references(
+    content: BookContent,
+    story: Story,
+) -> list[ReferenceImage]:
+    book_path = out_root() / story.id / "pages.json"
+    if not book_path.is_file():
+        print(f"skip references: missing {book_path}", file=sys.stderr)
+        return []
+    book = Book.from_dict(json.loads(book_path.read_text(encoding="utf-8")))
+    return save_references(content, story, book.directory)
 
 
 if __name__ == "__main__":
