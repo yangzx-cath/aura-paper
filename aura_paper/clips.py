@@ -13,6 +13,7 @@ from .config import out_root
 from .minimax import MiniMaxClient, MiniMaxError, VideoRequest
 from .output import write_json
 from .prompts import clip_prompt
+from .references import reference_path
 from .screenplay import PageScene, Screenplay
 from .story import Story
 from .understand import BookContent, PageContent
@@ -145,9 +146,11 @@ def generate_clip(
     """Generate one page clip and return its metadata."""
     assert scene.index == page.index
 
-    prompt = clip_prompt(page, story, beat=scene.beat)
+    refs = _reference_images(content, scene, root)
+    prompt = clip_prompt(
+        page, story, beat=scene.beat, characters=[name for name, _ in refs]
+    )
     seconds = scene.duration if duration is None else duration
-
     target = clip_path(content.id, page.filename, root)
     clip = VideoClip(
         index=page.index,
@@ -167,7 +170,8 @@ def generate_clip(
         # VideoRequest checks the length, so it belongs inside the guard.
         request = VideoRequest(
             prompt=prompt,
-            reference_images=[_page_path(content, page)],
+            reference_images=[_page_path(content, page)]
+            + [path for _, path in refs],
             duration=seconds,
             resolution=resolution,
         )
@@ -193,6 +197,20 @@ def generate_clip(
 # Resolve the source image of one page.
 def _page_path(content: BookContent, page: PageContent) -> Path:
     return Path(content.source) / page.filename
+
+
+# Resolve the character references that exist for one page, in cast order.
+def _reference_images(
+    content: BookContent,
+    scene: PageScene,
+    root: str | Path | None,
+) -> list[tuple[str, Path]]:
+    found: list[tuple[str, Path]] = []
+    for name in scene.characters:
+        path = reference_path(content.id, name, root)
+        if path.is_file():
+            found.append((name, path))
+    return found
 
 
 def build_clips(
@@ -262,7 +280,7 @@ def _one_clip(
     key = ""
 
     if cache is not None:
-        key = _clip_key(content, page, story, scene, client, resolution)
+        key = _clip_key(content, page, story, scene, client, resolution, root)
         entry = cache.load_json(ns, name, key)
         target = clip_path(content.id, page.filename, root)
         if entry is not None and target.is_file():
@@ -300,11 +318,16 @@ def _clip_key(
     scene: PageScene,
     client: MiniMaxClient,
     resolution: str,
+    root: str | Path | None,
 ) -> str:
-    prompt = clip_prompt(page, story, beat=scene.beat)
+    refs = _reference_images(content, scene, root)
+    prompt = clip_prompt(
+        page, story, beat=scene.beat, characters=[name for name, _ in refs]
+    )
     return fingerprint(
         prompt,
         file_fingerprint(_page_path(content, page)),
+        *[file_fingerprint(path) for _, path in refs],
         str(scene.duration),
         resolution,
         client.model,

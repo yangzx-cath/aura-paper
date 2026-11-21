@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 TEMPLATE = """你是儿童绘本动画分镜师，把这一页做成一段连贯动画。
 
 - 角色：__CHARACTERS__
+- 附图：__IMAGES__
 - 地点：__SETTING__
 - 画风：__STYLE__
 - 剧情：__BEAT__
@@ -29,12 +30,27 @@ def clip_prompt(
     story: Story,
     *,
     beat: str = "",
+    characters: list[str] | None = None,
 ) -> str:
     """Build the video prompt for one page."""
-    characters = "、".join(story.characters) or "（未提供）"
-
-    prompt = TEMPLATE.replace("__CHARACTERS__", characters)
+    names = list(characters or [])
+    prompt = TEMPLATE.replace(
+        "__CHARACTERS__", "、".join(story.characters) or "（未提供）"
+    )
+    if names:
+        prompt = prompt.replace("__IMAGES__", _image_label(names))
+    else:
+        prompt = prompt.replace("- 附图：__IMAGES__\n", "")
     prompt = prompt.replace("__SETTING__", story.setting or "（未提供）")
     prompt = prompt.replace("__STYLE__", story.style or "（未提供）")
     prompt = prompt.replace("__BEAT__", beat.strip() or "（按画面自然动作）")
     return prompt.replace("__DESCRIPTION__", page.description or "（未提供）")
+
+
+# Name each attached image in the order the request sends them.
+def _image_label(names: list[str]) -> str:
+    parts = ["第 1 张是本页原图"]
+    parts += [
+        f"第 {number} 张是{name}" for number, name in enumerate(names, 2)
+    ]
+    return "；".join(parts)

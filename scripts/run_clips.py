@@ -24,6 +24,7 @@ from aura_paper.clips import VideoClip, build_clips, save_clips
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.minimax import MiniMaxClient
 from aura_paper.prompts import clip_prompt
+from aura_paper.references import reference_path
 from aura_paper.screenplay import Screenplay
 from aura_paper.story import Story
 from aura_paper.understand import BookContent, PageContent
@@ -213,11 +214,17 @@ def _dump_prompt(
         )
         return 2
 
-    prompt = clip_prompt(page, story, beat=scene.beat)
+    refs = [
+        name
+        for name in scene.characters
+        if reference_path(content.id, name).is_file()
+    ]
+    prompt = clip_prompt(page, story, beat=scene.beat, characters=refs)
     head = f"scene   {scene.duration}s  {len(scene.lines)} lines"
     print(f"index   {index}  {page.filename}", file=sys.stderr)
     print(head, file=sys.stderr)
     print(f"beat    {scene.beat}", file=sys.stderr)
+    print(f"images  1 page + {len(refs)} refs", file=sys.stderr)
     print(f"prompt length: {len(prompt)}", file=sys.stderr)
     print(prompt)
     return 0

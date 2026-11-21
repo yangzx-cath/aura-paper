@@ -6,6 +6,7 @@ from aura_paper.cache import Cache
 from aura_paper.clips import VideoClip, build_clips, clip_path, generate_clip
 from aura_paper.minimax import MiniMaxError, VideoTask
 from aura_paper.prompts import clip_prompt
+from aura_paper.references import reference_path
 from aura_paper.screenplay import PageScene, Screenplay
 from aura_paper.story import Story
 from aura_paper.understand import BookContent, PageContent
@@ -106,6 +107,22 @@ def test_the_page_image_is_a_reference_not_a_first_frame(tmp_path):
 
     assert client.request.first_frame is None
     assert client.request.reference_images == [tmp_path / "page_2.png"]
+
+
+def test_character_references_follow_the_page_image(tmp_path):
+    content, page = make_content(tmp_path)
+    scene = PageScene(index=1, beat="我伸出手。", characters=["Kuan", "我"])
+    shot = reference_path("demo", "Kuan", tmp_path)
+    shot.parent.mkdir(parents=True)
+    shot.write_bytes(b"\xff\xd8\xff")
+    client = FakeMiniMax()
+
+    generate_clip(content, page, make_story(), scene, client, root=tmp_path)
+
+    # 我没有参考图，只带上 Kuan；页面原图永远是第一张。
+    assert client.request.reference_images == [tmp_path / "page_2.png", shot]
+    assert "第 2 张是Kuan" in client.request.prompt
+    assert "我" not in client.request.prompt.split("附图：")[1].split("\n")[0]
 
 
 def test_explicit_duration_overrides_the_scene(tmp_path):
