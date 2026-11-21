@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import time
@@ -159,6 +160,16 @@ class LLMClient:
                 raise LLMError(f"cannot reach {url}: {exc.reason}") from exc
             except TimeoutError as exc:
                 raise LLMError(f"timeout after {self.timeout}s") from exc
+            except (http.client.HTTPException, ConnectionError) as exc:
+                # The reply was cut off mid-read, which is worth another try.
+                # Only the type is safe to name. Some transport errors fail
+                # to stringify.
+                if attempt == RETRIES:
+                    raise LLMError(
+                        f"dropped connection ({type(exc).__name__})"
+                    ) from exc
+                time.sleep(delay)
+                delay *= 2
 
         try:
             data = json.loads(raw)
