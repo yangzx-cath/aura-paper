@@ -6,6 +6,7 @@ from aura_paper.llm import LLMClient, LLMError
 from aura_paper.prompts import story_prompt
 from aura_paper.story import (
     Cast,
+    Identity,
     Reference,
     Resolution,
     Story,
@@ -222,18 +223,50 @@ def test_cast_entries_without_a_name_are_skipped():
 
 
 def test_references_keep_only_known_characters_once():
+    content = make_content()
+    content.pages[3].figures = [Figure(index=0, name="小鸡球球")]
     reply = make_reply(
         references=[
-            {"name": "小鸡球球", "page": 3, "why": "全身正面"},
-            {"name": "小鸡球球", "page": 5, "why": "重复"},
-            {"name": "路人", "page": 4, "why": "不在角色表里"},
-            {"name": "向日葵", "page": 0, "why": "缺页码"},
+            {"name": "小鸡球球", "page": 3, "figure": 0, "why": "全身正面"},
+            {"name": "小鸡球球", "page": 5, "figure": 0, "why": "重复"},
+            {"name": "路人", "page": 4, "figure": 0, "why": "不在角色表里"},
+            {"name": "向日葵", "page": 0, "figure": 0, "why": "缺页码"},
         ]
     )
 
-    story = build_story(make_content(), FakeClient(reply))
+    story = build_story(content, FakeClient(reply))
 
-    assert story.references == [Reference("小鸡球球", 3, "全身正面")]
+    assert story.references == [Reference("小鸡球球", 3, 0, "全身正面")]
+
+
+def test_references_must_point_at_a_real_figure():
+    content = make_content()
+    reply = make_reply(
+        references=[{"name": "小鸡球球", "page": 2, "figure": 3}]
+    )
+
+    story = build_story(content, FakeClient(reply))
+
+    assert story.references == []
+
+
+def test_identified_figures_keep_known_names_only():
+    content = make_content()
+    content.pages[2].figures = [
+        Figure(index=0, name=""),
+        Figure(index=1, name=""),
+    ]
+    reply = make_reply(
+        identified=[
+            {"page": 2, "figure": 1, "name": "向日葵", "evidence": "花瓣一致"},
+            {"page": 2, "figure": 0, "name": "路人", "evidence": "不在角色表"},
+            {"page": 2, "figure": 7, "name": "小鸡球球"},
+        ]
+    )
+
+    story = build_story(content, FakeClient(reply))
+
+    assert story.identified == [Identity(2, 1, "向日葵", "花瓣一致")]
 
 
 def test_prompt_lists_figures_for_the_reference_choice():
@@ -253,7 +286,7 @@ def test_prompt_lists_figures_for_the_reference_choice():
     prompt = story_prompt(content)
 
     assert "人物：" in prompt
-    assert "小鸡球球｜动物｜全身｜正面" in prompt
+    assert "[0] 小鸡球球｜动物｜全身｜正面" in prompt
     assert "占画面 24%" in prompt
 
 
@@ -281,7 +314,7 @@ def test_story_dict_round_trip():
         summary="种下向日葵并守护它长大。",
         resolved=[Resolution(18, "手的主人", "我", "文字依据")],
         unresolved=[Resolution(26, "女孩身份", reason="缺少文字依据")],
-        references=[Reference("小鸡球球", 3, "全身正面")],
+        references=[Reference("小鸡球球", 3, 0, "全身正面")],
         model="m",
     )
 

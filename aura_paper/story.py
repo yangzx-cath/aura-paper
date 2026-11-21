@@ -9,7 +9,7 @@ from .cache import Cache, fingerprint
 from .llm import LLMClient, LLMError
 from .output import write_json
 from .prompts import story_prompt
-from .understand import BookContent
+from .understand import BookContent, PageContent
 from .utils import extract_json, now_iso
 
 
@@ -35,23 +35,59 @@ class Cast:
 
 @dataclass
 class Reference:
-    """The page chosen to show one character's look."""
+    """The figure chosen to show one character's look."""
 
     name: str
     page: int
+    figure: int = -1
     why: str = ""
 
     def to_dict(self) -> dict:
         """Return the external JSON shape of this reference."""
-        return {"name": self.name, "page": self.page, "why": self.why}
+        return {
+            "name": self.name,
+            "page": self.page,
+            "figure": self.figure,
+            "why": self.why,
+        }
 
     @classmethod
     def from_dict(cls, data: dict) -> Reference:
         """Build a reference from its external JSON shape."""
         return cls(
             name=str(data.get("name") or ""),
-            page=int(data.get("page") or 0),
+            page=_int_value(data.get("page"), 0),
+            figure=_int_value(data.get("figure"), -1),
             why=str(data.get("why") or ""),
+        )
+
+
+@dataclass
+class Identity:
+    """One unnamed figure the story stage matched to a cast member."""
+
+    page: int
+    figure: int
+    name: str
+    evidence: str = ""
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this identity."""
+        return {
+            "page": self.page,
+            "figure": self.figure,
+            "name": self.name,
+            "evidence": self.evidence,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Identity:
+        """Build an identity from its external JSON shape."""
+        return cls(
+            page=_int_value(data.get("page"), 0),
+            figure=_int_value(data.get("figure"), -1),
+            name=str(data.get("name") or ""),
+            evidence=str(data.get("evidence") or ""),
         )
 
 
@@ -94,6 +130,7 @@ class Story:
     id: str = ""
     characters: list[str] = field(default_factory=list)
     cast: list[Cast] = field(default_factory=list)
+    identified: list[Identity] = field(default_factory=list)
     references: list[Reference] = field(default_factory=list)
     setting: str = ""
     style: str = ""
@@ -111,6 +148,7 @@ class Story:
             "model": self.model,
             "characters": self.characters,
             "cast": [member.to_dict() for member in self.cast],
+            "identified": [item.to_dict() for item in self.identified],
             "references": [item.to_dict() for item in self.references],
             "setting": self.setting,
             "style": self.style,
@@ -127,6 +165,7 @@ class Story:
             id=str(data.get("id") or ""),
             characters=_text_list(data.get("characters")),
             cast=_cast_list(data.get("cast")),
+            identified=_identity_list(data.get("identified")),
             references=_reference_list(data.get("references")),
             setting=str(data.get("setting") or ""),
             style=str(data.get("style") or ""),
@@ -136,6 +175,14 @@ class Story:
             model=str(data.get("model") or ""),
             error=str(data.get("error") or ""),
         )
+
+
+# Read an integer, falling back to the default when the value is unusable.
+def _int_value(value: object, default: int) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
 
 
 # Turn a list from the model reply into strings, dropping empty entries.
@@ -155,7 +202,7 @@ def _cast_list(value: object) -> list[Cast]:
     return [member for member in members if member.name]
 
 
-# Read reference entries, keeping the first page chosen for each character.
+# Read reference entries, keeping the first figure chosen for each character.
 def _reference_list(value: object) -> list[Reference]:
     if not isinstance(value, list):
         return []
@@ -164,8 +211,22 @@ def _reference_list(value: object) -> list[Reference]:
     ]
     picked: dict[str, Reference] = {}
     for item in items:
-        if item.name and item.page > 0 and item.name not in picked:
-            picked[item.name] = item
+        if item.name and item.page > 0 and item.figure >= 0:
+            picked.setdefault(item.name, item)
+    return list(picked.values())
+
+
+# Read identity entries, keeping the first name given to each figure.
+def _identity_list(value: object) -> list[Identity]:
+    if not isinstance(value, list):
+        return []
+    items = [
+        Identity.from_dict(item) for item in value if isinstance(item, dict)
+    ]
+    picked: dict[tuple[int, int], Identity] = {}
+    for item in items:
+        if item.name and item.page > 0 and item.figure >= 0:
+            picked.setdefault((item.page, item.figure), item)
     return list(picked.values())
 
 
@@ -190,7 +251,7 @@ def build_story(
     story = Story(id=content.id, model=client.model)
 
     if cache is None:
-        return _request_story(story, client, prompt)
+        return _keep_known(_request_story(story, client, prompt), content)
 
     ns = f"story/{content.id}"
     key = fingerprint(prompt, *client.signature)
@@ -198,13 +259,35 @@ def build_story(
     entry = cache.load_json(ns, "story", key)
     if entry is not None:
         _apply_story(story, entry)
-        return story
+        return _keep_known(story, content)
 
-    story = _request_story(story, client, prompt)
+    story = _keep_known(_request_story(story, client, prompt), content)
     # Errors are never cached, so a malformed story is retried next run.
     if not story.error:
         cache.save_json(ns, "story", key, _story_fields(story))
     return story
+
+
+# Drop page and figure pointers that the book cannot satisfy.
+def _keep_known(story: Story, content: BookContent) -> Story:
+    pages = {page.index: page for page in content.pages}
+    story.identified = [
+        item
+        for item in story.identified
+        if _has_figure(pages, item.page, item.figure)
+    ]
+    story.references = [
+        item
+        for item in story.references
+        if _has_figure(pages, item.page, item.figure)
+    ]
+    return story
+
+
+# Check that a page holds a figure at the given number.
+def _has_figure(pages: dict[int, PageContent], page: int, figure: int) -> bool:
+    found = pages.get(page)
+    return found is not None and 0 <= figure < len(found.figures)
 
 
 # Call the model for the whole book and fill the story fields.
@@ -230,6 +313,11 @@ def _request_story(
 def _apply_story(story: Story, fields: dict) -> None:
     story.characters = _text_list(fields.get("characters"))
     story.cast = _cast_list(fields.get("cast"))
+    story.identified = [
+        item
+        for item in _identity_list(fields.get("identified"))
+        if item.name in story.characters
+    ]
     story.references = [
         item
         for item in _reference_list(fields.get("references"))
@@ -247,6 +335,7 @@ def _story_fields(story: Story) -> dict:
     return {
         "characters": story.characters,
         "cast": [member.to_dict() for member in story.cast],
+        "identified": [item.to_dict() for item in story.identified],
         "references": [item.to_dict() for item in story.references],
         "setting": story.setting,
         "style": story.style,
