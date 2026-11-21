@@ -7,6 +7,7 @@ from aura_paper.llm import LLMClient, LLMError
 from aura_paper.understand import (
     BookContent,
     CoverContent,
+    Figure,
     PageContent,
     save_content,
     understand_book,
@@ -160,6 +161,32 @@ def test_uncertain_copes_with_a_malformed_reply():
     assert understand_page(make_page(), FakeClient(with_junk)).uncertain == [
         "说话人未标明"
     ]
+
+
+def test_figures_cope_with_a_malformed_reply():
+    not_a_list = json.dumps({"description": "草地", "figures": "一个女孩"})
+    with_junk = json.dumps(
+        {
+            "description": "草地",
+            "figures": [None, [], "女孩", {"body": "粉衣"}],
+        }
+    )
+
+    assert understand_page(make_page(), FakeClient(not_a_list)).figures == []
+    kept = understand_page(make_page(), FakeClient(with_junk)).figures
+    assert [figure.body for figure in kept] == ["粉衣"]
+
+
+def test_a_bad_box_is_dropped():
+    good = Figure.from_dict({"box": [0.1, 0.2, 0.5, 0.9]})
+    clamped = Figure.from_dict({"box": [-0.5, 0.2, 1.5, 0.9]})
+    inverted = Figure.from_dict({"box": [0.5, 0.2, 0.1, 0.9]})
+
+    assert good.box == [0.1, 0.2, 0.5, 0.9]
+    assert clamped.box == [0.0, 0.2, 1.0, 0.9]
+    assert Figure.from_dict({"box": [0.1, 0.2, 0.5]}).box is None
+    assert Figure.from_dict({"box": "左下角"}).box is None
+    assert inverted.box is None
 
 
 def test_empty_payload_is_an_error():
@@ -383,6 +410,18 @@ def test_cache_keeps_every_page_field(tmp_path):
             "page_text": "小蝴蝶，你好。",
             "footer": "定价：38.00 元",
             "description": "封面",
+            "figures": [
+                {
+                    "name": "花花",
+                    "species": "人类",
+                    "body": "粉色蝴蝶结，丸子头，浅肤色",
+                    "outfit": "粉条纹短裤",
+                    "view": "全身",
+                    "facing": "正面",
+                    "occlusion": "无",
+                    "box": [0.1, 0.2, 0.5, 0.9],
+                }
+            ],
             "mood": "温暖",
             "mood_detail": "有一点期待",
             "uncertain": ["红衣孩子身份不明"],
@@ -395,6 +434,11 @@ def test_cache_keeps_every_page_field(tmp_path):
     assert content.page_text == "小蝴蝶，你好。"
     assert content.footer == "定价：38.00 元"
     assert content.description == "封面"
+    assert content.figures[0].name == "花花"
+    assert content.figures[0].species == "人类"
+    assert content.figures[0].outfit == "粉条纹短裤"
+    assert content.figures[0].view == "全身"
+    assert content.figures[0].box == [0.1, 0.2, 0.5, 0.9]
     assert content.mood == "温暖"
     assert content.mood_detail == "有一点期待"
     assert content.uncertain == ["红衣孩子身份不明"]
