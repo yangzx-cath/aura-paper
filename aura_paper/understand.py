@@ -50,7 +50,6 @@ class Figure:
 
     index: int = 0
     name: str = ""
-    species: str = ""
     body: str = ""
     outfit: str = ""
     view: str = ""
@@ -63,7 +62,6 @@ class Figure:
         return {
             "index": self.index,
             "name": self.name,
-            "species": self.species,
             "body": self.body,
             "outfit": self.outfit,
             "view": self.view,
@@ -78,7 +76,6 @@ class Figure:
         return cls(
             index=int(data.get("index") or 0),
             name=str(data.get("name") or ""),
-            species=str(data.get("species") or ""),
             body=str(data.get("body") or ""),
             outfit=str(data.get("outfit") or ""),
             view=str(data.get("view") or ""),

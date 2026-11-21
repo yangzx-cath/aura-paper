@@ -104,7 +104,6 @@ def story_prompt(content: BookContent) -> str:
 def _figure_line(figure: Figure) -> str:
     parts = [
         figure.name or "（未命名）",
-        figure.species or "-",
         figure.view or "-",
         figure.facing or "-",
         f"遮挡{figure.occlusion or '-'}",

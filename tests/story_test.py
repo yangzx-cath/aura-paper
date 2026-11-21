@@ -274,7 +274,6 @@ def test_prompt_lists_figures_for_the_reference_choice():
     content.pages[1].figures = [
         Figure(
             name="小鸡球球",
-            species="动物",
             body="黄色绒毛、红色围巾",
             view="全身",
             facing="正面",
@@ -286,7 +285,7 @@ def test_prompt_lists_figures_for_the_reference_choice():
     prompt = story_prompt(content)
 
     assert "人物：" in prompt
-    assert "[0] 小鸡球球｜动物｜全身｜正面" in prompt
+    assert "[0] 小鸡球球｜全身｜正面" in prompt
     assert "占画面 24%" in prompt
 
 

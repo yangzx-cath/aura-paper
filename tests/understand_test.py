@@ -408,8 +408,7 @@ def test_cache_keeps_every_page_field(tmp_path):
             "figures": [
                 {
                     "name": "花花",
-                    "species": "人类",
-                    "body": "粉色蝴蝶结，丸子头，浅肤色",
+                    "body": "小女孩、粉色蝴蝶结、丸子头、浅肤色",
                     "outfit": "粉条纹短裤",
                     "view": "全身",
                     "facing": "正面",
@@ -428,7 +427,7 @@ def test_cache_keeps_every_page_field(tmp_path):
     assert content.footer == "定价：38.00 元"
     assert content.description == "封面"
     assert content.figures[0].name == "花花"
-    assert content.figures[0].species == "人类"
+    assert content.figures[0].body == "小女孩、粉色蝴蝶结、丸子头、浅肤色"
     assert content.figures[0].outfit == "粉条纹短裤"
     assert content.figures[0].view == "全身"
     assert content.figures[0].box == [10, 20, 50, 90]
