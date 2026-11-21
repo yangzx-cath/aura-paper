@@ -7,20 +7,18 @@ downloads the resulting clip. The HTTP implementation is not written yet.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from .minimax import VideoRequest, VideoTask
+from .video_types import (
+    VideoError,
+    VideoRequest,
+    VideoTask,
+)
 
 DEFAULT_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
 DEFAULT_MODEL = "doubao-seedance-2-0-fast-260128"
 
-# Status values returned by the query endpoint.
-TASK_PENDING = ("queued", "running")
-TASK_DONE = ("succeeded", "failed", "cancelled", "expired")
 
-
-class SeedanceError(Exception):
+class SeedanceError(VideoError):
     """Error for Seedance calls."""
 
 

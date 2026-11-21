@@ -10,55 +10,39 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
-from .utils import IMAGE_SUFFIXES, data_url
+from .utils import data_url
+from .video_types import VideoError
+from .video_types import VideoRequest as _VideoRequest
+from .video_types import VideoTask as _VideoTask
 
 DEFAULT_BASE_URL = "https://api.minimax.io"
 DEFAULT_MODEL = "MiniMax-H3"
-
-# Status values returned by the query endpoint.
-TASK_PENDING = ("queued", "running")
-TASK_DONE = ("succeeded", "failed", "cancelled")
 
 # Request limits from the video endpoint.
 _MAX_IMAGE_BYTES = 30 * 1024 * 1024
 _MAX_BODY_BYTES = 64 * 1024 * 1024
 
 
-class MiniMaxError(Exception):
+class MiniMaxError(VideoError):
     """Error for MiniMax calls."""
 
 
 @dataclass
-class VideoRequest:
-    """One video generation request."""
+class VideoRequest(_VideoRequest):
+    """One MiniMax video generation request."""
 
-    prompt: str
-    first_frame: Path | None = None
-    last_frame: Path | None = None
-    reference_images: list[Path] = field(default_factory=list)
-    duration: int = 6
     resolution: str = "768P"
-    ratio: str | None = None
 
     def __post_init__(self) -> None:
-        if not self.prompt.strip():
-            raise ValueError("prompt is required")
-        if not 4 <= self.duration <= 15:
-            raise ValueError("duration must be 4 to 15 seconds")
-        if self.reference_images and (self.first_frame or self.last_frame):
-            raise ValueError("frames and reference images cannot be mixed")
-        if self.last_frame is not None and self.first_frame is None:
-            raise ValueError("last_frame needs first_frame")
+        super().__post_init__()
         images = [self.first_frame, self.last_frame]
         images += self.reference_images
         for path in images:
             if path is None:
                 continue
-            if path.suffix.lower() not in IMAGE_SUFFIXES:
-                raise ValueError(f"unsupported image type: {path.suffix}")
             if path.stat().st_size > _MAX_IMAGE_BYTES:
                 raise ValueError(f"image is larger than 30MB: {path}")
 
@@ -93,27 +77,8 @@ class VideoRequest:
 
 
 @dataclass
-class VideoTask:
-    """Snapshot of one asynchronous video task."""
-
-    task_id: str
-    status: str = ""
-    video_url: str = ""
-    resolution: str = ""
-    duration: int = 0
-    error: str = ""
-
-    @property
-    def pending(self) -> bool:
-        return self.status in TASK_PENDING
-
-    @property
-    def done(self) -> bool:
-        return self.status in TASK_DONE
-
-    @property
-    def succeeded(self) -> bool:
-        return self.status == "succeeded"
+class VideoTask(_VideoTask):
+    """Snapshot of one MiniMax video task."""
 
     @classmethod
     def from_response(cls, data: dict) -> VideoTask:
