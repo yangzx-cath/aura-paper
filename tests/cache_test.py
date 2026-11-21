@@ -119,8 +119,8 @@ def test_missing_entry_counts_as_miss(tmp_path):
 
 def test_saved_entry_is_returned(tmp_path):
     cache = make_cache(tmp_path)
-    cache.save_json(NS, "page_03", "abc", {"mood": "温暖"})
-    assert cache.load_json(NS, "page_03", "abc") == {"mood": "温暖"}
+    cache.save_json(NS, "page_03", "abc", {"标题": "小蝴蝶"})
+    assert cache.load_json(NS, "page_03", "abc") == {"标题": "小蝴蝶"}
     assert cache.stats() == {"hit": 1, "miss": 0}
 
 
@@ -133,8 +133,8 @@ def test_save_json_returns_the_path(tmp_path):
 
 def test_save_keeps_chinese_readable(tmp_path):
     cache = make_cache(tmp_path)
-    path = cache.save_json(NS, "page_03", "abc", {"mood": "温暖"})
-    assert "温暖" in path.read_text(encoding="utf-8")
+    path = cache.save_json(NS, "page_03", "abc", {"标题": "小蝴蝶"})
+    assert "小蝴蝶" in path.read_text(encoding="utf-8")
 
 
 def test_has_reports_existence(tmp_path):
