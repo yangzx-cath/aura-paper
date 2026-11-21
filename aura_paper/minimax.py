@@ -10,16 +10,14 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
 from pathlib import Path
 
 from .utils import data_url
-from .video_types import VideoError
-from .video_types import VideoRequest as _VideoRequest
-from .video_types import VideoTask as _VideoTask
+from .video_types import VideoError, VideoRequest, VideoTask
 
 DEFAULT_BASE_URL = "https://api.minimax.io"
 DEFAULT_MODEL = "MiniMax-H3"
+DEFAULT_RESOLUTION = "768P"
 
 # Request limits from the video endpoint.
 _MAX_IMAGE_BYTES = 30 * 1024 * 1024
@@ -28,81 +26,6 @@ _MAX_BODY_BYTES = 64 * 1024 * 1024
 
 class MiniMaxError(VideoError):
     """Error for MiniMax calls."""
-
-
-@dataclass
-class VideoRequest(_VideoRequest):
-    """One MiniMax video generation request."""
-
-    resolution: str = "768P"
-
-    def __post_init__(self) -> None:
-        super().__post_init__()
-        images = [self.first_frame, self.last_frame]
-        images += self.reference_images
-        for path in images:
-            if path is None:
-                continue
-            if path.stat().st_size > _MAX_IMAGE_BYTES:
-                raise ValueError(f"image is larger than 30MB: {path}")
-
-    def to_payload(self, model: str) -> dict:
-        """Return the request body for the video generation endpoint."""
-        content: list[dict] = [{"type": "text", "text": self.prompt}]
-        images = [
-            (self.first_frame, "first_frame"),
-            (self.last_frame, "last_frame"),
-        ]
-        images += [(path, "reference_image") for path in self.reference_images]
-        for path, role in images:
-            if path is None:
-                continue
-            content.append(
-                {
-                    "type": "image_url",
-                    "image_url": {"url": data_url(path)},
-                    "role": role,
-                }
-            )
-
-        payload = {
-            "model": model,
-            "content": content,
-            "duration": self.duration,
-            "resolution": self.resolution,
-        }
-        if self.ratio is not None:
-            payload["ratio"] = self.ratio
-        return payload
-
-
-@dataclass
-class VideoTask(_VideoTask):
-    """Snapshot of one MiniMax video task."""
-
-    @classmethod
-    def from_response(cls, data: dict) -> VideoTask:
-        """Build a task from a create or query response body."""
-        task = data.get("task", data)
-        if not isinstance(task, dict):
-            raise MiniMaxError("malformed task reply")
-
-        content = task.get("content")
-        content = content if isinstance(content, dict) else {}
-        error = task.get("error")
-        if isinstance(error, dict):
-            error = error.get("message") or error.get("code") or ""
-        elif not isinstance(error, str):
-            error = ""
-
-        return cls(
-            task_id=str(task.get("id") or task.get("task_id") or ""),
-            status=str(task.get("status") or ""),
-            video_url=str(content.get("url") or ""),
-            resolution=str(task.get("resolution") or ""),
-            duration=int(task.get("duration") or 0),
-            error=str(error),
-        )
 
 
 class MiniMaxClient:
@@ -158,14 +81,79 @@ class MiniMaxClient:
     # POST /v2/video_generation
     def create_task(self, request: VideoRequest) -> VideoTask:
         """Submit one generation task and return its first snapshot."""
-        payload = request.to_payload(self.model)
+        payload = self._payload(request)
         data = self._post("/v2/video_generation", payload)
-        task = VideoTask.from_response(data)
+        task = self._task_from(data)
         if not task.task_id:
             raise MiniMaxError("reply carries no task_id")
         if not task.status:
             task.status = "queued"
         return task
+
+    def _payload(self, request: VideoRequest) -> dict:
+        """Return the request body for the video generation endpoint."""
+        self._check_images(request)
+        content: list[dict] = [{"type": "text", "text": request.prompt}]
+        images = [
+            (request.first_frame, "first_frame"),
+            (request.last_frame, "last_frame"),
+        ]
+        images += [
+            (path, "reference_image") for path in request.reference_images
+        ]
+        for path, role in images:
+            if path is None:
+                continue
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": data_url(path)},
+                    "role": role,
+                }
+            )
+
+        payload = {
+            "model": self.model,
+            "content": content,
+            "duration": request.duration,
+            "resolution": request.resolution or DEFAULT_RESOLUTION,
+        }
+        if request.ratio is not None:
+            payload["ratio"] = request.ratio
+        return payload
+
+    @staticmethod
+    def _check_images(request: VideoRequest) -> None:
+        images = [request.first_frame, request.last_frame]
+        images += request.reference_images
+        for path in images:
+            if path is None:
+                continue
+            if path.stat().st_size > _MAX_IMAGE_BYTES:
+                raise ValueError(f"image is larger than 30MB: {path}")
+
+    @staticmethod
+    def _task_from(data: dict) -> VideoTask:
+        task = data.get("task", data)
+        if not isinstance(task, dict):
+            raise MiniMaxError("malformed task reply")
+
+        content = task.get("content")
+        content = content if isinstance(content, dict) else {}
+        error = task.get("error")
+        if isinstance(error, dict):
+            error = error.get("message") or error.get("code") or ""
+        elif not isinstance(error, str):
+            error = ""
+
+        return VideoTask(
+            task_id=str(task.get("id") or task.get("task_id") or ""),
+            status=str(task.get("status") or ""),
+            video_url=str(content.get("url") or ""),
+            resolution=str(task.get("resolution") or ""),
+            duration=int(task.get("duration") or 0),
+            error=str(error),
+        )
 
     # Send one JSON POST and return the parsed body.
     def _post(self, path: str, payload: dict) -> dict:
@@ -237,7 +225,7 @@ class MiniMaxClient:
         """Return the current snapshot of one task."""
         quoted = urllib.parse.quote(task_id, safe="")
         path = f"/v2/query/video_generation/{quoted}"
-        return VideoTask.from_response(self._get(path, {}))
+        return self._task_from(self._get(path, {}))
 
     # Send one GET and return the parsed body.
     def _get(self, path: str, params: dict) -> dict:

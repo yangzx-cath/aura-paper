@@ -17,7 +17,8 @@ def write_png(path: Path) -> Path:
 
 def test_payload_builds_content(tmp_path):
     frame = write_png(tmp_path / "page.png")
-    payload = VideoRequest(prompt="walk", first_frame=frame).to_payload("m")
+    client = MiniMaxClient(api_key="key", model="m")
+    payload = client._payload(VideoRequest(prompt="walk", first_frame=frame))
 
     assert payload["model"] == "m"
     assert payload["duration"] == 6
@@ -59,7 +60,9 @@ def test_payload_rejects_oversized_image(monkeypatch, tmp_path):
     target.write_bytes(b"xx")
 
     with pytest.raises(ValueError, match="larger than 30MB"):
-        VideoRequest(prompt="walk", first_frame=target)
+        MiniMaxClient(api_key="key")._payload(
+            VideoRequest(prompt="walk", first_frame=target)
+        )
 
 
 def test_task_from_query_response():
@@ -73,7 +76,7 @@ def test_task_from_query_response():
         }
     }
 
-    task = VideoTask.from_response(data)
+    task = MiniMaxClient._task_from(data)
 
     assert task.task_id == "424"
     assert task.succeeded
@@ -91,7 +94,7 @@ def test_task_from_failed_response():
         }
     }
 
-    task = VideoTask.from_response(data)
+    task = MiniMaxClient._task_from(data)
 
     assert task.done
     assert not task.succeeded

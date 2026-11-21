@@ -17,7 +17,6 @@ TASK_PENDING = ("queued", "running")
 TASK_DONE = ("succeeded", "failed", "cancelled", "expired")
 
 DEFAULT_DURATION = 6
-DEFAULT_RESOLUTION = "720p"
 
 
 class VideoError(Exception):
@@ -33,7 +32,7 @@ class VideoRequest:
     last_frame: Path | None = None
     reference_images: list[Path] = field(default_factory=list)
     duration: int = DEFAULT_DURATION
-    resolution: str = DEFAULT_RESOLUTION
+    resolution: str | None = None
     ratio: str | None = None
 
     def __post_init__(self) -> None:
