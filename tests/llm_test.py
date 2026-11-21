@@ -1,3 +1,4 @@
+import http.client
 import io
 import time
 import urllib.error
@@ -6,7 +7,7 @@ from email.message import Message
 
 import pytest
 
-from aura_paper.llm import LLMClient, LLMError
+from aura_paper.llm import RETRIES, LLMClient, LLMError
 
 
 def test_chat_builds_payload(monkeypatch, sample_jpeg):
@@ -143,6 +144,8 @@ def fake_urlopen(monkeypatch, replies):
     def open_request(request, timeout=0):
         calls.append(request)
         reply = replies[min(len(calls), len(replies)) - 1]
+        if isinstance(reply, BaseException):
+            raise reply
         if isinstance(reply, int):
             raise urllib.error.HTTPError(
                 request.full_url,
@@ -178,3 +181,28 @@ def test_a_bad_request_is_not_retried(monkeypatch):
     with pytest.raises(LLMError, match="HTTP 400"):
         client.chat("hello")
     assert len(calls) == 1
+
+
+def test_retries_a_reply_cut_off_mid_read(monkeypatch):
+    calls = fake_urlopen(
+        monkeypatch,
+        [
+            http.client.IncompleteRead(b'{"choi'),
+            '{"choices": [{"message": {"content": "ok"}}]}',
+        ],
+    )
+
+    client = LLMClient("http://x/v1", "k", "m")
+
+    assert client.chat("hello") == "ok"
+    assert len(calls) == 2
+
+
+def test_a_reply_that_keeps_dropping_ends_as_an_error(monkeypatch):
+    calls = fake_urlopen(monkeypatch, [ConnectionResetError("reset")])
+
+    client = LLMClient("http://x/v1", "k", "m")
+
+    with pytest.raises(LLMError, match="dropped connection"):
+        client.chat("hello")
+    assert len(calls) == RETRIES
