@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..schema.cast import FigurePick
 from ..schema.content import PageContent
+from ..schema.voice import CHOICES
 
 # Words that mark an uncertainty as being about who someone is.
 IDENTITY_WORDS = ("同一人", "身份", "是谁", "指谁", "名字", "对应")
@@ -18,10 +19,14 @@ __PAGES__
 【待确认的身份疑问】
 __ISSUES__
 
+【可选音色】
+__VOICES__
+
 【人物裁图】
 __CROPS__
 
-请判断这本书需要哪些角色、每张裁图拍的是哪个角色，并回答上面的身份疑问。
+请判断这本书需要哪些角色、每张裁图拍的是哪个角色、每个角色用什么声音，并回答
+上面的身份疑问。
 
 严格按下面的 JSON 结构输出：
 
@@ -31,6 +36,7 @@ __CROPS__
       "key": "短标签，figure_cast 用它指回来",
       "name": "书里给过的名字，没有就留空字符串",
       "look": "一眼认出他的外形，不超过 20 字",
+      "voice": "从【可选音色】里原样抄一个 id",
       "best": "最合适当参考图的一张裁图文件名，挑不出就留空字符串"
     }
   ],
@@ -75,6 +81,12 @@ __CROPS__
 9. 逐条处理【待确认的身份疑问】，issue 原样照抄。能用裁图和全书文字定的写
    resolved，evidence 写依据（第几张裁图、哪一页的文字）；定不了的写 open，
    reason 写原因。不要硬猜。
+
+【voice】
+10. voice 从【可选音色】里原样抄一个 id，不要写 id 以外的任何字。按角色的性别和
+   年龄挑：成年男人挑成年男声，小孩挑童声，不要把成年人的声音给小孩。
+11. 同一本书里性别和年龄都一样的角色，不能共用同一个 id；不够分时先给主角挑最
+   贴的，其余角色挑剩下的。
 """
 
 
@@ -83,7 +95,13 @@ def cast_prompt(pages: list[PageContent], picks: list[FigurePick]) -> str:
     text = TEMPLATE.replace("__COUNT__", str(len(picks)))
     text = text.replace("__PAGES__", _pages_text(pages))
     text = text.replace("__ISSUES__", _issues_text(pages))
+    text = text.replace("__VOICES__", _voices_text())
     return text.replace("__CROPS__", _crops_text(pages, picks))
+
+
+# List the voices a character may be given, with what each one sounds like.
+def _voices_text() -> str:
+    return "\n".join(f"{voice}：{sound}" for voice, sound in CHOICES)
 
 
 # List the story text of every page, so names can be matched to crops.

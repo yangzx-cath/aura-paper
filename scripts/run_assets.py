@@ -104,7 +104,8 @@ def main() -> int:
 def _cast_line(member: Cast) -> str:
     name = member.name or "（无名）"
     pictures = "、".join(member.pictures) or "（无可用图）"
-    return f"{member.id} {name}｜{member.look}｜{pictures}"
+    voice = member.voice or "（无音色）"
+    return f"{member.id} {name}｜{member.look}｜{voice}｜{pictures}"
 
 
 # Print one place with the crop that backs it.

@@ -259,6 +259,7 @@ def _apply(
                 "id": cast_id,
                 "name": entry.get("name"),
                 "look": entry.get("look"),
+                "voice": entry.get("voice"),
             }
         )
 

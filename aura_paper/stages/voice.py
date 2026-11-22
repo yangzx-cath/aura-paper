@@ -9,8 +9,9 @@ from pathlib import Path
 from ..cache import Cache, fingerprint
 from ..clients.tts import DEFAULT_RATE, TTSClient, TTSError
 from ..output import write_json
+from ..schema.cast import BookCast
 from ..schema.shot import BookShots, Shot
-from ..schema.voice import BookVoice, VoiceLine, VoiceShot
+from ..schema.voice import NARRATOR, BookVoice, VoiceLine, VoiceShot
 from .paths import book_dir, voice_dir
 
 # A short rest between two lines of the same shot.
@@ -30,7 +31,7 @@ def voice(
     book_id: str,
     *,
     tts: TTSClient,
-    voices: dict[str, str],
+    overrides: dict[str, str] | None = None,
     gap_ms: int = DEFAULT_GAP_MS,
     root: str | Path | None = None,
     cache: Cache | None = None,
@@ -38,6 +39,7 @@ def voice(
     """Read shots.json, speak every line, write voice.json and the audio."""
     directory = book_dir(book_id, root)
     shots = _read_shots(directory).shots
+    voices = voices_for(book_id, overrides=overrides, root=root)
 
     result = BookVoice(
         id=book_id,
@@ -66,6 +68,23 @@ def voice(
 
     write_json(book_id, "voice", result.to_dict(), root)
     return result
+
+
+# Read the voice of every speaker from cast.json, then apply the overrides.
+def voices_for(
+    book_id: str,
+    *,
+    overrides: dict[str, str] | None = None,
+    root: str | Path | None = None,
+) -> dict[str, str]:
+    """Return the voice of every speaker the cast stage named."""
+    cast_book = _read_cast(book_dir(book_id, root))
+    voices = {"旁白": NARRATOR}
+    for member in cast_book.cast:
+        if member.voice:
+            voices[member.id] = member.voice
+    voices.update(overrides or {})
+    return voices
 
 
 # List the speakers that have no voice yet, so nothing is spoken twice.
@@ -168,3 +187,10 @@ def _read_shots(directory: Path) -> BookShots:
     path = directory / "shots.json"
     text = path.read_text(encoding="utf-8")
     return BookShots.from_dict(json.loads(text))
+
+
+# Read the cast stage's record of the characters.
+def _read_cast(directory: Path) -> BookCast:
+    path = directory / "cast.json"
+    text = path.read_text(encoding="utf-8")
+    return BookCast.from_dict(json.loads(text))

@@ -1,10 +1,29 @@
-"""The audio of one book: what each shot says and how long it runs."""
+"""The audio of one book and the voices it can be spoken with."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
 from ..utils import now_iso
+
+# Ids and what each one sounds like, from the 豆包语音合成模型2.0 list.
+CHOICES = (
+    ("zh_female_zhixingnv_uranus_bigtts", "成年女声，清楚平实，像女老师"),
+    ("zh_female_shaoergushi_uranus_bigtts", "成年女声，绘本故事的讲法"),
+    ("zh_female_wenroumama_uranus_bigtts", "成年女声，温柔，像妈妈"),
+    ("zh_male_wennuanahu_uranus_bigtts", "成年男声，温暖，像爸爸"),
+    ("zh_male_chunhoudiyin_uranus_bigtts", "成年男声，低沉"),
+    ("zh_female_xiaoxue_uranus_bigtts", "女童，绘本童声"),
+    ("zh_female_yingtaowanzi_uranus_bigtts", "女童，活泼跳脱"),
+    ("zh_male_naiqimengwa_uranus_bigtts", "男童，奶气"),
+    ("zh_male_tiancaitongsheng_uranus_bigtts", "男童，清亮"),
+)
+
+# Every line that is not a character's is spoken with this voice.
+NARRATOR = "zh_female_zhixingnv_uranus_bigtts"
+
+# Every id a character may be given.
+ALL = frozenset(voice for voice, _ in CHOICES)
 
 
 @dataclass

@@ -1,13 +1,12 @@
 """Speak every line of one book and measure how long each shot runs.
 
-Reads out/<book>/shots.json, turns each line of a shot into audio, rests a
-short gap between lines, and writes voice.json with the length of every
-shot.
+Reads out/<book>/shots.json and cast.json, turns each line of a shot into
+audio with the voice the cast stage gave its speaker, rests a short gap
+between lines, and writes voice.json with the length of every shot.
 
 Usage:
-    python scripts/run_voice.py C01 \\
-        --voice 旁白=zh_female_xiaoxue_uranus_bigtts \\
-        --voice c1=zh_female_mengyatou_uranus_bigtts
+    python scripts/run_voice.py C01
+    python scripts/run_voice.py C01 --voice c1=zh_female_xiaoxue_uranus_bigtts
 """
 
 import argparse
@@ -19,7 +18,7 @@ from aura_paper.cache import Cache
 from aura_paper.clients.tts import TTSClient
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.schema.voice import BookVoice, VoiceShot
-from aura_paper.stages.voice import DEFAULT_GAP_MS, voice
+from aura_paper.stages.voice import DEFAULT_GAP_MS, voice, voices_for
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -37,7 +36,7 @@ def main() -> int:
         action="append",
         default=[],
         metavar="说话人=音色",
-        help="voice of one speaker, repeat for each speaker",
+        help="voice of one speaker, overriding the cast stage",
     )
     parser.add_argument(
         "--gap-ms",
@@ -55,11 +54,12 @@ def main() -> int:
     load_env(ROOT / ".env")
 
     root = Path(args.root).expanduser() if args.root else out_root()
-    shots_path = root / args.book / "shots.json"
-    if not shots_path.is_file():
-        print(f"missing {shots_path}", file=sys.stderr)
-        print("run scripts/run_storyboard.py first", file=sys.stderr)
-        return 2
+    for name, stage in (("cast", "assets"), ("shots", "storyboard")):
+        path = root / args.book / f"{name}.json"
+        if not path.is_file():
+            print(f"missing {path}", file=sys.stderr)
+            print(f"run scripts/run_{stage}.py first", file=sys.stderr)
+            return 2
 
     tts = TTSClient.from_env()
     missing = tts.missing_settings()
@@ -67,10 +67,8 @@ def main() -> int:
         print("missing config: " + ", ".join(missing), file=sys.stderr)
         return 2
 
-    voices = _voices(args.voice)
-    if not voices:
-        print("give at least one --voice 说话人=音色", file=sys.stderr)
-        return 2
+    overrides = _voices(args.voice)
+    voices = voices_for(args.book, overrides=overrides, root=root)
 
     cache = Cache(cache_root(), enabled=not args.no_cache)
 
@@ -79,6 +77,8 @@ def main() -> int:
     print(f"root     {root}")
     print(f"cache    {cache.root}  enabled={cache.enabled}")
     print(f"gap      {args.gap_ms}ms")
+    for speaker, voice_id in voices.items():
+        print(f"voice    {speaker} → {voice_id}")
     print()
     print("Speaking the lines", flush=True)
 
@@ -86,7 +86,7 @@ def main() -> int:
     result = voice(
         args.book,
         tts=tts,
-        voices=voices,
+        overrides=overrides,
         gap_ms=args.gap_ms,
         root=root,
         cache=cache,

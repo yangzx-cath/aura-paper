@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ..utils import now_iso
+from .voice import ALL as VOICES
 
 
 @dataclass
@@ -25,6 +26,7 @@ class Cast:
     id: str = ""
     name: str = ""
     look: str = ""
+    voice: str = ""
     pictures: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -33,6 +35,7 @@ class Cast:
             "id": self.id,
             "name": self.name,
             "look": self.look,
+            "voice": self.voice,
             "pictures": self.pictures,
         }
 
@@ -43,6 +46,7 @@ class Cast:
             id=_text(data.get("id")),
             name=_text(data.get("name")),
             look=_text(data.get("look")),
+            voice=_chosen(data.get("voice")),
             pictures=_text_list(data.get("pictures")),
         )
 
@@ -154,6 +158,12 @@ def _text_list(value: object) -> list[str]:
         return []
     texts = (_text(item) for item in value)
     return [text for text in texts if text]
+
+
+# Read a voice id, keeping it only when the pipeline offers it.
+def _chosen(value: object) -> str:
+    text = _text(value)
+    return text if text in VOICES else ""
 
 
 # Read an integer, falling back to zero when the value is unusable.
