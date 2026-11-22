@@ -22,6 +22,9 @@ from aura_paper.stages.assets import assets
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# Reading pages and grouping crops does not need deep thinking.
+DEFAULT_EFFORT = "low"
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Group figure crops.")
@@ -33,8 +36,8 @@ def main() -> int:
     )
     parser.add_argument(
         "--effort",
-        default="",
-        help="reasoning effort, empty keeps the env setting",
+        default=DEFAULT_EFFORT,
+        help=f"reasoning effort (default={DEFAULT_EFFORT})",
     )
     parser.add_argument(
         "--no-cache",

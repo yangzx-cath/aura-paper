@@ -24,7 +24,8 @@ from aura_paper.stages.understand import understand
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# An empty effort keeps LLM_REASONING_EFFORT from the environment.
+# Reading one page does not need deep thinking, and high burned 15k tokens
+# of reasoning per page. Pass an empty effort to use LLM_REASONING_EFFORT.
 DEFAULT_EFFORT = "low"
 
 # Pages below this share of ink inside the boxes are reported.
