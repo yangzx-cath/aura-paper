@@ -145,6 +145,8 @@ def _apply_fields(content: PageContent, fields: dict) -> None:
     parsed = PageContent.from_dict(fields)
     content.page_text = parsed.page_text
     content.meta_text = parsed.meta_text
+    content.place = parsed.place
+    content.light = parsed.light
     content.description = parsed.description
     content.panels = parsed.panels
     content.figures = parsed.figures
@@ -156,6 +158,8 @@ def _page_fields(content: PageContent) -> dict:
     return {
         "page_text": content.page_text,
         "meta_text": content.meta_text,
+        "place": content.place,
+        "light": content.light,
         "description": content.description,
         "panels": [panel.to_dict() for panel in content.panels],
         "figures": [figure.to_dict() for figure in content.figures],

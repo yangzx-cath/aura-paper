@@ -16,6 +16,8 @@ REPLY = json.dumps(
         "description": "封面",
         "page_text": "文字",
         "meta_text": "阅读指导",
+        "place": "菜园",
+        "light": "白天，阳光明媚",
         "panels": [{"box": [0, 0, 400, 500], "text": "三块、"}],
         "figures": [
             {
@@ -72,6 +74,8 @@ def test_reads_the_cover_and_one_page(tmp_path):
     assert content.title == "测试绘本"
     assert content.failed_count == 0
     assert content.pages[1].meta_text == "阅读指导"
+    assert content.pages[1].place == "菜园"
+    assert content.pages[1].light == "白天，阳光明媚"
     assert content.pages[1].panels[0].box == [0, 0, 400, 500]
     assert content.pages[1].panels[0].text == "三块、"
     assert content.pages[1].panels[0].needs_scene is True
