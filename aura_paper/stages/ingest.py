@@ -11,7 +11,7 @@ from PIL import Image
 from ..cache import Cache, file_fingerprint, fingerprint
 from ..llm import LLMClient, LLMError
 from ..media.image import (
-    crop_percent,
+    crop_box,
     load_image,
     save_jpeg,
     stitch_side_by_side,
@@ -37,7 +37,10 @@ THUMBNAIL_BOX = (1024, 1024)
 THUMBNAIL_QUALITY = 85
 
 # The two halves of a spread are cut at the middle.
-SPLIT_PERCENT = 50
+SPLIT_POINT = 500
+
+# A box covers the whole image.
+FULL_BOX = [[0, 0, 1000, 1000]]
 
 # The cover stands alone, so pairing starts after it.
 COVER_PAGES = 1
@@ -167,14 +170,14 @@ def _build_pages(
 
     if not two_pages:
         origin = "spread" if len(group) == 2 or wide else "page"
-        page = _page(start, sources, [[0, 0, 100, 100]], origin, text, error)
+        page = _page(start, sources, FULL_BOX, origin, text, error)
         written = _write(image, page, pages_dir, quality)
         return [written]
 
-    left_box = (0, 0, SPLIT_PERCENT, 100)
-    right_box = (SPLIT_PERCENT, 0, 100, 100)
-    left_half = crop_percent(image, left_box)
-    right_half = crop_percent(image, right_box)
+    left_box = (0, 0, SPLIT_POINT, 1000)
+    right_box = (SPLIT_POINT, 0, 1000, 1000)
+    left_half = crop_box(image, left_box)
+    right_half = crop_box(image, right_box)
 
     first_page = _page(start, sources, [list(left_box)], "half", text, error)
     second_page = _page(
