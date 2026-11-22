@@ -84,6 +84,7 @@ class LLMClient:
         *,
         image_path: Path | None = None,
         json_mode: bool = True,
+        max_tokens: int = 0,
     ) -> str:
         """Send a prompt, optionally with one image, and return the reply."""
         if not (self.base_url and self.api_key and self.model):
@@ -109,6 +110,8 @@ class LLMClient:
             payload["response_format"] = {"type": "json_object"}
         if self.reasoning_effort:
             payload["reasoning_effort"] = self.reasoning_effort
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
 
         return self._post(payload)
 
@@ -116,9 +119,13 @@ class LLMClient:
         data = self._send(payload)
 
         try:
-            content = data["choices"][0]["message"]["content"]
+            choice = data["choices"][0]
+            content = choice["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
             raise LLMError("malformed reply from endpoint") from exc
+
+        if choice.get("finish_reason") == "length":
+            raise LLMError("reply hit the token limit")
 
         if isinstance(content, list):
             content = "".join(

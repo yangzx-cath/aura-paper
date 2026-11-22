@@ -36,7 +36,9 @@ def extract_json(text: str) -> dict:
     try:
         obj, _ = json.JSONDecoder().raw_decode(text[start:])
     except json.JSONDecodeError as exc:
-        raise ValueError(f"invalid JSON: {exc.msg}") from exc
+        at = start + exc.pos
+        near = text[max(start, at - 30) : at + 30]
+        raise ValueError(f"invalid JSON: {exc.msg} near {near!r}") from exc
 
     return obj
 
