@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+from typing import Callable
 
 from PIL import Image
 
@@ -55,6 +56,7 @@ def ingest(
     quality: int = DEFAULT_QUALITY,
     pair_from: int = COVER_PAGES,
     cache: Cache | None = None,
+    on_page: Callable[[Page], None] | None = None,
 ) -> Book:
     """Render a PDF into logical pages and write <root>/<id>/ingest.json."""
     directory = _book_dir(book_id, root)
@@ -91,6 +93,9 @@ def ingest(
         )
         book.pages.extend(pages)
         index += len(pages)
+        if on_page is not None:
+            for page in pages:
+                on_page(page)
 
     write_json(book_id, "ingest", book.to_dict(), root)
     return book
