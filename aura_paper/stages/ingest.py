@@ -9,7 +9,6 @@ from typing import Callable
 from PIL import Image
 
 from ..cache import Cache, file_fingerprint, fingerprint
-from ..config import out_root
 from ..llm import LLMClient, LLMError
 from ..media.image import (
     crop_percent,
@@ -28,6 +27,7 @@ from ..output import write_json
 from ..prompts import layout_prompt
 from ..schema.book import Book, Page
 from ..utils import extract_json
+from .paths import book_dir
 
 # A spread is about twice as wide as one page.
 SPREAD_RATIO = 1.6
@@ -62,7 +62,7 @@ def ingest(
     on_page: Callable[[Page], None] | None = None,
 ) -> Book:
     """Render a PDF into logical pages and write <root>/<id>/ingest.json."""
-    directory = _book_dir(book_id, root)
+    directory = book_dir(book_id, root)
     source_dir = directory / "source"
     pages_dir = directory / "pages"
     _empty(source_dir)
@@ -102,12 +102,6 @@ def ingest(
 
     write_json(book_id, "ingest", book.to_dict(), root)
     return book
-
-
-# Return the output directory of one book.
-def _book_dir(book_id: str, root: str | Path | None) -> Path:
-    base = Path(root) if root is not None else out_root()
-    return base / book_id
 
 
 # Remove files left by an earlier run, so the folders match this one.
