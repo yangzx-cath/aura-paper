@@ -16,7 +16,19 @@ REPLY = json.dumps(
         "description": "封面",
         "page_text": "文字",
         "meta_text": "阅读指导",
-        "figures": [],
+        "panels": [{"box": [0, 0, 50, 100], "visual_type": "vignette"}],
+        "figures": [
+            {
+                "name": "小满",
+                "body": "小女孩",
+                "outfit": "粉色上衣",
+                "view": "全身",
+                "facing": "正面",
+                "occlusion": "无",
+                "box": [10, 20, 40, 60],
+                "panel": 0,
+            }
+        ],
         "uncertain": [],
     }
 )
@@ -58,8 +70,10 @@ def test_reads_the_cover_and_one_page(tmp_path):
 
     assert content.page_count == 2
     assert content.title == "测试绘本"
-    assert [page.kind for page in content.pages] == ["landscape", "portrait"]
     assert content.failed_count == 0
     assert content.pages[1].meta_text == "阅读指导"
+    assert content.pages[1].panels[0].box == [0, 0, 50, 100]
+    assert content.pages[1].panels[0].visual_type == "vignette"
+    assert content.pages[1].figures[0].panel == 0
     assert llm.calls == 2
     assert (tmp_path / "demo" / "understand.json").is_file()

@@ -94,11 +94,9 @@ def _read_page(
     ns: str,
     pages_dir: Path,
 ) -> PageContent:
-    kind = "landscape" if page.width > page.height else "portrait"
     content = PageContent(
         index=page.index,
         filename=page.filename,
-        kind=kind,
         model=llm.model,
     )
     prompt = page_prompt()
@@ -148,6 +146,7 @@ def _apply_fields(content: PageContent, fields: dict) -> None:
     content.page_text = parsed.page_text
     content.meta_text = parsed.meta_text
     content.description = parsed.description
+    content.panels = parsed.panels
     content.figures = parsed.figures
     content.uncertain = parsed.uncertain
 
@@ -158,6 +157,7 @@ def _page_fields(content: PageContent) -> dict:
         "page_text": content.page_text,
         "meta_text": content.meta_text,
         "description": content.description,
+        "panels": [panel.to_dict() for panel in content.panels],
         "figures": [figure.to_dict() for figure in content.figures],
         "uncertain": content.uncertain,
     }
@@ -171,11 +171,9 @@ def _read_cover(
     ns: str,
     pages_dir: Path,
 ) -> tuple[PageContent, CoverContent]:
-    kind = "landscape" if page.width > page.height else "portrait"
     content = PageContent(
         index=page.index,
         filename=page.filename,
-        kind=kind,
         model=llm.model,
     )
     cover = CoverContent()
