@@ -136,7 +136,7 @@ def _ask_page(
     path: Path,
 ) -> PageContent:
     try:
-        reply = llm.chat(prompt, image_path=path)
+        reply = llm.chat(prompt, images=[path])
         fields = extract_json(reply)
     except (LLMError, ValueError) as exc:
         content.error = str(exc)
@@ -221,7 +221,7 @@ def _ask_cover(
     path: Path,
 ) -> tuple[PageContent, CoverContent]:
     try:
-        reply = llm.chat(prompt, image_path=path)
+        reply = llm.chat(prompt, images=[path])
         fields = extract_json(reply)
     except (LLMError, ValueError) as exc:
         content.error = str(exc)

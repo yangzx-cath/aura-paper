@@ -231,7 +231,7 @@ def _ask_layout(
                 return _as_bool(entry.get("two_pages")), ""
 
         try:
-            reply = llm.chat(prompt, image_path=path)
+            reply = llm.chat(prompt, images=[path])
             fields = extract_json(reply)
         except (LLMError, ValueError) as exc:
             return False, str(exc)

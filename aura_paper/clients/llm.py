@@ -82,22 +82,19 @@ class LLMClient:
         self,
         prompt: str,
         *,
-        image_path: Path | None = None,
+        images: list[Path] | None = None,
         json_mode: bool = True,
         max_tokens: int = 0,
     ) -> str:
-        """Send a prompt, optionally with one image, and return the reply."""
+        """Send a prompt with any number of images and return the reply."""
         if not (self.base_url and self.api_key and self.model):
             raise LLMError(f"llm endpoint is not configured: {self!r}")
 
         content: str | list = prompt
-        if image_path is not None:
-            image_part = {
-                "type": "image_url",
-                "image_url": {"url": data_url(image_path)},
-            }
-            text_part = {"type": "text", "text": prompt}
-            content = [image_part, text_part]
+        if images:
+            # The endpoint reads the images in the order they are given.
+            content = [self._image_part(path) for path in images]
+            content.append({"type": "text", "text": prompt})
 
         messages = []
         if json_mode:
@@ -114,6 +111,14 @@ class LLMClient:
             payload["max_tokens"] = max_tokens
 
         return self._post(payload)
+
+    # Build one image part, reading the file once.
+    @staticmethod
+    def _image_part(path: Path) -> dict:
+        return {
+            "type": "image_url",
+            "image_url": {"url": data_url(path)},
+        }
 
     def _post(self, payload: dict) -> str:
         data = self._send(payload)

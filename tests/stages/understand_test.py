@@ -45,7 +45,7 @@ class FakeLLM(LLMClient):
         super().__init__("http://example/v1", "test-key", "fake-model")
         self.calls = 0
 
-    def chat(self, prompt, *, image_path=None, json_mode=True):
+    def chat(self, prompt, *, images=None, json_mode=True):
         self.calls += 1
         return REPLY
 

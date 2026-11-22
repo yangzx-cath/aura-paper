@@ -12,7 +12,7 @@ class FakeLLM(LLMClient):
         self.two_pages = two_pages
         self.calls = 0
 
-    def chat(self, prompt, *, image_path=None, json_mode=True):
+    def chat(self, prompt, *, images=None, json_mode=True):
         self.calls += 1
         return json.dumps({"two_pages": self.two_pages, "reason": ""})
 
