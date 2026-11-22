@@ -103,6 +103,8 @@ def _read_page(
     content = PageContent(
         index=page.index,
         filename=page.filename,
+        width=page.width,
+        height=page.height,
         model=llm.model,
     )
     prompt = page_prompt()
@@ -141,7 +143,7 @@ def _ask_page(
         return content
 
     _apply_fields(content, fields)
-    if not content.page_text and not content.description:
+    if not content.page_text and not content.panels:
         content.error = "model returned no content"
     return content
 
@@ -153,7 +155,6 @@ def _apply_fields(content: PageContent, fields: dict) -> None:
     content.meta_text = parsed.meta_text
     content.place = parsed.place
     content.light = parsed.light
-    content.description = parsed.description
     content.panels = parsed.panels
     content.figures = parsed.figures
     content.uncertain = parsed.uncertain
@@ -166,7 +167,6 @@ def _page_fields(content: PageContent) -> dict:
         "meta_text": content.meta_text,
         "place": content.place,
         "light": content.light,
-        "description": content.description,
         "panels": [panel.to_dict() for panel in content.panels],
         "figures": [figure.to_dict() for figure in content.figures],
         "uncertain": content.uncertain,
