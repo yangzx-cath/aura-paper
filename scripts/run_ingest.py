@@ -7,6 +7,7 @@ Usage:
     python scripts/run_ingest.py <book.pdf>
     python scripts/run_ingest.py <book.pdf> --pair-from 2
     python scripts/run_ingest.py <book.pdf> --dpi 200 --no-cache
+    python scripts/run_ingest.py <book.pdf> --effort high
 """
 
 import argparse
@@ -56,6 +57,11 @@ def main() -> int:
         help=f"pages before this index never pair (default={COVER_PAGES})",
     )
     parser.add_argument(
+        "--effort",
+        default="low",
+        help="reasoning effort (default=low)",
+    )
+    parser.add_argument(
         "--no-cache",
         action="store_true",
         help="ignore the cache and do not write it",
@@ -82,7 +88,7 @@ def main() -> int:
         )
         return 2
 
-    llm = LLMClient.from_env()
+    llm = LLMClient.from_env(args.effort)
     missing = llm.missing_settings()
     if missing:
         print("missing config: " + ", ".join(missing), file=sys.stderr)
@@ -94,7 +100,7 @@ def main() -> int:
 
     print(f"pdf     {source}")
     print(f"book    {book_id}")
-    print(f"model   {llm.model}")
+    print(f"model   {llm.model}  effort={llm.reasoning_effort or '-'}")
     print(f"root    {root}")
     print(f"dpi     {args.dpi}  pair_from={args.pair_from}")
     print(f"cache   {cache.root}  enabled={cache.enabled}")
