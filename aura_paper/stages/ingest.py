@@ -42,6 +42,9 @@ SPLIT_PERCENT = 50
 # The cover stands alone, so pairing starts after it.
 COVER_PAGES = 1
 
+# Facing pages may share this share of the page width at the fold.
+SEAM_SHARE = 0.08
+
 # Page files are numbered by their order in the book.
 PAGE_TEMPLATE = "p{index:03d}.jpg"
 
@@ -163,7 +166,9 @@ def _build_pages(
 
     two_pages = False
     error = ""
-    if len(group) == 2 or wide:
+    # A stitched pair is one picture by construction, so only a single
+    # page that is already wide can still hold two printed pages.
+    if len(group) == 1 and wide:
         two_pages, error = _ask_layout(image, llm, cache, ns, start)
 
     if not two_pages:
@@ -177,20 +182,10 @@ def _build_pages(
     left_half = crop_percent(image, left_box)
     right_half = crop_percent(image, right_box)
 
-    if len(group) == 2:
-        # Cutting a stitched spread recovers the two source pages.
-        whole = [[0, 0, 100, 100]]
-        first_page = _page(start, [sources[0]], whole, "page", text, error)
-        second_page = _page(
-            start + 1, [sources[1]], whole, "page", text, error
-        )
-    else:
-        first_page = _page(
-            start, sources, [list(left_box)], "half", text, error
-        )
-        second_page = _page(
-            start + 1, sources, [list(right_box)], "half", text, error
-        )
+    first_page = _page(start, sources, [list(left_box)], "half", text, error)
+    second_page = _page(
+        start + 1, sources, [list(right_box)], "half", text, error
+    )
 
     first = _write(left_half, first_page, pages_dir, quality)
     second = _write(right_half, second_page, pages_dir, quality)
@@ -205,15 +200,16 @@ def _group_image(
     if len(group) == 1:
         image = load_image(source_dir / group[0].filename)
     else:
-        image = stitch_side_by_side(
-            source_dir / group[0].filename,
-            source_dir / group[1].filename,
-        )
+        left = source_dir / group[0].filename
+        right = source_dir / group[1].filename
+        limit = round(group[0].width * SEAM_SHARE)
+        image = stitch_side_by_side(left, right, limit)
     wide = image.width >= image.height * SPREAD_RATIO
     return image, wide
 
 
-# Ask the model whether one group holds two pages. Errors keep it whole.
+# Ask the model whether one wide page holds two printed pages. Errors keep
+# it whole.
 def _ask_layout(
     image: Image.Image,
     llm: LLMClient,

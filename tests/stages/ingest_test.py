@@ -57,4 +57,4 @@ def test_stitches_adjacent_pages_of_one_spread(tmp_path):
     ]
     assert book.pages[1].sources == [1, 2]
     assert book.pages[1].origin == "spread"
-    assert llm.calls == 1
+    assert llm.calls == 0
