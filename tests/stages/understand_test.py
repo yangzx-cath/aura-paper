@@ -22,7 +22,6 @@ REPLY = json.dumps(
                 "box": [0, 0, 400, 500],
                 "text": "三块、",
                 "description": "小女孩坐在地上搭积木",
-                "scale": "medium",
             }
         ],
         "figures": [
@@ -88,7 +87,6 @@ def test_reads_the_cover_and_one_page(tmp_path):
     assert content.pages[1].panels[0].box == [0, 0, 400, 500]
     assert content.pages[1].panels[0].text == "三块、"
     assert content.pages[1].panels[0].description == "小女孩坐在地上搭积木"
-    assert content.pages[1].panels[0].scale == "medium"
     assert content.pages[1].panels[0].needs_scene is True
     assert content.pages[1].figures[0].panel == 0
     assert llm.calls == 2

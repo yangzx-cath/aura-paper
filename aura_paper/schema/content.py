@@ -9,9 +9,6 @@ from ..utils import now_iso
 # A panel below this share of the page needs a scene behind it.
 NEEDS_SCENE_AREA = 0.5
 
-# Framing words a panel may carry.
-SCALES = ("wide", "medium", "close_up")
-
 
 @dataclass
 class CoverContent:
@@ -114,7 +111,6 @@ class Panel:
     box: list[int] | None = None
     text: str = ""
     description: str = ""
-    scale: str = ""
     needs_scene: bool = False
 
     def to_dict(self) -> dict:
@@ -124,7 +120,6 @@ class Panel:
             "box": self.box,
             "text": self.text,
             "description": self.description,
-            "scale": self.scale,
             "needs_scene": self.needs_scene,
         }
 
@@ -136,15 +131,8 @@ class Panel:
             box=_box_value(data.get("box")),
             text=str(data.get("text") or ""),
             description=str(data.get("description") or ""),
-            scale=_scale_value(data.get("scale")),
             needs_scene=bool(data.get("needs_scene")),
         )
-
-
-# Read a panel scale, keeping only one of the known words.
-def _scale_value(value: object) -> str:
-    text = str(value or "").strip().lower().replace("-", "_")
-    return text if text in SCALES else ""
 
 
 # Tell whether a panel is too small to carry its own environment.
