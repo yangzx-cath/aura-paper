@@ -12,11 +12,13 @@ Usage:
 import argparse
 import sys
 import time
+from functools import partial
 from pathlib import Path
 
 from aura_paper.cache import Cache
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.llm import LLMClient
+from aura_paper.media.image import ink_coverage, load_image
 from aura_paper.schema.content import PageContent
 from aura_paper.stages.understand import understand
 
@@ -24,6 +26,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # An empty effort keeps LLM_REASONING_EFFORT from the environment.
 DEFAULT_EFFORT = ""
+
+# Pages below this share of ink inside the boxes are reported.
+COVERAGE_LIMIT = 0.75
 
 
 def main() -> int:
@@ -88,7 +93,10 @@ def main() -> int:
         root=root,
         workers=args.workers,
         cache=cache,
-        on_page=_print_page,
+        on_page=partial(
+            _print_page,
+            pages_dir=root / args.book / "pages",
+        ),
     )
     elapsed = time.perf_counter() - started
 
@@ -108,10 +116,34 @@ def main() -> int:
 
 
 # Print one page as soon as it is read.
-def _print_page(page: PageContent, elapsed: float) -> None:
+def _print_page(
+    page: PageContent,
+    elapsed: float,
+    *,
+    pages_dir: Path,
+) -> None:
     status = page.error or "ok"
-    text = f"{page.filename}  {elapsed:6.1f}s  {status}  {page.light}"
+    note = _coverage_note(page, pages_dir)
+    text = f"{page.filename}  {elapsed:6.1f}s  {status}  {page.light}{note}"
     print(text, flush=True)
+
+
+# Report how much of the page ink the panel boxes hold, when it is low.
+def _coverage_note(page: PageContent, pages_dir: Path) -> str:
+    boxes = []
+    for panel in page.panels:
+        box = panel.box
+        if box is None:
+            continue
+        left, top, right, bottom = box
+        boxes.append((left, top, right, bottom))
+    if not boxes:
+        return ""
+    image = load_image(pages_dir / page.filename)
+    share = ink_coverage(image, boxes)
+    if share >= COVERAGE_LIMIT:
+        return ""
+    return f"  框覆盖 {share:.0%}"
 
 
 # Count the pages that carry an error.

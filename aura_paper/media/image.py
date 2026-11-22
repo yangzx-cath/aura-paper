@@ -12,6 +12,9 @@ SEAM_STEP = 2
 # A real overlap matches far better than this mean colour difference.
 SEAM_LIMIT = 12.0
 
+# Pixels darker than this count as ink.
+INK_LEVEL = 235
+
 
 def load_image(path: str | Path) -> Image.Image:
     """Read one image as RGB."""
@@ -116,6 +119,36 @@ def crop_box(
             round(bottom / 1000 * height),
         )
     )
+
+
+def ink_coverage(
+    image: Image.Image,
+    boxes: list[tuple[int, int, int, int]],
+) -> float:
+    """Return the share of the page ink that the boxes hold.
+
+    Box values are per-mille. Boxes that overlap are counted twice, so
+    the result is capped at 1.
+    """
+    gray = image.convert("L")
+    width, height = gray.size
+    covered = 0
+    for box in boxes:
+        left, top, right, bottom = box
+        area = (
+            round(left / 1000 * width),
+            round(top / 1000 * height),
+            round(right / 1000 * width),
+            round(bottom / 1000 * height),
+        )
+        covered += _ink(gray.crop(area))
+    return min(1.0, covered / max(1, _ink(gray)))
+
+
+# Count the pixels darker than the paper.
+def _ink(image: Image.Image) -> int:
+    histogram = image.histogram()
+    return sum(n for value, n in enumerate(histogram) if value < INK_LEVEL)
 
 
 def thumbnail(
