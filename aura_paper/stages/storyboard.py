@@ -11,7 +11,7 @@ from ..cache import Cache, file_fingerprint, fingerprint
 from ..clients.llm import LLMClient, LLMError
 from ..media.image import load_image, save_jpeg, thumbnail
 from ..output import write_json
-from ..prompts import storyboard_prompt
+from ..prompts import spoken_prompt, storyboard_prompt
 from ..schema.cast import BookCast
 from ..schema.content import BookContent, PageContent
 from ..schema.location import BookLocations
@@ -59,7 +59,7 @@ def storyboard(
     images = _thumbs(book_id, panels, refs, root)
 
     try:
-        fields = _ask(llm, prompt, images, cache, book_id)
+        fields = _ask(llm, prompt, images, cache, book_id, "plan")
     except (LLMError, ValueError) as exc:
         scene_book.error = str(exc)
         shot_book.error = str(exc)
@@ -71,6 +71,8 @@ def storyboard(
         notes.insert(0, "model returned no scene")
     if not shot_book.shots:
         notes.append("model returned no shot")
+    _merge(shot_book.shots)
+    notes += _spoken(shot_book.shots, cast_book, llm, cache, book_id)
     if notes:
         shot_book.error = "；".join(notes)
     _write(book_id, scene_book, shot_book, root)
@@ -146,25 +148,26 @@ def _thumbs(
     return kept
 
 
-# Read the plan, reusing the cached one when nothing changed.
+# Read an answer, reusing the cached one when nothing changed.
 def _ask(
     llm: LLMClient,
     prompt: str,
     images: list[Path],
     cache: Cache | None,
     book_id: str,
+    name: str,
 ) -> dict:
     if cache is None:
         return _chat(llm, prompt, images)
 
     ns = f"storyboard/{book_id}"
     key = _key(images, prompt, llm)
-    entry = cache.load_json(ns, "plan", key)
+    entry = cache.load_json(ns, name, key)
     if entry is not None:
         return entry
 
     fields = _chat(llm, prompt, images)
-    cache.save_json(ns, "plan", key, fields)
+    cache.save_json(ns, name, key, fields)
     return fields
 
 
@@ -252,6 +255,9 @@ def _scenes(
 # A clip holds at most this many panels: the service takes 4 to 15 seconds
 # and one counting line is about a second.
 MAX_PANELS = 6
+
+# Characters that carry a number, which a rewrite must keep.
+NUMERALS = set("零一二三四五六七八九十百千万亿0123456789")
 
 
 # Number the shots, resolve their scene and keep the cast that exists.
@@ -412,6 +418,97 @@ def _joins(shots: list[Shot]) -> list[Shot]:
         before = shots[number - 1] if number else None
         shot.join = "硬切" if before and before.scene == shot.scene else "叠化"
     return shots
+
+
+# Join the lines of one speaker that sit next to each other in a shot.
+def _merge(shots: list[Shot]) -> None:
+    for shot in shots:
+        merged: list = []
+        for line in shot.audio:
+            last = merged[-1] if merged else None
+            if (
+                last is not None
+                and line.kind != "音效"
+                and last.kind == line.kind
+                and last.cast == line.cast
+            ):
+                last.text = _seam(last.text, line.text)
+                continue
+            merged.append(line)
+        shot.audio = merged
+
+
+# Put two printed pieces back together without leaving a gap.
+def _seam(first: str, second: str) -> str:
+    return first.rstrip() + second.lstrip()
+
+
+# Fill the spoken text of every line, rewriting the narration.
+def _spoken(
+    shots: list[Shot],
+    cast_book: BookCast,
+    llm: LLMClient,
+    cache: Cache | None,
+    book_id: str,
+) -> list[str]:
+    for shot in shots:
+        for line in shot.audio:
+            line.spoken = _clean(line.text)
+
+    if not any(line.kind == "旁白" for shot in shots for line in shot.audio):
+        return []
+
+    prompt = spoken_prompt(shots)
+    try:
+        fields = _ask(llm, prompt, [], cache, book_id, "spoken")
+    except (LLMError, ValueError) as exc:
+        return [str(exc)]
+
+    names = [member.name for member in cast_book.cast if member.name]
+    wanted = {
+        (shot.id, number): line
+        for shot in shots
+        for number, line in enumerate(shot.audio)
+        if line.kind == "旁白"
+    }
+    notes = []
+    for entry in fields.get("lines") or []:
+        if not isinstance(entry, dict):
+            continue
+        shot_id = str(entry.get("shot") or "").strip()
+        line = wanted.get((shot_id, _int(entry.get("index"))))
+        if line is None:
+            continue
+        spoken = _clean(str(entry.get("spoken") or ""))
+        if _keeps(line.text, spoken, names):
+            line.spoken = spoken
+        else:
+            notes.append(f"{shot_id} 的旁白改写不合格，用了原句")
+    return notes
+
+
+# Return the text as it should be read aloud.
+def _clean(text: str) -> str:
+    for mark in "“”『』「」":
+        text = text.replace(mark, "")
+    return " ".join(text.split())
+
+
+# Tell whether a rewrite keeps the facts the page states.
+def _keeps(original: str, rewritten: str, names: list[str]) -> bool:
+    if not rewritten.strip():
+        return False
+    share = len(rewritten) / max(1, len(original))
+    if not 0.7 <= share <= 1.3:
+        return False
+    if _numerals(original) != _numerals(rewritten):
+        return False
+    return all(name in rewritten for name in names if name in original)
+
+
+# Return the counting words of a text, sorted for comparison.
+def _numerals(text: str) -> list[str]:
+    return sorted(char for char in text if char in NUMERALS)
 
 
 # Match every sound back to the printed text, so nothing is paraphrased.

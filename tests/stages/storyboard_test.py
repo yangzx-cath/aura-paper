@@ -114,6 +114,21 @@ def make_book(root, pages):
     write_json("demo", "locations", places.to_dict(), root)
 
 
+# Reply with one plan and one narration rewrite.
+class TwoLLM(LLMClient):
+    def __init__(self, plan, spoken, model="fake-model"):
+        super().__init__("http://example/v1", "test-key", model)
+        self.plan = plan
+        self.spoken = spoken
+        self.calls = 0
+
+    def chat(self, prompt, *, images=None, json_mode=True, max_tokens=0):
+        self.calls += 1
+        if "朗读编剧" in prompt:
+            return json.dumps(self.spoken)
+        return json.dumps(self.plan)
+
+
 # Describe one shot as the model would write it.
 def shot(scene, page, index, **extra):
     entry = {
@@ -386,7 +401,7 @@ def test_reuses_the_cached_plan(tmp_path):
     first = storyboard("demo", llm=llm, root=tmp_path, cache=Cache(cache_dir))
     second = storyboard("demo", llm=llm, root=tmp_path, cache=Cache(cache_dir))
 
-    assert llm.calls == 1
+    assert llm.calls == 2
     assert [item.id for item in second[1].shots] == ["j1"]
     assert second[1].shots == first[1].shots
     assert (cache_dir / "storyboard" / "demo").is_dir()
@@ -431,3 +446,92 @@ def test_reads_the_thumbnail_images_it_sends(tmp_path):
     )
     # Two panels first, then the one character reference.
     assert thumbs == ["p000_0.jpg", "p000_1.jpg", "p000_f0.jpg"]
+
+
+def test_joins_neighbouring_lines_of_one_speaker(tmp_path):
+    make_book(tmp_path, [{"panels": [panel(FULL_BOX)]}])
+    reply = {
+        "scenes": [{"key": "A", "name": "搭积木", "location": "l1"}],
+        "shots": [
+            shot(
+                "A",
+                "p000.jpg",
+                0,
+                audio=[
+                    {"kind": "旁白", "text": "三块、", "cast": ""},
+                    {"kind": "旁白", "text": "四块、", "cast": ""},
+                    {"kind": "对白", "text": "还没倒！", "cast": "c1"},
+                    {"kind": "音效", "text": "阿嚏！", "cast": ""},
+                    {"kind": "旁白", "text": "五块、", "cast": ""},
+                ],
+            )
+        ],
+    }
+
+    _, shot_book = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+
+    kept = [(line.kind, line.text) for line in shot_book.shots[0].audio]
+    # The two counting lines join, the sound breaks the run.
+    assert kept == [
+        ("旁白", "三块、四块、"),
+        ("对白", "还没倒！"),
+        ("音效", "阿嚏！"),
+        ("旁白", "五块、"),
+    ]
+
+
+def test_rewrites_the_narration_and_cleans_the_dialogue(tmp_path):
+    printed = "花花放上小木门。“还没倒！”"
+    make_book(tmp_path, [{"panels": [panel(FULL_BOX, text=printed)]}])
+    plan = {
+        "scenes": [{"key": "A", "name": "搭积木", "location": "l1"}],
+        "shots": [
+            shot(
+                "A",
+                "p000.jpg",
+                0,
+                audio=[
+                    {"kind": "旁白", "text": "花花放上小木门。", "cast": ""},
+                    {"kind": "对白", "text": "“还没倒！”", "cast": "c1"},
+                ],
+            )
+        ],
+    }
+    spoken = {
+        "lines": [{"shot": "j1", "index": 0, "spoken": "花花把小木门放上去。"}]
+    }
+
+    _, shot_book = storyboard("demo", llm=TwoLLM(plan, spoken), root=tmp_path)
+
+    lines = shot_book.shots[0].audio
+    # The page keeps its own words, the voice reads the rewrite.
+    assert lines[0].text == "花花放上小木门。"
+    assert lines[0].spoken == "花花把小木门放上去。"
+    # Dialogue is not rewritten, only stripped of printing quotes.
+    assert lines[1].text == "“还没倒！”"
+    assert lines[1].spoken == "还没倒！"
+    assert shot_book.error == ""
+
+
+def test_falls_back_when_a_rewrite_changes_a_number(tmp_path):
+    make_book(tmp_path, [{"panels": [panel(FULL_BOX)]}])
+    plan = {
+        "scenes": [{"key": "A", "name": "搭积木", "location": "l1"}],
+        "shots": [
+            shot(
+                "A",
+                "p000.jpg",
+                0,
+                audio=[
+                    {"kind": "旁白", "text": "三块、", "cast": ""},
+                ],
+            )
+        ],
+    }
+    spoken = {"lines": [{"shot": "j1", "index": 0, "spoken": "很多块积木。"}]}
+
+    _, shot_book = storyboard("demo", llm=TwoLLM(plan, spoken), root=tmp_path)
+
+    line = shot_book.shots[0].audio[0]
+    assert line.spoken == "三块、"
+    assert "改写不合格" in shot_book.error

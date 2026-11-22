@@ -39,11 +39,17 @@ class AudioLine:
 
     kind: str = ""
     text: str = ""
+    spoken: str = ""
     cast: str = ""
 
     def to_dict(self) -> dict:
         """Return the external JSON shape of this sound."""
-        return {"kind": self.kind, "text": self.text, "cast": self.cast}
+        return {
+            "kind": self.kind,
+            "text": self.text,
+            "spoken": self.spoken,
+            "cast": self.cast,
+        }
 
     @classmethod
     def from_dict(cls, data: dict) -> AudioLine:
@@ -51,6 +57,7 @@ class AudioLine:
         return cls(
             kind=_kind(data.get("kind")),
             text=_text(data.get("text")),
+            spoken=_text(data.get("spoken")),
             cast=_text(data.get("cast")),
         )
 

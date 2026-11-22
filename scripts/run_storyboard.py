@@ -93,6 +93,7 @@ def main() -> int:
         print(_scene_line(scene, shot_book.shots))
     print()
     print(f"audio    {_kind_line(shot_book.shots)}")
+    print(f"spoken   {_spoken_line(shot_book.shots)}")
     print(f"join     {_join_line(shot_book.shots)}")
     print(f"unused   {_unused_line(args.book, root, shot_book)}")
     print()
@@ -121,6 +122,15 @@ def _kind_line(shots: list[Shot]) -> str:
         for line in shot.audio:
             counts[line.kind] = counts.get(line.kind, 0) + 1
     return "  ".join(f"{kind} {count}" for kind, count in counts.items())
+
+
+# Count the lines, and how many differ from what the page prints.
+def _spoken_line(shots: list[Shot]) -> str:
+    lines = [line for shot in shots for line in shot.audio]
+    rewritten = sum(
+        1 for line in lines if line.spoken and line.spoken != line.text
+    )
+    return f"{len(lines)} lines, {rewritten} rewritten"
 
 
 # Count the shots per join.
