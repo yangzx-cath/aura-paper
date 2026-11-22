@@ -6,10 +6,10 @@ run reuses the cache and skips the model calls.
 
 Usage:
     export LLM_API_KEY=sk-xxx
-    python scripts/run_understand.py <book_id> [--no-cache] [--workers N]
-    python scripts/run_understand.py <book_id> --effort high
-    python scripts/run_understand.py <book_id> --dump-prompt 0
-    python scripts/run_understand.py <book_id> --dump-prompt 1
+    python scripts/run_understand_v1.py <book_id> [--no-cache] [--workers N]
+    python scripts/run_understand_v1.py <book_id> --effort high
+    python scripts/run_understand_v1.py <book_id> --dump-prompt 0
+    python scripts/run_understand_v1.py <book_id> --dump-prompt 1
 """
 
 import argparse
@@ -39,7 +39,7 @@ def main() -> int:
     )
     parser.add_argument(
         "book",
-        help="book id from run_pdf.py, the PDF name without suffix",
+        help="book id from run_pdf_v1.py, the PDF name without suffix",
     )
     parser.add_argument(
         "--no-cache",
@@ -70,7 +70,7 @@ def main() -> int:
     book_path = out_root() / args.book / "pages.json"
     if not book_path.is_file():
         print(f"missing {book_path}", file=sys.stderr)
-        print("start with run_split.py", file=sys.stderr)
+        print("start with run_split_v1.py", file=sys.stderr)
         return 2
 
     book = Book.from_dict(json.loads(book_path.read_text(encoding="utf-8")))

@@ -4,8 +4,8 @@ Renders a PDF into page images, reads whatever text layer it has, and
 writes book.json for the next stage.
 
 Usage:
-    python scripts/run_pdf.py <book.pdf>
-    python scripts/run_pdf.py <book.pdf> --dpi 150 --quality 90
+    python scripts/run_pdf_v1.py <book.pdf>
+    python scripts/run_pdf_v1.py <book.pdf> --dpi 150 --quality 90
 """
 
 import argparse

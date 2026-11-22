@@ -6,10 +6,10 @@ clip per page into out/<book>/clips/, and records the set in clips.json.
 Usage:
     export AURA_VIDEO_PROVIDER=seedance
     export ARK_API_KEY=...
-    python scripts/run_clips.py <book_id>
-    python scripts/run_clips.py <book_id> --page 1
-    python scripts/run_clips.py <book_id> --duration 8
-    python scripts/run_clips.py <book_id> --dump-prompt 1
+    python scripts/run_clips_v1.py <book_id>
+    python scripts/run_clips_v1.py <book_id> --page 1
+    python scripts/run_clips_v1.py <book_id> --duration 8
+    python scripts/run_clips_v1.py <book_id> --dump-prompt 1
 """
 
 import argparse
@@ -37,7 +37,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run the clips stage.")
     parser.add_argument(
         "book",
-        help="book id from run_pdf.py, the PDF name without suffix",
+        help="book id from run_pdf_v1.py, the PDF name without suffix",
     )
     parser.add_argument(
         "--page",
@@ -91,8 +91,8 @@ def main() -> int:
         if not path.is_file():
             print(f"missing {path}", file=sys.stderr)
             print(
-                "start with run_understand.py, run_story.py and "
-                "run_screenplay.py",
+                "start with run_understand_v1.py, run_story_v1.py and "
+                "run_screenplay_v1.py",
                 file=sys.stderr,
             )
             return 2

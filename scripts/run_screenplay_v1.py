@@ -5,10 +5,10 @@ every story page to screenplay.json.
 
 Usage:
     export LLM_API_KEY=sk-xxx
-    python scripts/run_screenplay.py <book_id>
-    python scripts/run_screenplay.py <book_id> --workers 4
-    python scripts/run_screenplay.py <book_id> --effort high
-    python scripts/run_screenplay.py <book_id> --dump-prompt 1 > prompt.txt
+    python scripts/run_screenplay_v1.py <book_id>
+    python scripts/run_screenplay_v1.py <book_id> --workers 4
+    python scripts/run_screenplay_v1.py <book_id> --effort high
+    python scripts/run_screenplay_v1.py <book_id> --dump-prompt 1 > prompt.txt
 """
 
 import argparse
@@ -33,7 +33,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run the screenplay stage.")
     parser.add_argument(
         "book",
-        help="book id from run_pdf.py, the PDF name without suffix",
+        help="book id from run_pdf_v1.py, the PDF name without suffix",
     )
     parser.add_argument(
         "--workers",
@@ -68,7 +68,7 @@ def main() -> int:
         if not path.is_file():
             print(f"missing {path}", file=sys.stderr)
             print(
-                "start with run_understand.py and run_story.py",
+                "start with run_understand_v1.py and run_story_v1.py",
                 file=sys.stderr,
             )
             return 2

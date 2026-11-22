@@ -5,10 +5,10 @@ story.json next to it.
 
 Usage:
     export LLM_API_KEY=sk-xxx
-    python scripts/run_story.py <book_id>
-    python scripts/run_story.py <book_id> --no-cache
-    python scripts/run_story.py <book_id> --effort high
-    python scripts/run_story.py <book_id> --dump-prompt > prompt.txt
+    python scripts/run_story_v1.py <book_id>
+    python scripts/run_story_v1.py <book_id> --no-cache
+    python scripts/run_story_v1.py <book_id> --effort high
+    python scripts/run_story_v1.py <book_id> --dump-prompt > prompt.txt
 """
 
 import argparse
@@ -33,7 +33,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run the story stage.")
     parser.add_argument(
         "book",
-        help="book id from run_pdf.py, the PDF name without suffix",
+        help="book id from run_pdf_v1.py, the PDF name without suffix",
     )
     parser.add_argument(
         "--no-cache",
@@ -57,7 +57,7 @@ def main() -> int:
     source = out_root() / args.book / "content.json"
     if not source.is_file():
         print(f"missing {source}", file=sys.stderr)
-        print("start with run_understand.py", file=sys.stderr)
+        print("start with run_understand_v1.py", file=sys.stderr)
         return 2
 
     data = json.loads(source.read_text(encoding="utf-8"))
