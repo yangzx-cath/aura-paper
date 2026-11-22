@@ -1,8 +1,8 @@
-"""Group the figure crops into characters for one book.
+"""Build the reference images for one book's cast and places.
 
-Reads out/<book>/understand.json, keeps the figures that can stand alone
-as a reference image, crops them, and asks the model which crops show the
-same character.
+Reads out/<book>/understand.json, crops the figures that can stand alone,
+asks the model which crops show the same character, then asks which panels
+share a place. Writes cast.json and locations.json.
 
 Usage:
     python scripts/run_assets.py C01
@@ -28,7 +28,9 @@ DEFAULT_EFFORT = "low"
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Group figure crops.")
+    parser = argparse.ArgumentParser(
+        description="Build the cast and place reference images."
+    )
     parser.add_argument("book", help="book id produced by run_understand.py")
     parser.add_argument(
         "--root",
@@ -69,7 +71,7 @@ def main() -> int:
     print(f"root    {root}")
     print(f"cache   {cache.root}  enabled={cache.enabled}")
     print()
-    print("Grouping the figure crops", flush=True)
+    print("Building the reference images", flush=True)
 
     started = time.perf_counter()
 
