@@ -18,6 +18,16 @@ def panels_dir(book_id: str, root: str | Path | None = None) -> Path:
     return book_dir(book_id, root) / "panels"
 
 
+def figures_dir(book_id: str, root: str | Path | None = None) -> Path:
+    """Return the folder holding one image per figure candidate."""
+    return book_dir(book_id, root) / "figures"
+
+
 def panel_name(page_name: str, index: int) -> str:
     """Return the panel image name for one page image name."""
     return f"{Path(page_name).stem}_{index}.jpg"
+
+
+def figure_name(page_name: str, index: int) -> str:
+    """Return the figure image name for one page image name."""
+    return f"{Path(page_name).stem}_f{index}.jpg"
