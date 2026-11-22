@@ -3,7 +3,7 @@ import random
 from PIL import Image, ImageDraw
 
 from aura_paper.media.image import (
-    crop_percent,
+    crop_box,
     save_jpeg,
     stitch_side_by_side,
 )
@@ -22,7 +22,7 @@ def test_stitches_crops_and_saves(tmp_path):
     whole = stitch_side_by_side(left, right)
     assert whole.size == (200, 150)
 
-    half = crop_percent(whole, (50, 0, 100, 100))
+    half = crop_box(whole, (500, 0, 1000, 1000))
     assert half.size == (100, 150)
 
     size = save_jpeg(half, tmp_path / "out" / "half.jpg", 92)
