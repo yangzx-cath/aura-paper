@@ -11,7 +11,7 @@ from typing import Callable
 from .cache import Cache, file_fingerprint, fingerprint
 from .config import out_root
 from .output import write_json
-from .prompts import clip_prompt
+from .prompts1 import clip_prompt
 from .references import reference_path
 from .screenplay import PageScene, Screenplay
 from .story import Story

@@ -17,7 +17,7 @@ from .cache import Cache, file_fingerprint, fingerprint
 from .llm import LLMClient, LLMError
 from .output import write_json
 from .pdf import IMAGE_QUALITY
-from .prompts import split_prompt
+from .prompts1 import split_prompt
 from .utils import IMAGE_SUFFIXES, extract_json
 
 # Two pages side by side are about twice as wide as one page.

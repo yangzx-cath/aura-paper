@@ -23,7 +23,7 @@ from threading import Lock
 from aura_paper.cache import Cache
 from aura_paper.clips import VideoClip, build_clips, save_clips
 from aura_paper.config import cache_root, load_env, out_root
-from aura_paper.prompts import clip_prompt
+from aura_paper.prompts1 import clip_prompt
 from aura_paper.providers import make_video_client
 from aura_paper.references import reference_path
 from aura_paper.screenplay import Screenplay

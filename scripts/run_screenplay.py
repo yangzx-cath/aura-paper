@@ -21,7 +21,7 @@ from threading import Lock
 from aura_paper.cache import Cache
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.llm import LLMClient
-from aura_paper.prompts import screenplay_prompt
+from aura_paper.prompts1 import screenplay_prompt
 from aura_paper.screenplay import PageScene, build_screenplay, save_screenplay
 from aura_paper.story import Story
 from aura_paper.understand import BookContent, PageContent

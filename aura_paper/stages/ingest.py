@@ -25,7 +25,7 @@ from ..media.pdf import (
     render_pdf,
 )
 from ..output import write_json
-from ..prompts import split_prompt
+from ..prompts1 import split_prompt
 from ..schema.book import Book, Page
 from ..utils import extract_json
 

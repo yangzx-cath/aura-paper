@@ -5,7 +5,7 @@ import pytest
 from aura_paper.cache import Cache
 from aura_paper.clips import VideoClip, build_clips, clip_path, generate_clip
 from aura_paper.minimax import MiniMaxError, VideoTask
-from aura_paper.prompts import clip_prompt
+from aura_paper.prompts1 import clip_prompt
 from aura_paper.references import reference_path
 from aura_paper.screenplay import PageScene, Screenplay
 from aura_paper.story import Story

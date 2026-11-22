@@ -3,7 +3,7 @@ from pathlib import Path
 
 from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient, LLMError
-from aura_paper.prompts import story_prompt
+from aura_paper.prompts1 import story_prompt
 from aura_paper.story import (
     Cast,
     PageCast,

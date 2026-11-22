@@ -8,7 +8,7 @@ from pathlib import Path
 from .cache import Cache, fingerprint
 from .llm import LLMClient, LLMError
 from .output import write_json
-from .prompts import story_prompt
+from .prompts1 import story_prompt
 from .understand import BookContent, PageContent
 from .utils import extract_json, now_iso
 

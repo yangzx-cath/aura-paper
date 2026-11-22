@@ -14,7 +14,7 @@ from .book import Book, Page
 from .cache import Cache, file_fingerprint, fingerprint
 from .llm import LLMClient, LLMError
 from .output import write_json
-from .prompts import cover_prompt, page_prompt
+from .prompts1 import cover_prompt, page_prompt
 from .utils import extract_json, now_iso
 
 

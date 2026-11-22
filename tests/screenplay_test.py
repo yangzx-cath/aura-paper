@@ -2,7 +2,7 @@ import json
 
 from aura_paper.cache import Cache
 from aura_paper.llm import LLMClient, LLMError
-from aura_paper.prompts import screenplay_prompt
+from aura_paper.prompts1 import screenplay_prompt
 from aura_paper.screenplay import (
     Line,
     PageScene,

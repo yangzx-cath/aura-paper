@@ -12,7 +12,7 @@ from typing import Callable
 from .cache import Cache, fingerprint
 from .llm import LLMClient, LLMError
 from .output import write_json
-from .prompts import page_characters, screenplay_prompt
+from .prompts1 import page_characters, screenplay_prompt
 from .story import Story
 from .understand import BookContent, PageContent
 from .utils import extract_json, now_iso

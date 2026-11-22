@@ -21,7 +21,7 @@ from aura_paper.book import Book
 from aura_paper.cache import Cache
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.llm import LLMClient
-from aura_paper.prompts import story_prompt
+from aura_paper.prompts1 import story_prompt
 from aura_paper.references import ReferenceImage, save_references
 from aura_paper.story import Story, build_story, save_story
 from aura_paper.understand import BookContent

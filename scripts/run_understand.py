@@ -23,7 +23,7 @@ from aura_paper.book import Book, Page
 from aura_paper.cache import Cache
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.llm import LLMClient
-from aura_paper.prompts import cover_prompt, page_prompt
+from aura_paper.prompts1 import cover_prompt, page_prompt
 from aura_paper.understand import (
     PageContent,
     save_content,
