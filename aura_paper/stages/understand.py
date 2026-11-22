@@ -146,7 +146,7 @@ def _ask_page(
 def _apply_fields(content: PageContent, fields: dict) -> None:
     parsed = PageContent.from_dict(fields)
     content.page_text = parsed.page_text
-    content.footer = parsed.footer
+    content.meta_text = parsed.meta_text
     content.description = parsed.description
     content.figures = parsed.figures
     content.uncertain = parsed.uncertain
@@ -156,7 +156,7 @@ def _apply_fields(content: PageContent, fields: dict) -> None:
 def _page_fields(content: PageContent) -> dict:
     return {
         "page_text": content.page_text,
-        "footer": content.footer,
+        "meta_text": content.meta_text,
         "description": content.description,
         "figures": [figure.to_dict() for figure in content.figures],
         "uncertain": content.uncertain,

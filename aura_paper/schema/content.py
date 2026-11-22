@@ -97,7 +97,7 @@ class PageContent:
     filename: str
     kind: str = "portrait"
     page_text: str = ""
-    footer: str = ""
+    meta_text: str = ""
     description: str = ""
     figures: list[Figure] = field(default_factory=list)
     uncertain: list[str] = field(default_factory=list)
@@ -113,7 +113,7 @@ class PageContent:
             "model": self.model,
             "generated_at": now_iso(),
             "page_text": self.page_text,
-            "footer": self.footer,
+            "meta_text": self.meta_text,
             "description": self.description,
             "figures": [figure.to_dict() for figure in self.figures],
             "uncertain": self.uncertain,
@@ -128,7 +128,7 @@ class PageContent:
             filename=str(data.get("filename") or ""),
             kind=str(data.get("kind") or "portrait"),
             page_text=str(data.get("page_text") or ""),
-            footer=str(data.get("footer") or ""),
+            meta_text=str(data.get("meta_text") or ""),
             description=str(data.get("description") or ""),
             figures=_figure_list(data.get("figures")),
             uncertain=_text_list(data.get("uncertain")),

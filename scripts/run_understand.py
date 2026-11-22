@@ -70,7 +70,7 @@ def main() -> int:
     print(f"workers {args.workers}")
     print(f"cache   {cache.root}  enabled={cache.enabled}")
     print()
-    print("Reading every page", flush=True)
+    print("Understanding every page", flush=True)
 
     started = time.perf_counter()
     content = understand(

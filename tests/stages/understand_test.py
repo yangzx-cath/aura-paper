@@ -15,7 +15,7 @@ REPLY = json.dumps(
         "illustrator": "",
         "description": "封面",
         "page_text": "文字",
-        "footer": "",
+        "meta_text": "阅读指导",
         "figures": [],
         "uncertain": [],
     }
@@ -60,5 +60,6 @@ def test_reads_the_cover_and_one_page(tmp_path):
     assert content.title == "测试绘本"
     assert [page.kind for page in content.pages] == ["landscape", "portrait"]
     assert content.failed_count == 0
+    assert content.pages[1].meta_text == "阅读指导"
     assert llm.calls == 2
     assert (tmp_path / "demo" / "understand.json").is_file()
