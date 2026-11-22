@@ -1,4 +1,4 @@
-"""Pick the figure crops that later become character references."""
+"""Pick the cast and place reference images."""
 
 from __future__ import annotations
 
@@ -13,8 +13,9 @@ from ..clients.llm import LLMClient, LLMError
 from ..media.image import crop_box, load_image, save_jpeg
 from ..output import write_json
 from ..prompts import cast_prompt, location_prompt
-from ..schema.assets import Assets, FigurePick
+from ..schema.cast import BookCast, FigurePick
 from ..schema.content import BookContent, Figure, PageContent
+from ..schema.location import BookLocations
 from ..utils import extract_json
 from .paths import (
     book_dir,
@@ -70,24 +71,26 @@ def assets(
     llm: LLMClient,
     root: str | Path | None = None,
     cache: Cache | None = None,
-) -> Assets:
-    """Group the figure crops into characters and write assets.json."""
+) -> tuple[BookCast, BookLocations]:
+    """Read understand.json, build the reference images, write two files."""
     directory = book_dir(book_id, root)
     pages = _read_content(directory).pages
     picks = pick_figures(book_id, root=root)
-    result = Assets(id=book_id, model=llm.model)
+    cast_book = BookCast(id=book_id, model=llm.model)
+    places = BookLocations(id=book_id, model=llm.model)
     if picks:
-        _fill(result, llm, pages, picks, cache, book_id, root)
+        _fill(cast_book, llm, pages, picks, cache, book_id, root)
     full = _full_panels(pages)
     if full:
-        _fill_locations(result, llm, pages, full, cache, book_id, root)
-    write_json(book_id, "assets", result.to_dict(), root)
-    return result
+        _fill_locations(places, llm, pages, full, cache, book_id, root)
+    write_json(book_id, "cast", cast_book.to_dict(), root)
+    write_json(book_id, "locations", places.to_dict(), root)
+    return cast_book, places
 
 
 # Ask the model which crops show the same character, then fill the result.
 def _fill(
-    result: Assets,
+    result: BookCast,
     llm: LLMClient,
     pages: list[PageContent],
     picks: list[FigurePick],
@@ -121,7 +124,7 @@ def _full_panels(pages: list[PageContent]) -> list[tuple[str, int, str]]:
 
 # Ask the model which panels share a place, then fill the result.
 def _fill_locations(
-    result: Assets,
+    result: BookLocations,
     llm: LLMClient,
     pages: list[PageContent],
     full: list[tuple[str, int, str]],
@@ -137,11 +140,15 @@ def _fill_locations(
         result.error = _joined(result.error, str(exc))
         return
     _apply_locations(result, fields, pages, full)
+    if not result.locations:
+        result.error = _joined(result.error, "model returned no location")
+    if not result.style:
+        result.error = _joined(result.error, "model returned no style")
 
 
 # Turn the place answer into locations and a place for every panel.
 def _apply_locations(
-    result: Assets,
+    result: BookLocations,
     fields: dict,
     pages: list[PageContent],
     full: list[tuple[str, int, str]],
@@ -176,7 +183,7 @@ def _apply_locations(
         owners[(page_name, index)] = ids.get(key, "")
 
     result.style = str(fields.get("style") or "").strip()
-    parsed = Assets.from_dict(
+    parsed = BookLocations.from_dict(
         {
             "locations": entries,
             "panel_locations": [
@@ -230,7 +237,7 @@ def _key(images: list[Path], prompt: str, llm: LLMClient) -> str:
 
 # Turn the answer into characters, crop owners and resolutions.
 def _apply(
-    result: Assets,
+    result: BookCast,
     fields: dict,
     picks: list[FigurePick],
 ) -> None:
@@ -262,7 +269,7 @@ def _apply(
         key = str(entry.get("key") or "").strip()
         owners[str(entry.get("file") or "").strip()] = ids.get(key, "")
 
-    parsed = Assets.from_dict(
+    parsed = BookCast.from_dict(
         {
             "cast": members,
             "figure_cast": [

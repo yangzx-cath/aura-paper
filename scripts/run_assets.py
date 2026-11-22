@@ -17,7 +17,8 @@ from pathlib import Path
 from aura_paper.cache import Cache
 from aura_paper.clients.llm import LLMClient
 from aura_paper.config import cache_root, load_env, out_root
-from aura_paper.schema.assets import Cast, Location
+from aura_paper.schema.cast import Cast
+from aura_paper.schema.location import Location
 from aura_paper.stages.assets import assets
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,28 +73,29 @@ def main() -> int:
 
     started = time.perf_counter()
 
-    result = assets(args.book, llm=llm, root=root, cache=cache)
+    cast_book, places = assets(args.book, llm=llm, root=root, cache=cache)
     elapsed = time.perf_counter() - started
 
     print()
-    print(f"cast     {len(result.cast)}")
-    print(f"crops    {len(result.figure_cast)}")
-    print(f"resolved {len(result.resolved)}  open {len(result.open)}")
-    for member in result.cast:
+    print(f"cast     {len(cast_book.cast)}")
+    print(f"crops    {len(cast_book.figure_cast)}")
+    print(f"resolved {len(cast_book.resolved)}  open {len(cast_book.open)}")
+    for member in cast_book.cast:
         print(_cast_line(member))
-    loose = sum(1 for item in result.panel_locations if not item.location)
+    loose = sum(1 for item in places.panel_locations if not item.location)
     print()
-    print(f"style    {result.style}")
-    print(f"places   {len(result.locations)}  unplaced {loose}")
-    for location in result.locations:
+    print(f"style    {places.style}")
+    print(f"places   {len(places.locations)}  unplaced {loose}")
+    for location in places.locations:
         print(_location_line(location))
     print()
     print(f"total    {elapsed:.1f}s")
-    print(f"output   {root / args.book / 'assets.json'}")
-    if result.error:
-        print(f"error    {result.error}", file=sys.stderr)
-        return 1
-    return 0
+    print(f"output   {root / args.book / 'cast.json'}")
+    print(f"output   {root / args.book / 'locations.json'}")
+    errors = [text for text in (cast_book.error, places.error) if text]
+    for text in errors:
+        print(f"error    {text}", file=sys.stderr)
+    return 1 if errors else 0
 
 
 # Print one character with the crops chosen for it.

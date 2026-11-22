@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..schema.assets import FigurePick
+from ..schema.cast import FigurePick
 from ..schema.content import PageContent
 
 # Words that mark an uncertainty as being about who someone is.

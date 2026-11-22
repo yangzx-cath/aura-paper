@@ -150,26 +150,28 @@ def test_groups_crops_into_cast_and_locations(tmp_path):
     make_book(tmp_path, pages)
     llm = FakeLLM(CAST, LOCATIONS)
 
-    result = assets("demo", llm=llm, root=tmp_path)
+    cast_book, places = assets("demo", llm=llm, root=tmp_path)
 
-    assert [member.id for member in result.cast] == ["c1"]
-    assert result.cast[0].name == "小满"
+    assert [member.id for member in cast_book.cast] == ["c1"]
+    assert cast_book.cast[0].name == "小满"
     # The rank order puts p000_f1.jpg first, the model pick moves it back.
-    assert result.cast[0].pictures == ["p000_f0.jpg", "p000_f1.jpg"]
-    assert result.resolved[0].answer == "小满"
-    owners = sorted((item.file, item.cast) for item in result.figure_cast)
+    assert cast_book.cast[0].pictures == ["p000_f0.jpg", "p000_f1.jpg"]
+    assert cast_book.resolved[0].answer == "小满"
+    owners = sorted((item.file, item.cast) for item in cast_book.figure_cast)
     assert owners == [
         ("p000_f0.jpg", "c1"),
         ("p000_f1.jpg", "c1"),
     ]
     # p000_1.jpg is a close-up, so it cannot be a place master.
-    assert [place.master for place in result.locations] == [
+    assert [place.master for place in places.locations] == [
         "p000_0.jpg",
         "",
     ]
-    places = [(item.panel, item.location) for item in result.panel_locations]
-    assert places == [(0, "l1"), (1, "l2")]
-    assert result.style == "水彩"
+    owned = [(item.panel, item.location) for item in places.panel_locations]
+    assert owned == [(0, "l1"), (1, "l2")]
+    assert places.style == "水彩"
+    assert (tmp_path / "demo" / "cast.json").is_file()
+    assert (tmp_path / "demo" / "locations.json").is_file()
     assert llm.calls == 2
 
 
@@ -243,23 +245,30 @@ def test_keeps_two_pictures_and_ignores_a_pick_it_does_not_own(tmp_path):
     }
     llm = FakeLLM(reply)
 
-    result = assets("demo", llm=llm, root=tmp_path)
+    cast_book, _ = assets("demo", llm=llm, root=tmp_path)
 
     # A owns three crops, so only its two best stay.
-    assert [member.id for member in result.cast] == ["c1", "c2"]
-    assert result.cast[0].pictures == ["p000_f0.jpg", "p000_f1.jpg"]
-    assert result.cast[1].pictures == ["p001_f0.jpg"]
+    assert [member.id for member in cast_book.cast] == ["c1", "c2"]
+    assert cast_book.cast[0].pictures == ["p000_f0.jpg", "p000_f1.jpg"]
+    assert cast_book.cast[1].pictures == ["p001_f0.jpg"]
 
 
-def test_records_a_failed_call_and_still_writes_assets(tmp_path):
-    pages = [{"figures": [figure([0, 0, 300, 700])]}]
+def test_records_a_failed_call_in_both_files(tmp_path):
+    pages = [
+        {
+            "panels": [{"box": [0, 0, 800, 800], "description": "客厅"}],
+            "figures": [figure([0, 0, 300, 700])],
+        }
+    ]
     make_book(tmp_path, pages)
 
-    result = assets("demo", llm=BrokenLLM(), root=tmp_path)
+    cast_book, places = assets("demo", llm=BrokenLLM(), root=tmp_path)
 
-    assert "endpoint down" in result.error
-    assert result.cast == []
-    assert (tmp_path / "demo" / "assets.json").is_file()
+    assert "endpoint down" in cast_book.error
+    assert "endpoint down" in places.error
+    assert cast_book.cast == []
+    assert (tmp_path / "demo" / "cast.json").is_file()
+    assert (tmp_path / "demo" / "locations.json").is_file()
 
 
 def test_reports_an_empty_cast(tmp_path):
@@ -267,22 +276,25 @@ def test_reports_an_empty_cast(tmp_path):
     make_book(tmp_path, pages)
     llm = FakeLLM({"cast": []})
 
-    result = assets("demo", llm=llm, root=tmp_path)
+    cast_book, _ = assets("demo", llm=llm, root=tmp_path)
 
-    assert result.cast == []
-    assert result.error == "model returned no cast"
+    assert cast_book.cast == []
+    assert cast_book.error == "model returned no cast"
 
 
-def test_writes_empty_assets_for_a_book_without_content(tmp_path):
+def test_writes_empty_files_for_a_book_without_content(tmp_path):
     make_book(tmp_path, [{}])
     llm = FakeLLM(CAST)
 
-    result = assets("demo", llm=llm, root=tmp_path)
+    cast_book, places = assets("demo", llm=llm, root=tmp_path)
 
     assert llm.calls == 0
-    assert result.cast == []
-    assert result.locations == []
-    assert result.error == ""
+    assert cast_book.cast == []
+    assert places.locations == []
+    assert cast_book.error == ""
+    assert places.error == ""
+    assert (tmp_path / "demo" / "cast.json").is_file()
+    assert (tmp_path / "demo" / "locations.json").is_file()
 
 
 def test_reuses_the_cached_answer(tmp_path):
@@ -291,8 +303,8 @@ def test_reuses_the_cached_answer(tmp_path):
     llm = FakeLLM(CAST)
     cache_dir = tmp_path / "cache"
 
-    first = assets("demo", llm=llm, root=tmp_path, cache=Cache(cache_dir))
-    second = assets("demo", llm=llm, root=tmp_path, cache=Cache(cache_dir))
+    first, _ = assets("demo", llm=llm, root=tmp_path, cache=Cache(cache_dir))
+    second, _ = assets("demo", llm=llm, root=tmp_path, cache=Cache(cache_dir))
 
     assert llm.calls == 1
     assert second.error == ""
@@ -308,14 +320,16 @@ def test_asks_again_when_the_model_changes(tmp_path):
     other = FakeLLM(CAST, model="other-model")
 
     assets("demo", llm=first, root=tmp_path, cache=Cache(cache_dir))
-    result = assets("demo", llm=other, root=tmp_path, cache=Cache(cache_dir))
+    cast_book, _ = assets(
+        "demo", llm=other, root=tmp_path, cache=Cache(cache_dir)
+    )
 
     assert first.calls == 1
     assert other.calls == 1
-    assert result.model == "other-model"
+    assert cast_book.model == "other-model"
 
 
-def test_joins_the_two_errors(tmp_path):
+def test_records_each_error_in_its_own_file(tmp_path):
     pages = [
         {
             "panels": [{"box": [0, 0, 800, 800], "description": "客厅"}],
@@ -324,10 +338,10 @@ def test_joins_the_two_errors(tmp_path):
     ]
     make_book(tmp_path, pages)
 
-    result = assets("demo", llm=BrokenLLM(), root=tmp_path)
+    cast_book, places = assets("demo", llm=BrokenLLM(), root=tmp_path)
 
-    assert result.error.count("endpoint down") == 2
-    assert "；" in result.error
+    assert cast_book.error == "endpoint down"
+    assert places.error == "endpoint down"
 
 
 def test_keeps_the_cast_when_only_the_place_call_fails(tmp_path):
@@ -339,21 +353,26 @@ def test_keeps_the_cast_when_only_the_place_call_fails(tmp_path):
     ]
     make_book(tmp_path, pages)
 
-    result = assets("demo", llm=PlacesBrokenLLM(CAST), root=tmp_path)
+    cast_book, places = assets(
+        "demo", llm=PlacesBrokenLLM(CAST), root=tmp_path
+    )
 
-    assert [member.name for member in result.cast] == ["小满"]
-    assert result.locations == []
-    assert result.error == "locations down"
+    assert [member.name for member in cast_book.cast] == ["小满"]
+    assert cast_book.error == ""
+    assert places.locations == []
+    assert places.error == "locations down"
 
 
 def test_records_a_reply_that_is_not_json(tmp_path):
     pages = [{"figures": [figure([0, 0, 300, 700])]}]
     make_book(tmp_path, pages)
 
-    result = assets("demo", llm=RawLLM("抱歉，我看不清。"), root=tmp_path)
+    cast_book, _ = assets(
+        "demo", llm=RawLLM("抱歉，我看不清。"), root=tmp_path
+    )
 
-    assert result.cast == []
-    assert "no JSON object found" in result.error
+    assert cast_book.cast == []
+    assert "no JSON object found" in cast_book.error
 
 
 def test_reads_panel_numbers_and_leaves_unknown_places_empty(tmp_path):
@@ -387,12 +406,12 @@ def test_reads_panel_numbers_and_leaves_unknown_places_empty(tmp_path):
         "style": " 水彩 ",
     }
 
-    result = assets("demo", llm=FakeLLM({}, reply), root=tmp_path)
+    _, places = assets("demo", llm=FakeLLM({}, reply), root=tmp_path)
 
-    places = [(item.panel, item.location) for item in result.panel_locations]
-    assert places == [(0, "l1"), (1, ""), (2, "")]
-    assert result.locations[0].master == ""
-    assert result.style == "水彩"
+    owned = [(item.panel, item.location) for item in places.panel_locations]
+    assert owned == [(0, "l1"), (1, ""), (2, "")]
+    assert places.locations[0].master == ""
+    assert places.style == "水彩"
 
 
 def test_leaves_a_crop_of_an_unknown_character_unowned(tmp_path):
@@ -403,21 +422,23 @@ def test_leaves_a_crop_of_an_unknown_character_unowned(tmp_path):
         "figure_cast": [{"file": "p000_f0.jpg", "key": "没这个标签"}],
     }
 
-    result = assets("demo", llm=FakeLLM(reply), root=tmp_path)
+    cast_book, _ = assets("demo", llm=FakeLLM(reply), root=tmp_path)
 
-    assert result.figure_cast[0].cast == ""
-    assert result.cast[0].pictures == []
-    assert result.unpictured == result.cast
+    assert cast_book.figure_cast[0].cast == ""
+    assert cast_book.cast[0].pictures == []
+    assert cast_book.unpictured == cast_book.cast
 
 
 def test_reports_an_empty_place_list(tmp_path):
     pages = [{"panels": [{"box": [0, 0, 800, 800], "description": "客厅"}]}]
     make_book(tmp_path, pages)
 
-    result = assets("demo", llm=FakeLLM({}, {"style": "水彩"}), root=tmp_path)
+    _, places = assets(
+        "demo", llm=FakeLLM({}, {"style": "水彩"}), root=tmp_path
+    )
 
-    assert result.locations == []
-    assert result.error == "model returned no location"
+    assert places.locations == []
+    assert places.error == "model returned no location"
 
 
 def test_reports_an_empty_style(tmp_path):
@@ -428,13 +449,13 @@ def test_reports_an_empty_style(tmp_path):
         "panel_locations": [{"page": "p000.jpg", "panel": 0, "key": "L1"}],
     }
 
-    result = assets("demo", llm=FakeLLM({}, reply), root=tmp_path)
+    _, places = assets("demo", llm=FakeLLM({}, reply), root=tmp_path)
 
-    assert result.locations[0].id == "l1"
-    assert result.error == "model returned no style"
+    assert places.locations[0].id == "l1"
+    assert places.error == "model returned no style"
 
 
-def test_keeps_the_cast_error_when_the_places_also_fail(tmp_path):
+def test_reports_the_place_errors_on_their_own(tmp_path):
     pages = [
         {
             "panels": [{"box": [0, 0, 800, 800], "description": "客厅"}],
@@ -443,9 +464,11 @@ def test_keeps_the_cast_error_when_the_places_also_fail(tmp_path):
     ]
     make_book(tmp_path, pages)
 
-    result = assets("demo", llm=FakeLLM({"cast": []}, {}), root=tmp_path)
+    cast_book, places = assets(
+        "demo", llm=FakeLLM({"cast": []}, {}), root=tmp_path
+    )
 
-    assert result.error == (
-        "model returned no cast；model returned no location；"
-        "model returned no style"
+    assert cast_book.error == "model returned no cast"
+    assert places.error == (
+        "model returned no location；model returned no style"
     )
