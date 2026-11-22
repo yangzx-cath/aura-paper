@@ -16,7 +16,7 @@ from ..output import write_json
 from ..prompts import cover_prompt, page_prompt
 from ..schema.book import Book as IngestBook
 from ..schema.book import Page as IngestPage
-from ..schema.content import BookContent, CoverContent, PageContent
+from ..schema.content import BookContent, CoverContent, PageContent, Panel
 from ..utils import extract_json
 from .paths import book_dir, panel_name, panels_dir
 
@@ -143,7 +143,7 @@ def _ask_page(
         return content
 
     _apply_fields(content, fields)
-    if not content.page_text and not content.panels:
+    if not content.panels and not content.meta_text:
         content.error = "model returned no content"
     return content
 
@@ -151,19 +151,23 @@ def _ask_page(
 # Copy the model fields, turning missing or null values into empty strings.
 def _apply_fields(content: PageContent, fields: dict) -> None:
     parsed = PageContent.from_dict(fields)
-    content.page_text = parsed.page_text
     content.meta_text = parsed.meta_text
     content.place = parsed.place
     content.light = parsed.light
     content.panels = parsed.panels
     content.figures = parsed.figures
     content.uncertain = parsed.uncertain
+    content.page_text = _panel_text(parsed.panels)
+
+
+# Join the panel texts, which are the only copy of the story words.
+def _panel_text(panels: list[Panel]) -> str:
+    return "\n".join(panel.text for panel in panels if panel.text)
 
 
 # Read the model's figures and notes into the page shape.
 def _page_fields(content: PageContent) -> dict:
     return {
-        "page_text": content.page_text,
         "meta_text": content.meta_text,
         "place": content.place,
         "light": content.light,

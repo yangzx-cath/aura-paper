@@ -14,7 +14,6 @@ REPLY = json.dumps(
         "author": "作者",
         "illustrator": "",
         "description": "封面",
-        "page_text": "文字",
         "meta_text": "阅读指导",
         "place": "菜园",
         "light": "白天，阳光明媚",
@@ -81,6 +80,7 @@ def test_reads_the_cover_and_one_page(tmp_path):
     assert content.title == "测试绘本"
     assert content.failed_count == 0
     assert content.pages[1].meta_text == "阅读指导"
+    assert content.pages[1].page_text == "三块、"
     assert content.pages[1].place == "菜园"
     assert content.pages[1].light == "白天，阳光明媚"
     assert content.pages[1].width == 100
