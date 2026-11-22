@@ -47,7 +47,7 @@ class Figure:
     view: str = ""
     facing: str = ""
     occlusion: str = ""
-    box: list[int] | None = None  # [left, top, right, bottom], percent
+    box: list[int] | None = None  # [left, top, right, bottom], per-mille
     panel: int = -1  # index of the panel this figure sits in
 
     def to_dict(self) -> dict:
@@ -88,7 +88,7 @@ def _panel_index(value: object) -> int:
         return -1
 
 
-# Read a crop box as [left, top, right, bottom] in percent, or None.
+# Read a crop box as [left, top, right, bottom] in per-mille, or None.
 def _box_value(value: object) -> list[int] | None:
     if not isinstance(value, (list, tuple)) or len(value) != 4:
         return None
@@ -96,7 +96,7 @@ def _box_value(value: object) -> list[int] | None:
     for item in value:
         if not isinstance(item, (int, float)):
             return None
-        numbers.append(int(min(100, max(0, item))))
+        numbers.append(int(min(1000, max(0, item))))
     left, top, right, bottom = numbers
     if right <= left or bottom <= top:
         return None
