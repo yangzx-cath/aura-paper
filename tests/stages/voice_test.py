@@ -14,7 +14,7 @@ HALF_SECOND = b"\x01\x02" * 12000
 WAV_HEADER = 44
 
 # The voice the cast stage gives the girl in these books.
-GIRL = "zh_female_xiaoxue_uranus_bigtts"
+GIRL = "zh_female_yingtaowanzi_uranus_bigtts"
 
 
 # Return a WAV file holding one second of silence per character.
