@@ -79,7 +79,10 @@ def main() -> int:
     started = time.perf_counter()
 
     scene_book, shot_book = storyboard(
-        args.book, llm=llm, root=root, cache=cache
+        args.book,
+        llm=llm,
+        root=root,
+        cache=cache,
     )
     elapsed = time.perf_counter() - started
 
@@ -90,13 +93,12 @@ def main() -> int:
         print(_scene_line(scene, shot_book.shots))
     print()
     print(f"audio    {_kind_line(shot_book.shots)}")
-    print(f"mode     {_mode_line(shot_book.shots)}")
     print(f"join     {_join_line(shot_book.shots)}")
     print(f"unused   {_unused_line(args.book, root, shot_book)}")
     print()
     print(f"total    {elapsed:.1f}s")
-    print(f"output   {root / args.book / 'scene.json'}")
-    print(f"output   {root / args.book / 'shot.json'}")
+    print(f"output   {root / args.book / 'scenes.json'}")
+    print(f"output   {root / args.book / 'shots.json'}")
     errors = [text for text in (scene_book.error, shot_book.error) if text]
     for text in errors:
         print(f"error    {text}", file=sys.stderr)
@@ -119,13 +121,6 @@ def _kind_line(shots: list[Shot]) -> str:
         for line in shot.audio:
             counts[line.kind] = counts.get(line.kind, 0) + 1
     return "  ".join(f"{kind} {count}" for kind, count in counts.items())
-
-
-# Count the shots per mode.
-def _mode_line(shots: list[Shot]) -> str:
-    first = sum(1 for shot in shots if shot.mode == "首帧")
-    wide = sum(1 for shot in shots if shot.mode == "扩景")
-    return f"首帧 {first}  扩景 {wide}"
 
 
 # Count the shots per join.

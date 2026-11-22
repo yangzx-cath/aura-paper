@@ -9,9 +9,6 @@ from ..utils import now_iso
 # The three sounds a shot can carry.
 LINE_KINDS = ("旁白", "对白", "音效")
 
-# How the video for a shot is made from its panels.
-SHOT_MODES = ("首帧", "扩景")
-
 # How a shot meets the shot before it.
 SHOT_JOINS = ("硬切", "叠化")
 
@@ -66,7 +63,6 @@ class Shot:
     scene: str = ""
     panels: list[ShotPanel] = field(default_factory=list)
     cast: list[str] = field(default_factory=list)
-    mode: str = ""
     join: str = ""
     camera: str = ""
     beats: list[str] = field(default_factory=list)
@@ -80,7 +76,6 @@ class Shot:
             "scene": self.scene,
             "panels": [item.to_dict() for item in self.panels],
             "cast": self.cast,
-            "mode": self.mode,
             "join": self.join,
             "camera": self.camera,
             "beats": self.beats,
@@ -96,7 +91,6 @@ class Shot:
             scene=_text(data.get("scene")),
             panels=_shot_panel_list(data.get("panels")),
             cast=_text_list(data.get("cast")),
-            mode=_text(data.get("mode")),
             join=_text(data.get("join")),
             camera=_text(data.get("camera")),
             beats=_text_list(data.get("beats")),

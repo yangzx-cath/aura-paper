@@ -84,8 +84,8 @@ def _write(
     shot_book: BookShots,
     root: str | Path | None,
 ) -> None:
-    write_json(book_id, "scene", scene_book.to_dict(), root)
-    write_json(book_id, "shot", shot_book.to_dict(), root)
+    write_json(book_id, "scenes", scene_book.to_dict(), root)
+    write_json(book_id, "shots", shot_book.to_dict(), root)
 
 
 # List the panels that have a crop, in reading order.
@@ -285,7 +285,6 @@ def _shots(
                     ),
                     "panels": group,
                     "cast": cast,
-                    "mode": _mode(entry, group, panels),
                     "join": str(entry.get("join") or "").strip(),
                     "camera": entry.get("camera"),
                     "beats": _beats_for(beats, covered, group),
@@ -371,22 +370,6 @@ def _covered(
             continue
         kept.append({"page": page_name, "panel": index})
     return kept
-
-
-# One panel with its own background can be a frame; everything else is
-# built from reference images.
-def _mode(
-    entry: dict,
-    covered: list[dict],
-    panels: dict[tuple[str, int], object],
-) -> str:
-    if len(covered) == 1:
-        panel = panels[(covered[0]["page"], covered[0]["panel"])]
-        if not getattr(panel, "needs_scene", True):
-            mode = str(entry.get("mode") or "").strip()
-            if mode == "首帧":
-                return mode
-    return "扩景"
 
 
 # Keep one voice per line, because one line is one sentence of speech.

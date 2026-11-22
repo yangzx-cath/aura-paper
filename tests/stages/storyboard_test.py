@@ -120,7 +120,6 @@ def shot(scene, page, index, **extra):
         "scene": scene,
         "panels": [{"page": page, "panel": index}],
         "cast": ["c1"],
-        "mode": "首帧",
         "join": "硬切",
         "camera": "中景",
         "beats": ["搭积木"],
@@ -146,7 +145,9 @@ def test_numbers_scenes_and_shots(tmp_path):
     }
 
     scene_book, shot_book = storyboard(
-        "demo", llm=FakeLLM(reply), root=tmp_path
+        "demo",
+        llm=FakeLLM(reply),
+        root=tmp_path,
     )
 
     assert [scene.id for scene in scene_book.scenes] == ["s1"]
@@ -157,60 +158,6 @@ def test_numbers_scenes_and_shots(tmp_path):
     # A character outside the cast cannot appear in a shot.
     assert shot_book.shots[0].cast == ["c1"]
     assert shot_book.error == ""
-
-
-def test_forces_a_widened_shot_for_a_blank_panel(tmp_path):
-    make_book(
-        tmp_path,
-        [{"panels": [panel(FULL_BOX), panel(BLANK_BOX)]}],
-    )
-    reply = {
-        "scenes": [{"key": "A", "name": "搭积木", "location": "l1"}],
-        "shots": [
-            shot("A", "p000.jpg", 0),
-            shot("A", "p000.jpg", 1, mode="首帧"),
-        ],
-    }
-
-    scene_book, shot_book = storyboard(
-        "demo", llm=FakeLLM(reply), root=tmp_path
-    )
-
-    assert [item.mode for item in shot_book.shots] == ["首帧", "扩景"]
-
-
-def test_keeps_one_shot_for_several_panels_of_one_action(tmp_path):
-    make_book(
-        tmp_path,
-        [{"panels": [panel(BLANK_BOX), panel(BLANK_BOX)]}],
-    )
-    reply = {
-        "scenes": [{"key": "A", "name": "搭积木", "location": "l1"}],
-        "shots": [
-            {
-                "scene": "A",
-                "panels": [
-                    {"page": "p000.jpg", "panel": 0},
-                    {"page": "p000.jpg", "panel": 1},
-                ],
-                "cast": ["c1"],
-                "mode": "首帧",
-                "camera": "中景",
-                "beats": ["放下三块", "放下四块"],
-                "audio": [{"kind": "旁白", "text": "三块、", "cast": ""}],
-            }
-        ],
-    }
-
-    scene_book, shot_book = storyboard(
-        "demo", llm=FakeLLM(reply), root=tmp_path
-    )
-
-    assert [item.id for item in shot_book.shots] == ["j1"]
-    covered = [(item.page, item.panel) for item in shot_book.shots[0].panels]
-    assert covered == [("p000.jpg", 0), ("p000.jpg", 1)]
-    # Two panels cannot be one frame, so the shot widens even if asked for one.
-    assert shot_book.shots[0].mode == "扩景"
 
 
 def test_cuts_a_merged_shot_at_six_panels(tmp_path):
@@ -244,7 +191,9 @@ def test_cuts_a_merged_shot_at_six_panels(tmp_path):
     }
 
     scene_book, shot_book = storyboard(
-        "demo", llm=FakeLLM(reply), root=tmp_path
+        "demo",
+        llm=FakeLLM(reply),
+        root=tmp_path,
     )
 
     assert [len(item.panels) for item in shot_book.shots] == [6, 2]
@@ -264,7 +213,9 @@ def test_drops_a_shot_without_a_panel(tmp_path):
     }
 
     scene_book, shot_book = storyboard(
-        "demo", llm=FakeLLM(reply), root=tmp_path
+        "demo",
+        llm=FakeLLM(reply),
+        root=tmp_path,
     )
 
     assert [item.id for item in shot_book.shots] == ["j1"]
@@ -286,7 +237,9 @@ def test_fills_the_join_from_the_scene_change(tmp_path):
     }
 
     scene_book, shot_book = storyboard(
-        "demo", llm=FakeLLM(reply), root=tmp_path
+        "demo",
+        llm=FakeLLM(reply),
+        root=tmp_path,
     )
 
     # The first shot fades in, a scene change dissolves, staying cuts.
@@ -308,7 +261,9 @@ def test_records_a_sound_kind_it_does_not_know(tmp_path):
     }
 
     scene_book, shot_book = storyboard(
-        "demo", llm=FakeLLM(reply), root=tmp_path
+        "demo",
+        llm=FakeLLM(reply),
+        root=tmp_path,
     )
 
     # The text is kept, so nothing is lost, and the kind is left empty.
@@ -332,7 +287,9 @@ def test_keeps_one_voice_when_two_people_say_a_line(tmp_path):
     }
 
     scene_book, shot_book = storyboard(
-        "demo", llm=FakeLLM(reply), root=tmp_path
+        "demo",
+        llm=FakeLLM(reply),
+        root=tmp_path,
     )
 
     assert shot_book.shots[0].audio[0].cast == "c1"
@@ -360,7 +317,9 @@ def test_matches_a_line_back_to_the_printed_text(tmp_path):
     }
 
     scene_book, shot_book = storyboard(
-        "demo", llm=FakeLLM(reply), root=tmp_path
+        "demo",
+        llm=FakeLLM(reply),
+        root=tmp_path,
     )
 
     # The space the model added is dropped, so the voice reads the page.
@@ -383,7 +342,9 @@ def test_reports_a_line_the_page_does_not_hold(tmp_path):
     }
 
     scene_book, shot_book = storyboard(
-        "demo", llm=FakeLLM(reply), root=tmp_path
+        "demo",
+        llm=FakeLLM(reply),
+        root=tmp_path,
     )
 
     assert shot_book.shots[0].audio[0].text == "十块、"
@@ -405,7 +366,9 @@ def test_reports_a_dialogue_without_a_voice(tmp_path):
     }
 
     scene_book, shot_book = storyboard(
-        "demo", llm=FakeLLM(reply), root=tmp_path
+        "demo",
+        llm=FakeLLM(reply),
+        root=tmp_path,
     )
 
     assert "1 句对白没有说话人" in shot_book.error
@@ -437,19 +400,21 @@ def test_writes_the_file_when_the_call_fails(tmp_path):
     assert shot_book.shots == []
     assert shot_book.error == "endpoint down"
     assert scene_book.error == "endpoint down"
-    assert (tmp_path / "demo" / "scene.json").is_file()
-    assert (tmp_path / "demo" / "shot.json").is_file()
+    assert (tmp_path / "demo" / "scenes.json").is_file()
+    assert (tmp_path / "demo" / "shots.json").is_file()
 
 
 def test_writes_the_file_when_the_reply_is_not_json(tmp_path):
     make_book(tmp_path, [{"panels": [panel(FULL_BOX)]}])
 
     scene_book, shot_book = storyboard(
-        "demo", llm=RawLLM("抱歉，我看不清。"), root=tmp_path
+        "demo",
+        llm=RawLLM("抱歉，我看不清。"),
+        root=tmp_path,
     )
 
     assert "no JSON object found" in shot_book.error
-    assert (tmp_path / "demo" / "shot.json").is_file()
+    assert (tmp_path / "demo" / "shots.json").is_file()
 
 
 def test_reads_the_thumbnail_images_it_sends(tmp_path):
