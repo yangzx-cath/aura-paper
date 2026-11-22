@@ -33,7 +33,7 @@ def stitch_side_by_side(
 ) -> Image.Image:
     """Place two page images side by side and return the result.
 
-    The shorter image is scaled to the taller one's height; nothing
+    The shorter image is scaled to the taller one's height. Nothing
     else is aligned or cropped.
     """
     left_image = load_image(left)

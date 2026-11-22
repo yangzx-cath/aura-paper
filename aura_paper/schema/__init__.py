@@ -1,1 +1,3 @@
-"""JSON contracts shared by the pipeline stages."""
+"""
+JSON contracts shared by the pipeline stages.
+"""
