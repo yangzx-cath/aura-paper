@@ -25,7 +25,7 @@ from aura_paper.stages.understand import understand
 ROOT = Path(__file__).resolve().parent.parent
 
 # An empty effort keeps LLM_REASONING_EFFORT from the environment.
-DEFAULT_EFFORT = ""
+DEFAULT_EFFORT = "low"
 
 # Pages below this share of ink inside the boxes are reported.
 COVERAGE_LIMIT = 0.75
