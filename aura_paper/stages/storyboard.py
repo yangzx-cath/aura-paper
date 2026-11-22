@@ -17,7 +17,6 @@ from ..schema.content import BookContent, PageContent
 from ..schema.location import BookLocations
 from ..schema.storyboard import (
     SHOT_JOINS,
-    SHOT_MODES,
     BookStoryboard,
     Scene,
     Shot,
@@ -237,6 +236,11 @@ def _scenes(
     return parsed.scenes, keys
 
 
+# A clip holds at most this many panels: the service takes 4 to 15 seconds
+# and one counting line is about a second.
+MAX_PANELS = 6
+
+
 # Number the shots, resolve their scene and keep the cast that exists.
 def _shots(
     fields: dict,
@@ -249,41 +253,127 @@ def _shots(
     for entry in fields.get("shots") or []:
         if not isinstance(entry, dict):
             continue
-        page_name = str(entry.get("page") or "").strip()
-        index = _int(entry.get("panel"))
-        panel = panels.get((page_name, index))
-        if panel is None:
-            notes.append(f"{page_name} 第 {index} 块不存在")
+        covered = _covered(entry, panels, notes)
+        if not covered:
             continue
-        entries.append(
-            {
-                "id": f"j{len(entries) + 1}",
-                "scene": keys.get(str(entry.get("scene") or "").strip(), ""),
-                "page": page_name,
-                "panel": index,
-                "cast": [
-                    cast_id
-                    for cast_id in _texts(entry.get("cast"))
-                    if cast_id in cast_ids
-                ],
-                "mode": _mode(entry, panel),
-                "join": str(entry.get("join") or "").strip(),
-                "camera": entry.get("camera"),
-                "beats": entry.get("beats"),
-                "audio": _audio(entry.get("audio"), cast_ids),
-                "continuity": entry.get("continuity"),
-            }
-        )
+        cast = [
+            cast_id
+            for cast_id in _texts(entry.get("cast"))
+            if cast_id in cast_ids
+        ]
+        beats = _texts(entry.get("beats"))
+        lines = _audio(entry.get("audio"), cast_ids)
+        for group, group_lines in _groups(covered, beats, lines, panels):
+            entries.append(
+                {
+                    "id": f"j{len(entries) + 1}",
+                    "scene": keys.get(
+                        str(entry.get("scene") or "").strip(), ""
+                    ),
+                    "panels": group,
+                    "cast": cast,
+                    "mode": _mode(entry, group, panels),
+                    "join": str(entry.get("join") or "").strip(),
+                    "camera": entry.get("camera"),
+                    "beats": _beats_for(beats, covered, group),
+                    "audio": group_lines,
+                    "continuity": entry.get("continuity"),
+                }
+            )
     parsed = BookStoryboard.from_dict({"shots": entries})
     return parsed.shots, notes
 
 
-# A panel without a background can only be widened, never used as a frame.
-def _mode(entry: dict, panel: object) -> str:
-    if getattr(panel, "needs_scene", False):
-        return "扩景"
-    mode = str(entry.get("mode") or "").strip()
-    return mode if mode in SHOT_MODES else "首帧"
+# Cut the panels of one action into clips the service can render.
+def _groups(
+    covered: list[dict],
+    beats: list[str],
+    lines: list[dict],
+    panels: dict[tuple[str, int], object],
+) -> list[tuple[list[dict], list[dict]]]:
+    if len(covered) <= MAX_PANELS:
+        return [(covered, lines)]
+
+    groups = [
+        covered[start : start + MAX_PANELS]
+        for start in range(0, len(covered), MAX_PANELS)
+    ]
+    carried: list[list[dict]] = [[] for _ in groups]
+    for line in lines:
+        carried[_group_of(str(line.get("text") or ""), groups, panels)].append(
+            line
+        )
+    return list(zip(groups, carried))
+
+
+# Find the clip that shows the panel a line is printed on.
+def _group_of(
+    text: str,
+    groups: list[list[dict]],
+    panels: dict[tuple[str, int], object],
+) -> int:
+    wanted = "".join(char for char in text if not char.isspace())
+    if not wanted:
+        return 0
+    for number, group in enumerate(groups):
+        for item in group:
+            source = getattr(panels[(item["page"], item["panel"])], "text", "")
+            squeezed = "".join(char for char in source if not char.isspace())
+            if wanted in squeezed:
+                return number
+    return 0
+
+
+# Give a clip the beats that belong to its own panels.
+def _beats_for(
+    beats: list[str],
+    covered: list[dict],
+    group: list[dict],
+) -> list[str]:
+    if len(group) == len(covered) or not covered:
+        return beats
+    start = covered.index(group[0])
+    if len(beats) == len(covered):
+        return beats[start : start + len(group)]
+    size = len(beats) / len(covered)
+    first = round(start * size)
+    last = round((start + len(group)) * size)
+    return beats[first:last]
+
+
+# Keep the panels a shot really covers, in the order the shot lists them.
+def _covered(
+    entry: dict,
+    panels: dict[tuple[str, int], object],
+    notes: list[str],
+) -> list[dict]:
+    kept = []
+    for item in entry.get("panels") or []:
+        if not isinstance(item, dict):
+            continue
+        page_name = str(item.get("page") or "").strip()
+        index = _int(item.get("panel"))
+        if (page_name, index) not in panels:
+            notes.append(f"{page_name} 第 {index} 块不存在")
+            continue
+        kept.append({"page": page_name, "panel": index})
+    return kept
+
+
+# One panel with its own background can be a frame; everything else is
+# built from reference images.
+def _mode(
+    entry: dict,
+    covered: list[dict],
+    panels: dict[tuple[str, int], object],
+) -> str:
+    if len(covered) == 1:
+        panel = panels[(covered[0]["page"], covered[0]["panel"])]
+        if not getattr(panel, "needs_scene", True):
+            mode = str(entry.get("mode") or "").strip()
+            if mode == "首帧":
+                return mode
+    return "扩景"
 
 
 # Keep one voice per line, because one line is one sentence of speech.
@@ -332,10 +422,19 @@ def _joins(shots: list[Shot]) -> list[Shot]:
 def _printed(shots: list[Shot], panels: dict) -> int:
     missed = 0
     for shot in shots:
-        panel = panels.get((shot.page, shot.panel))
-        source = getattr(panel, "text", "") or ""
+        sources = [
+            getattr(panels.get((item.page, item.panel)), "text", "") or ""
+            for item in shot.panels
+        ]
         for line in shot.audio:
-            exact = _as_printed(line.text, source)
+            exact = next(
+                (
+                    found
+                    for source in sources
+                    if (found := _as_printed(line.text, source)) is not None
+                ),
+                None,
+            )
             if exact is None:
                 missed += 1
                 continue

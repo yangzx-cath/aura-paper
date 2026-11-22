@@ -68,13 +68,32 @@ class Scene:
 
 
 @dataclass
+class ShotPanel:
+    """One panel a shot is made from."""
+
+    page: str = ""
+    panel: int = 0
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this panel."""
+        return {"page": self.page, "panel": self.panel}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ShotPanel:
+        """Build a panel from its external JSON shape."""
+        return cls(
+            page=_text(data.get("page")),
+            panel=_int_value(data.get("panel")),
+        )
+
+
+@dataclass
 class Shot:
-    """One clip, made from one panel."""
+    """One clip, made from the panels that show one action."""
 
     id: str = ""
     scene: str = ""
-    page: str = ""
-    panel: int = 0
+    panels: list[ShotPanel] = field(default_factory=list)
     cast: list[str] = field(default_factory=list)
     mode: str = ""
     join: str = ""
@@ -88,8 +107,7 @@ class Shot:
         return {
             "id": self.id,
             "scene": self.scene,
-            "page": self.page,
-            "panel": self.panel,
+            "panels": [item.to_dict() for item in self.panels],
             "cast": self.cast,
             "mode": self.mode,
             "join": self.join,
@@ -105,8 +123,7 @@ class Shot:
         return cls(
             id=_text(data.get("id")),
             scene=_text(data.get("scene")),
-            page=_text(data.get("page")),
-            panel=_int_value(data.get("panel")),
+            panels=_shot_panel_list(data.get("panels")),
             cast=_text_list(data.get("cast")),
             mode=_text(data.get("mode")),
             join=_text(data.get("join")),
@@ -198,9 +215,19 @@ def _scene_list(value: object) -> list[Scene]:
     return [item for item in items if item.id]
 
 
-# Read the shot list, keeping entries that name a page.
+# Read the shot list, keeping entries that carry at least one panel.
 def _shot_list(value: object) -> list[Shot]:
     if not isinstance(value, list):
         return []
     items = [Shot.from_dict(item) for item in value if isinstance(item, dict)]
+    return [item for item in items if item.panels]
+
+
+# Read the panels of one shot, keeping the ones that name a page.
+def _shot_panel_list(value: object) -> list[ShotPanel]:
+    if not isinstance(value, list):
+        return []
+    items = [
+        ShotPanel.from_dict(item) for item in value if isinstance(item, dict)
+    ]
     return [item for item in items if item.page]

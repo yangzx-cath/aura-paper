@@ -118,8 +118,7 @@ def make_book(root, pages):
 def shot(scene, page, index, **extra):
     entry = {
         "scene": scene,
-        "page": page,
-        "panel": index,
+        "panels": [{"page": page, "panel": index}],
         "cast": ["c1"],
         "mode": "首帧",
         "join": "硬切",
@@ -174,6 +173,79 @@ def test_forces_a_widened_shot_for_a_blank_panel(tmp_path):
     result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
 
     assert [item.mode for item in result.shots] == ["首帧", "扩景"]
+
+
+def test_keeps_one_shot_for_several_panels_of_one_action(tmp_path):
+    make_book(
+        tmp_path,
+        [{"panels": [panel(BLANK_BOX), panel(BLANK_BOX)]}],
+    )
+    reply = {
+        "scenes": [{"key": "A", "name": "搭积木", "location": "l1"}],
+        "shots": [
+            {
+                "scene": "A",
+                "panels": [
+                    {"page": "p000.jpg", "panel": 0},
+                    {"page": "p000.jpg", "panel": 1},
+                ],
+                "cast": ["c1"],
+                "mode": "首帧",
+                "camera": "中景",
+                "beats": ["放下三块", "放下四块"],
+                "audio": [{"kind": "旁白", "text": "三块、", "cast": ""}],
+            }
+        ],
+    }
+
+    result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+
+    assert [item.id for item in result.shots] == ["j1"]
+    covered = [(item.page, item.panel) for item in result.shots[0].panels]
+    assert covered == [("p000.jpg", 0), ("p000.jpg", 1)]
+    # Two panels cannot be one frame, so the shot widens even if asked for one.
+    assert result.shots[0].mode == "扩景"
+
+
+def test_cuts_a_merged_shot_at_six_panels(tmp_path):
+    pages = [
+        {
+            "panels": [
+                panel(BLANK_BOX, text=f"第{number}块、") for number in range(8)
+            ]
+        }
+    ]
+    make_book(tmp_path, pages)
+    reply = {
+        "scenes": [{"key": "A", "name": "搭积木", "location": "l1"}],
+        "shots": [
+            {
+                "scene": "A",
+                "panels": [
+                    {"page": "p000.jpg", "panel": number}
+                    for number in range(8)
+                ],
+                "cast": ["c1"],
+                "mode": "扩景",
+                "camera": "中景",
+                "beats": [f"第{number}步" for number in range(8)],
+                "audio": [
+                    {"kind": "旁白", "text": f"第{number}块、", "cast": ""}
+                    for number in (0, 7)
+                ],
+            }
+        ],
+    }
+
+    result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+
+    assert [len(item.panels) for item in result.shots] == [6, 2]
+    assert [item.id for item in result.shots] == ["j1", "j2"]
+    # Each line of sound travels with the panel it is printed on.
+    voices = [[line.text for line in item.audio] for item in result.shots]
+    assert voices == [["第0块、"], ["第7块、"]]
+    # The beats follow their own panels too.
+    assert result.shots[1].beats == ["第6步", "第7步"]
 
 
 def test_drops_a_shot_without_a_panel(tmp_path):

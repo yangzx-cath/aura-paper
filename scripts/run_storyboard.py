@@ -135,7 +135,11 @@ def _join_line(shots: list[Shot]) -> str:
 def _unused_line(book_id: str, root: Path, result: BookStoryboard) -> str:
     path = root / book_id / "understand.json"
     content = json.loads(path.read_text(encoding="utf-8"))
-    used = {(shot.page, shot.panel) for shot in result.shots}
+    used = {
+        (item.page, item.panel)
+        for shot in result.shots
+        for item in shot.panels
+    }
     unused = [
         f"{page['filename'][1:4]}.{panel['index']}"
         for page in content["pages"]
