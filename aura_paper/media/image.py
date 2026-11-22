@@ -1,10 +1,30 @@
-"""Stitch, crop and save page images."""
+"""Page image operations."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from PIL import Image
+
+
+def load_image(path: str | Path) -> Image.Image:
+    """Read one image as RGB."""
+    with Image.open(path) as image:
+        return image.convert("RGB")
+
+
+def save_jpeg(
+    image: Image.Image,
+    path: str | Path,
+    quality: int,
+) -> tuple[int, int]:
+    """Write an RGB JPEG and return its (width, height)."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+    image.save(target, "JPEG", quality=quality, optimize=True)
+    return image.size
 
 
 def stitch_side_by_side(
@@ -16,8 +36,8 @@ def stitch_side_by_side(
     The shorter image is scaled to the taller one's height; nothing
     else is aligned or cropped.
     """
-    left_image = _load(left)
-    right_image = _load(right)
+    left_image = load_image(left)
+    right_image = load_image(right)
     height = max(left_image.height, right_image.height)
     left_image = _fit_height(left_image, height)
     right_image = _fit_height(right_image, height)
@@ -26,6 +46,14 @@ def stitch_side_by_side(
     canvas.paste(left_image, (0, 0))
     canvas.paste(right_image, (left_image.width, 0))
     return canvas
+
+
+# Scale an image to the given height, keeping its shape.
+def _fit_height(image: Image.Image, height: int) -> Image.Image:
+    if image.height == height:
+        return image
+    width = round(image.width * height / image.height)
+    return image.resize((width, height), Image.Resampling.LANCZOS)
 
 
 def crop_percent(
@@ -45,29 +73,11 @@ def crop_percent(
     )
 
 
-def save_jpeg(
+def thumbnail(
     image: Image.Image,
-    path: str | Path,
-    quality: int,
-) -> tuple[int, int]:
-    """Write an RGB JPEG and return its (width, height)."""
-    target = Path(path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if image.mode != "RGB":
-        image = image.convert("RGB")
-    image.save(target, "JPEG", quality=quality, optimize=True)
-    return image.size
-
-
-# Read one image as RGB, with its file closed.
-def _load(path: str | Path) -> Image.Image:
-    with Image.open(path) as image:
-        return image.convert("RGB")
-
-
-# Scale an image to the given height, keeping its shape.
-def _fit_height(image: Image.Image, height: int) -> Image.Image:
-    if image.height == height:
-        return image
-    width = round(image.width * height / image.height)
-    return image.resize((width, height), Image.Resampling.LANCZOS)
+    box: tuple[int, int],
+) -> Image.Image:
+    """Shrink an image into box, keeping its shape."""
+    copy = image.copy()
+    copy.thumbnail(box, Image.Resampling.LANCZOS)
+    return copy
