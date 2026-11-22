@@ -1,0 +1,231 @@
+"""Page content read from the page images."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from ..utils import now_iso
+
+
+@dataclass
+class CoverContent:
+    """The book details read from the cover."""
+
+    title: str = ""
+    author: str = ""
+    illustrator: str = ""
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this cover."""
+        return {
+            "title": self.title,
+            "author": self.author,
+            "illustrator": self.illustrator,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> CoverContent:
+        """Build a cover from its external JSON shape."""
+        return cls(
+            title=str(data.get("title") or ""),
+            author=str(data.get("author") or ""),
+            illustrator=str(data.get("illustrator") or ""),
+        )
+
+
+@dataclass
+class Figure:
+    """One figure on one page, which may or may not be a cast member."""
+
+    index: int = 0
+    name: str = ""
+    body: str = ""
+    outfit: str = ""
+    view: str = ""
+    facing: str = ""
+    occlusion: str = ""
+    box: list[int] | None = None  # [left, top, right, bottom], percent
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this figure."""
+        return {
+            "index": self.index,
+            "name": self.name,
+            "body": self.body,
+            "outfit": self.outfit,
+            "view": self.view,
+            "facing": self.facing,
+            "occlusion": self.occlusion,
+            "box": self.box,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Figure:
+        """Build a figure from its external JSON shape."""
+        return cls(
+            index=int(data.get("index") or 0),
+            name=str(data.get("name") or ""),
+            body=str(data.get("body") or ""),
+            outfit=str(data.get("outfit") or ""),
+            view=str(data.get("view") or ""),
+            facing=str(data.get("facing") or ""),
+            occlusion=str(data.get("occlusion") or ""),
+            box=_box_value(data.get("box")),
+        )
+
+
+# Read a crop box as [left, top, right, bottom] in percent, or None.
+def _box_value(value: object) -> list[int] | None:
+    if not isinstance(value, (list, tuple)) or len(value) != 4:
+        return None
+    numbers = []
+    for item in value:
+        if not isinstance(item, (int, float)):
+            return None
+        numbers.append(int(min(100, max(0, item))))
+    left, top, right, bottom = numbers
+    if right <= left or bottom <= top:
+        return None
+    return numbers
+
+
+@dataclass
+class PageContent:
+    """Structured content of one page."""
+
+    index: int
+    filename: str
+    kind: str = "portrait"
+    page_text: str = ""
+    footer: str = ""
+    description: str = ""
+    figures: list[Figure] = field(default_factory=list)
+    uncertain: list[str] = field(default_factory=list)
+    model: str = ""
+    error: str = ""
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this page."""
+        return {
+            "index": self.index,
+            "filename": self.filename,
+            "kind": self.kind,
+            "model": self.model,
+            "generated_at": now_iso(),
+            "page_text": self.page_text,
+            "footer": self.footer,
+            "description": self.description,
+            "figures": [figure.to_dict() for figure in self.figures],
+            "uncertain": self.uncertain,
+            "error": self.error,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> PageContent:
+        """Build a page from its external JSON shape."""
+        return cls(
+            index=int(data.get("index") or 0),
+            filename=str(data.get("filename") or ""),
+            kind=str(data.get("kind") or "portrait"),
+            page_text=str(data.get("page_text") or ""),
+            footer=str(data.get("footer") or ""),
+            description=str(data.get("description") or ""),
+            figures=_figure_list(data.get("figures")),
+            uncertain=_text_list(data.get("uncertain")),
+            model=str(data.get("model") or ""),
+            error=str(data.get("error") or ""),
+        )
+
+
+# Read the figure list, numbering the entries by their order on the page.
+def _figure_list(value: object) -> list[Figure]:
+    if not isinstance(value, list):
+        return []
+    figures = [
+        Figure.from_dict(item) for item in value if isinstance(item, dict)
+    ]
+    for index, figure in enumerate(figures):
+        figure.index = index
+    return figures
+
+
+# Read the note list, keeping one line per text entry.
+def _text_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    texts = []
+    for item in value:
+        if isinstance(item, (dict, list)):
+            continue
+        text = str(item).strip()
+        if text:
+            texts.append(text)
+    return texts
+
+
+@dataclass
+class BookContent:
+    """Structured content of a whole book."""
+
+    id: str
+    source: str
+    cover: CoverContent = field(default_factory=CoverContent)
+    pages: list[PageContent] = field(default_factory=list)
+
+    @property
+    def title(self) -> str:
+        """Return the title printed on the cover."""
+        return self.cover.title
+
+    @property
+    def page_count(self) -> int:
+        """Return the number of pages, the cover included."""
+        return len(self.pages)
+
+    @property
+    def failed_count(self) -> int:
+        """Return how many pages failed, the cover included."""
+        return sum(1 for page in self.pages if page.error)
+
+    @property
+    def cover_page(self) -> PageContent | None:
+        """Return the first page, which is the cover."""
+        return self.pages[0] if self.pages else None
+
+    @property
+    def story_pages(self) -> list[PageContent]:
+        """Return the pages after the cover, which carry the story."""
+        return self.pages[1:]
+
+    @property
+    def language(self) -> str:
+        """Return the language printed on the pages, so narration uses it."""
+        text = "".join(page.page_text for page in self.pages)
+        letters = [char for char in text if char.isalpha()]
+        english = sum(1 for char in letters if char.isascii())
+        return "英文" if english * 2 > len(letters) else "中文"
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this book."""
+        return {
+            "id": self.id,
+            "title": self.title,
+            "source": self.source,
+            "generated_at": now_iso(),
+            "page_count": self.page_count,
+            "failed_count": self.failed_count,
+            "cover": self.cover.to_dict(),
+            "pages": [page.to_dict() for page in self.pages],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> BookContent:
+        """Build a book from its external JSON shape."""
+        return cls(
+            id=str(data.get("id") or ""),
+            source=str(data.get("source") or ""),
+            cover=CoverContent.from_dict(data.get("cover") or {}),
+            pages=[
+                PageContent.from_dict(page) for page in data.get("pages") or []
+            ],
+        )
