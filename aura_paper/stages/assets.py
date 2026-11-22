@@ -4,19 +4,24 @@ from __future__ import annotations
 
 import json
 import shutil
-from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image
 
+from ..cache import Cache, file_fingerprint, fingerprint
+from ..clients.llm import LLMClient, LLMError
 from ..media.image import crop_box, load_image, save_jpeg
+from ..output import write_json
+from ..prompts import cast_prompt
+from ..schema.assets import Assets, FigurePick
 from ..schema.content import BookContent, Figure, PageContent
+from ..utils import extract_json
 from .paths import book_dir, figure_name, figures_dir
 
 # A crop below this share of the page is too small to show a character.
 MIN_AREA = 0.05
 
-# A crop sharing more than this share with a neighbour cannot stand alone.
+# A crop sharing more than this share with a neighbor cannot stand alone.
 MAX_OVERLAP = 0.3
 
 # Faces first, then profiles, then side views.
@@ -25,16 +30,8 @@ FACING_RANK = {"正面": 3, "斜侧": 2, "侧面": 1}
 # Crops come from an already encoded page, so keep the second encode clean.
 FIGURE_QUALITY = 95
 
-
-@dataclass
-class FigurePick:
-    """One figure crop that may become a character reference."""
-
-    page: str
-    figure: int
-    file: str
-    facing: str
-    area: float
+# Keep a second crop per character, in case the best one is a poor crop.
+MAX_PICTURES = 2
 
 
 def pick_figures(
@@ -59,6 +56,144 @@ def pick_figures(
 
     picks.sort(key=_rank, reverse=True)
     return picks
+
+
+def assets(
+    book_id: str,
+    *,
+    llm: LLMClient,
+    root: str | Path | None = None,
+    cache: Cache | None = None,
+) -> Assets:
+    """Group the figure crops into characters and write assets.json."""
+    directory = book_dir(book_id, root)
+    pages = _read_content(directory).pages
+    picks = pick_figures(book_id, root=root)
+    result = Assets(id=book_id, model=llm.model)
+    if picks:
+        _fill(result, llm, pages, picks, cache, book_id, root)
+    write_json(book_id, "assets", result.to_dict(), root)
+    return result
+
+
+# Ask the model which crops show the same character, then fill the result.
+def _fill(
+    result: Assets,
+    llm: LLMClient,
+    pages: list[PageContent],
+    picks: list[FigurePick],
+    cache: Cache | None,
+    book_id: str,
+    root: str | Path | None,
+) -> None:
+    prompt = cast_prompt(pages, picks)
+    images = [figures_dir(book_id, root) / pick.file for pick in picks]
+    try:
+        fields = _ask(llm, prompt, images, cache, book_id)
+    except (LLMError, ValueError) as exc:
+        result.error = str(exc)
+        return
+    _apply(result, fields, picks)
+    if not result.cast:
+        result.error = "model returned no cast"
+
+
+# Read the grouping answer, reusing the cached one when nothing changed.
+def _ask(
+    llm: LLMClient,
+    prompt: str,
+    images: list[Path],
+    cache: Cache | None,
+    book_id: str,
+) -> dict:
+    if cache is None:
+        return _chat(llm, prompt, images)
+
+    ns = f"assets/{book_id}"
+    key = _key(images, prompt, llm)
+    entry = cache.load_json(ns, "cast", key)
+    if entry is not None:
+        return entry
+
+    fields = _chat(llm, prompt, images)
+    cache.save_json(ns, "cast", key, fields)
+    return fields
+
+
+# Send the crops and read the reply as JSON.
+def _chat(llm: LLMClient, prompt: str, images: list[Path]) -> dict:
+    return extract_json(llm.chat(prompt, images=images))
+
+
+# Fingerprint the crops, the prompt and the model, so the key is exact.
+def _key(images: list[Path], prompt: str, llm: LLMClient) -> str:
+    digests = [file_fingerprint(path) for path in images]
+    return fingerprint(*digests, prompt, *llm.signature)
+
+
+# Turn the answer into characters, crop owners and resolutions.
+def _apply(
+    result: Assets,
+    fields: dict,
+    picks: list[FigurePick],
+) -> None:
+    members = []
+    ids: dict[str, str] = {}
+    preferred: dict[str, str] = {}
+    for entry in fields.get("cast") or []:
+        if not isinstance(entry, dict):
+            continue
+        cast_id = f"c{len(members) + 1}"
+        key = str(entry.get("key") or "").strip()
+        if key:
+            ids[key] = cast_id
+            best = str(entry.get("best") or "").strip()
+            if best:
+                preferred[cast_id] = best
+        members.append(
+            {
+                "id": cast_id,
+                "name": entry.get("name"),
+                "look": entry.get("look"),
+            }
+        )
+
+    owners: dict[str, str] = {}
+    for entry in fields.get("figure_cast") or []:
+        if not isinstance(entry, dict):
+            continue
+        key = str(entry.get("key") or "").strip()
+        owners[str(entry.get("crop") or "").strip()] = ids.get(key, "")
+
+    parsed = Assets.from_dict(
+        {
+            "cast": members,
+            "figure_cast": [
+                {"file": pick.file, "cast": owners.get(pick.file, "")}
+                for pick in picks
+            ],
+            "resolved": fields.get("resolved"),
+            "open": fields.get("open"),
+        }
+    )
+    result.cast = parsed.cast
+    result.figure_cast = parsed.figure_cast
+    result.resolved = parsed.resolved
+    result.open = parsed.open
+
+    # The model's pick wins when it is one of the crops it gave that character.
+    ranked: dict[str, list[str]] = {}
+    for pick in picks:
+        owner = owners.get(pick.file, "")
+        if owner:
+            ranked.setdefault(owner, []).append(pick.file)
+    for member in result.cast:
+        files = ranked.get(member.id, [])
+        best = preferred.get(member.id, "")
+        if best in files:
+            files.remove(best)
+            files.insert(0, best)
+        member.pictures = files[:MAX_PICTURES]
 
 
 # Read the understand stage's record of the book.
