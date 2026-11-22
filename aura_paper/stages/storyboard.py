@@ -491,7 +491,32 @@ def _spoken(
 def _clean(text: str) -> str:
     for mark in "“”『』「」":
         text = text.replace(mark, "")
-    return " ".join(text.split())
+    return _tight(" ".join(text.split()))
+
+
+# Drop the spaces that sit between two Chinese characters.
+def _tight(text: str) -> str:
+    kept = []
+    for index, char in enumerate(text):
+        between = 0 < index < len(text) - 1
+        if (
+            char == " "
+            and between
+            and _chinese(text[index - 1])
+            and _chinese(text[index + 1])
+        ):
+            continue
+        kept.append(char)
+    return "".join(kept)
+
+
+# Tell whether one character is Chinese, punctuation included.
+def _chinese(char: str) -> bool:
+    return (
+        "\u3000" <= char <= "\u303f"
+        or "\u4e00" <= char <= "\u9fff"
+        or "\uff00" <= char <= "\uffef"
+    )
 
 
 # Tell whether a rewrite keeps the facts the page states.
