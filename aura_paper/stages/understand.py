@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..cache import Cache, file_fingerprint, fingerprint
-from ..llm import LLMClient, LLMError
+from ..clients.llm import LLMClient, LLMError
 from ..media.image import crop_box, load_image, save_jpeg
 from ..output import write_json
 from ..prompts import cover_prompt, page_prompt

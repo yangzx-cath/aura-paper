@@ -9,7 +9,7 @@ from typing import Callable
 from PIL import Image
 
 from ..cache import Cache, file_fingerprint, fingerprint
-from ..llm import LLMClient, LLMError
+from ..clients.llm import LLMClient, LLMError
 from ..media.image import (
     crop_box,
     load_image,

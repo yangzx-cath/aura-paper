@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from aura_paper.llm import LLMClient
+from aura_paper.clients.llm import LLMClient
 from aura_paper.output import write_json
 from aura_paper.schema.book import Book, Page
 from aura_paper.stages.understand import understand

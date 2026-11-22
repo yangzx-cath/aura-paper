@@ -2,7 +2,7 @@ import json
 
 from PIL import Image
 
-from aura_paper.llm import LLMClient
+from aura_paper.clients.llm import LLMClient
 from aura_paper.stages.ingest import ingest
 
 
