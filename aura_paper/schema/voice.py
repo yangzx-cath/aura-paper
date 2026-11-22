@@ -14,8 +14,8 @@ CHOICES = (
     ("zh_male_wennuanahu_uranus_bigtts", "成年男声，温暖，像爸爸"),
     ("zh_male_chunhoudiyin_uranus_bigtts", "成年男声，低沉"),
     ("zh_female_yingtaowanzi_uranus_bigtts", "女童，活泼跳脱"),
-    ("zh_female_xiaoxue_uranus_bigtts", "女童，绘本童声，略成熟"),
     ("zh_female_peiqi_uranus_bigtts", "女童，卡通感强，鼻音重"),
+    ("zh_female_xiaoxue_uranus_bigtts", "女童，绘本童声，略成熟"),
     ("zh_male_naiqimengwa_uranus_bigtts", "男童，奶气"),
     ("zh_male_liangsangmengzai_uranus_bigtts", "男童，清亮"),
 )
