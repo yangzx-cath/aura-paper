@@ -24,6 +24,9 @@ from aura_paper.stages.ingest import COVER_PAGES, ingest
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# The layout question is simple, so the default does not burn reasoning.
+DEFAULT_EFFORT = "low"
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the ingest stage.")
@@ -58,8 +61,8 @@ def main() -> int:
     )
     parser.add_argument(
         "--effort",
-        default="low",
-        help="reasoning effort (default=low)",
+        default=DEFAULT_EFFORT,
+        help=f"reasoning effort (default={DEFAULT_EFFORT})",
     )
     parser.add_argument(
         "--no-cache",

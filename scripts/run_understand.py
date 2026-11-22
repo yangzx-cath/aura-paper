@@ -6,6 +6,7 @@ understand.json for the next stage.
 Usage:
     python scripts/run_understand.py C01
     python scripts/run_understand.py C01 --workers 4
+    python scripts/run_understand.py C01 --effort high
 """
 
 import argparse
@@ -21,6 +22,9 @@ from aura_paper.stages.understand import understand
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# An empty effort keeps LLM_REASONING_EFFORT from the environment.
+DEFAULT_EFFORT = ""
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the understand stage.")
@@ -35,6 +39,11 @@ def main() -> int:
         type=int,
         default=4,
         help="pages to read at once (default=4)",
+    )
+    parser.add_argument(
+        "--effort",
+        default=DEFAULT_EFFORT,
+        help="reasoning effort, empty keeps the env setting",
     )
     parser.add_argument(
         "--no-cache",
@@ -56,7 +65,7 @@ def main() -> int:
         print("start with scripts/run_ingest.py", file=sys.stderr)
         return 2
 
-    llm = LLMClient.from_env()
+    llm = LLMClient.from_env(args.effort)
     missing = llm.missing_settings()
     if missing:
         print("missing config: " + ", ".join(missing), file=sys.stderr)
@@ -65,7 +74,7 @@ def main() -> int:
     cache = Cache(cache_root(), enabled=not args.no_cache)
 
     print(f"book    {args.book}")
-    print(f"model   {llm.model}")
+    print(f"model   {llm.model}  effort={llm.reasoning_effort or '-'}")
     print(f"root    {root}")
     print(f"workers {args.workers}")
     print(f"cache   {cache.root}  enabled={cache.enabled}")
