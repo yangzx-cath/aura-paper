@@ -94,6 +94,7 @@ def main() -> int:
         return 1
 
     print(f"output  {root / args.book / 'understand.json'}")
+    print(f"panels  {root / args.book / 'panels'}")
     return 0 if failed == 0 else 1
 
 

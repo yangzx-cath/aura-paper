@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -10,13 +11,17 @@ from typing import Callable
 
 from ..cache import Cache, file_fingerprint, fingerprint
 from ..llm import LLMClient, LLMError
+from ..media.image import crop_box, load_image, save_jpeg
 from ..output import write_json
 from ..prompts import cover_prompt, page_prompt
 from ..schema.book import Book as IngestBook
 from ..schema.book import Page as IngestPage
 from ..schema.content import BookContent, CoverContent, PageContent
 from ..utils import extract_json
-from .paths import book_dir
+from .paths import book_dir, panel_name, panels_dir
+
+# Panels are cropped from the page once, so keep the second encode clean.
+PANEL_QUALITY = 95
 
 
 def understand(
@@ -75,6 +80,7 @@ def understand(
 
     content.cover = cover
     content.pages = results
+    _save_panels(content.pages, pages_dir, panels_dir(book_id, root))
     write_json(book_id, "understand", content.to_dict(), root)
     return content
 
@@ -243,3 +249,24 @@ def _cover_fields(content: PageContent, cover: CoverContent) -> dict:
         "illustrator": cover.illustrator,
         "description": content.description,
     }
+
+
+# Crop every panel to its own file, so later stages crop nothing.
+def _save_panels(
+    pages: list[PageContent],
+    pages_dir: Path,
+    out_dir: Path,
+) -> None:
+    shutil.rmtree(out_dir, ignore_errors=True)
+    for page in pages:
+        if not page.panels:
+            continue
+        image = load_image(pages_dir / page.filename)
+        for panel in page.panels:
+            box = panel.box
+            if box is None:
+                continue
+            left, top, right, bottom = box
+            name = panel_name(page.filename, panel.index)
+            crop = crop_box(image, (left, top, right, bottom))
+            save_jpeg(crop, out_dir / name, PANEL_QUALITY)
