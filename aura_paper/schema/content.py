@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 
 from ..utils import now_iso
 
-# The two kinds of picture block a page can hold.
-PANEL_TYPES = ("full_scene", "vignette")
+# A panel below this share of the page needs a scene behind it.
+NEEDS_SCENE_AREA = 0.5
 
 
 @dataclass
@@ -109,14 +109,16 @@ class Panel:
 
     index: int = 0
     box: list[int] | None = None
-    visual_type: str = "full_scene"
+    text: str = ""
+    needs_scene: bool = False
 
     def to_dict(self) -> dict:
         """Return the external JSON shape of this panel."""
         return {
             "index": self.index,
             "box": self.box,
-            "visual_type": self.visual_type,
+            "text": self.text,
+            "needs_scene": self.needs_scene,
         }
 
     @classmethod
@@ -125,14 +127,18 @@ class Panel:
         return cls(
             index=int(data.get("index") or 0),
             box=_box_value(data.get("box")),
-            visual_type=_visual_type(data.get("visual_type")),
+            text=str(data.get("text") or ""),
+            needs_scene=bool(data.get("needs_scene")),
         )
 
 
-# Keep a panel type inside the two supported values.
-def _visual_type(value: object) -> str:
-    text = str(value or "").strip().lower()
-    return text if text in PANEL_TYPES else "full_scene"
+# Tell whether a panel is too small to carry its own environment.
+def _needs_scene(box: list[int] | None) -> bool:
+    if box is None:
+        return True
+    left, top, right, bottom = box
+    share = (right - left) * (bottom - top) / (1000 * 1000)
+    return share < NEEDS_SCENE_AREA
 
 
 @dataclass
@@ -197,6 +203,7 @@ def _panel_list(value: object) -> list[Panel]:
             panels.append(panel)
     for index, panel in enumerate(panels):
         panel.index = index
+        panel.needs_scene = _needs_scene(panel.box)
     return panels
 
 
