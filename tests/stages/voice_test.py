@@ -36,7 +36,7 @@ class FakeTTS(TTSClient):
         self.failing = set(failing)
 
     def synthesize(self, text, *, voice, speed=1.0, emotion=""):
-        self.texts.append((text, voice))
+        self.texts.append((text, voice, speed))
         if text in self.failing:
             raise TTSError("speaker permission denied")
         return _speech(text, voice)
@@ -106,7 +106,10 @@ def test_speaks_every_line_and_measures_the_shot(tmp_path):
     result = voice("demo", tts=tts, gap_ms=300, root=tmp_path)
 
     # The sound effect is never spoken.
-    assert tts.texts == [("滴答", NARRATOR), ("好", GIRL)]
+    assert tts.texts == [
+        ("滴答", NARRATOR, 1.0),
+        ("好", GIRL, 1.0),
+    ]
     spoken = result.shots[0].lines
     assert [item.voice for item in spoken] == [NARRATOR, GIRL]
     # Two seconds for 滴答, one for 好, and one gap between them.
@@ -123,7 +126,7 @@ def test_takes_a_voice_from_the_command_line_over_the_cast(tmp_path):
 
     result = voice("demo", tts=tts, overrides={"c1": "other"}, root=tmp_path)
 
-    assert tts.texts == [("好", "other")]
+    assert tts.texts == [("好", "other", 1.0)]
     assert result.shots[0].lines[0].voice == "other"
 
 
@@ -134,7 +137,7 @@ def test_uses_the_spoken_text_when_there_is_one(tmp_path):
 
     result = voice("demo", tts=tts, root=tmp_path)
 
-    assert tts.texts == [("改过", NARRATOR)]
+    assert tts.texts == [("改过", NARRATOR, 1.0)]
     spoken = result.shots[0].lines[0]
     assert spoken.text == "原文"
     assert spoken.spoken == "改过"

@@ -32,6 +32,7 @@ def voice(
     *,
     tts: TTSClient,
     overrides: dict[str, str] | None = None,
+    speeds: dict[str, float] | None = None,
     gap_ms: int = DEFAULT_GAP_MS,
     root: str | Path | None = None,
     cache: Cache | None = None,
@@ -40,6 +41,7 @@ def voice(
     directory = book_dir(book_id, root)
     shots = _read_shots(directory).shots
     voices = voices_for(book_id, overrides=overrides, root=root)
+    rates = dict(speeds or {})
 
     result = BookVoice(
         id=book_id,
@@ -59,7 +61,9 @@ def voice(
     for shot in shots:
         record = VoiceShot(shot=shot.id, gap_ms=gap_ms)
         try:
-            record.lines = _speak_shot(shot, out_dir, tts, voices, cache)
+            record.lines = _speak_shot(
+                shot, out_dir, tts, voices, rates, cache
+            )
         except TTSError as exc:
             result.error = f"{shot.id} 配音失败：{exc}"
             break
@@ -113,6 +117,7 @@ def _speak_shot(
     out_dir: Path,
     tts: TTSClient,
     voices: dict[str, str],
+    rates: dict[str, float],
     cache: Cache | None,
 ) -> list[VoiceLine]:
     spoken = []
@@ -124,8 +129,9 @@ def _speak_shot(
         if not text:
             continue
         voice_id = voices[speaker]
+        speed = rates.get(speaker, 1.0)
         target = out_dir / f"{shot.id}-{index}{FILE_SUFFIX}"
-        _speak(text, voice_id, target, tts, cache)
+        _speak(text, voice_id, speed, target, tts, cache)
         spoken.append(
             VoiceLine(
                 index=index,
@@ -134,6 +140,7 @@ def _speak_shot(
                 text=line.text,
                 spoken=text,
                 voice=voice_id,
+                speed=speed,
                 file=f"voice/{target.name}",
                 duration_ms=_file_length(target),
             )
@@ -145,18 +152,19 @@ def _speak_shot(
 def _speak(
     text: str,
     voice_id: str,
+    speed: float,
     target: Path,
     tts: TTSClient,
     cache: Cache | None,
 ) -> None:
-    key = fingerprint(text, voice_id, *tts.signature)
+    key = fingerprint(text, voice_id, speed, *tts.signature)
     if cache is not None:
         cached = cache.file_path("voice", key, FILE_SUFFIX)
         if cache.enabled and cached.is_file():
             _copy(cached, target)
             return
 
-    speech = tts.synthesize(text, voice=voice_id)
+    speech = tts.synthesize(text, voice=voice_id, speed=speed)
     speech.save(target)
     if cache is not None and cache.enabled:
         _copy(target, cache.file_path("voice", key, FILE_SUFFIX))

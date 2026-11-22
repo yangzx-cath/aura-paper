@@ -8,19 +8,20 @@ from ..utils import now_iso
 
 # Ids and what each one sounds like, from the 豆包语音合成模型2.0 list.
 CHOICES = (
-    ("zh_female_zhixingnv_uranus_bigtts", "成年女声，清楚平实，像女老师"),
-    ("zh_female_shaoergushi_uranus_bigtts", "成年女声，绘本故事的讲法"),
+    ("zh_female_shaoergushi_uranus_bigtts", "成年女声，讲绘本故事，语速稳"),
     ("zh_female_wenroumama_uranus_bigtts", "成年女声，温柔，像妈妈"),
+    ("zh_female_wenroushunv_uranus_bigtts", "成年女声，平缓，像有声书"),
     ("zh_male_wennuanahu_uranus_bigtts", "成年男声，温暖，像爸爸"),
     ("zh_male_chunhoudiyin_uranus_bigtts", "成年男声，低沉"),
-    ("zh_female_xiaoxue_uranus_bigtts", "女童，绘本童声"),
     ("zh_female_yingtaowanzi_uranus_bigtts", "女童，活泼跳脱"),
+    ("zh_female_xiaoxue_uranus_bigtts", "女童，绘本童声，略成熟"),
+    ("zh_female_peiqi_uranus_bigtts", "女童，卡通感强，鼻音重"),
     ("zh_male_naiqimengwa_uranus_bigtts", "男童，奶气"),
-    ("zh_male_tiancaitongsheng_uranus_bigtts", "男童，清亮"),
+    ("zh_male_liangsangmengzai_uranus_bigtts", "男童，清亮"),
 )
 
 # Every line that is not a character's is spoken with this voice.
-NARRATOR = "zh_female_zhixingnv_uranus_bigtts"
+NARRATOR = "zh_female_shaoergushi_uranus_bigtts"
 
 # Every id a character may be given.
 ALL = frozenset(voice for voice, _ in CHOICES)
@@ -36,6 +37,7 @@ class VoiceLine:
     text: str = ""
     spoken: str = ""
     voice: str = ""
+    speed: float = 1.0
     file: str = ""
     duration_ms: int = 0
 
@@ -48,6 +50,7 @@ class VoiceLine:
             "text": self.text,
             "spoken": self.spoken,
             "voice": self.voice,
+            "speed": self.speed,
             "file": self.file,
             "duration_ms": self.duration_ms,
         }
@@ -62,6 +65,7 @@ class VoiceLine:
             text=_text(data.get("text")),
             spoken=_text(data.get("spoken")),
             voice=_text(data.get("voice")),
+            speed=_speed(data.get("speed")),
             file=_text(data.get("file")),
             duration_ms=_int_value(data.get("duration_ms")),
         )
@@ -140,6 +144,14 @@ def _int_value(value: object) -> int:
         return int(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return 0
+
+
+# Read a speed multiplier, falling back to normal speed.
+def _speed(value: object) -> float:
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 1.0
 
 
 # Read a mapping of speaker to voice, dropping the empty entries.

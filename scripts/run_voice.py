@@ -39,6 +39,13 @@ def main() -> int:
         help="voice of one speaker, overriding the cast stage",
     )
     parser.add_argument(
+        "--speed",
+        action="append",
+        default=[],
+        metavar="说话人=倍率",
+        help="speaking speed of one speaker, 1.0 is normal",
+    )
+    parser.add_argument(
         "--gap-ms",
         type=int,
         default=DEFAULT_GAP_MS,
@@ -69,6 +76,7 @@ def main() -> int:
 
     overrides = _voices(args.voice)
     voices = voices_for(args.book, overrides=overrides, root=root)
+    speeds = _speeds(args.speed)
 
     cache = Cache(cache_root(), enabled=not args.no_cache)
 
@@ -78,7 +86,8 @@ def main() -> int:
     print(f"cache    {cache.root}  enabled={cache.enabled}")
     print(f"gap      {args.gap_ms}ms")
     for speaker, voice_id in voices.items():
-        print(f"voice    {speaker} → {voice_id}")
+        rate = speeds.get(speaker, 1.0)
+        print(f"voice    {speaker} → {voice_id} ×{rate:g}")
     print()
     print("Speaking the lines", flush=True)
 
@@ -87,6 +96,7 @@ def main() -> int:
         args.book,
         tts=tts,
         overrides=overrides,
+        speeds=speeds,
         gap_ms=args.gap_ms,
         root=root,
         cache=cache,
@@ -119,6 +129,20 @@ def _voices(pairs: list[str]) -> dict[str, str]:
         if name.strip() and value.strip():
             voices[name.strip()] = value.strip()
     return voices
+
+
+# Read the repeated speaker=speed arguments into a mapping.
+def _speeds(pairs: list[str]) -> dict[str, float]:
+    speeds = {}
+    for pair in pairs:
+        name, _, value = pair.partition("=")
+        try:
+            rate = float(value)
+        except ValueError:
+            continue
+        if name.strip():
+            speeds[name.strip()] = rate
+    return speeds
 
 
 # Print one shot with its length and line count.
