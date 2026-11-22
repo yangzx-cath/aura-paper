@@ -28,6 +28,10 @@ class Cache:
         """Return the file that would hold this entry."""
         return self.root / ns / f"{name}-{key}.json"
 
+    def file_path(self, ns: str, key: str, suffix: str) -> Path:
+        """Return the file that would hold an entry that is not JSON."""
+        return self.root / ns / f"{key}{suffix}"
+
     def has(self, ns: str, name: str, key: str) -> bool:
         """Return True when the entry exists on disk."""
         return self.enabled and self.path(ns, name, key).is_file()

@@ -87,6 +87,11 @@ class TTSClient:
             f"resource_id={self.resource_id!r})"
         )
 
+    # Settings that change the audio, so callers can cache on them.
+    @property
+    def signature(self) -> tuple[str, str]:
+        return (self.base_url, self.resource_id)
+
     @classmethod
     def from_env(cls) -> TTSClient:
         """Build a client from the TTS_* environment variables."""

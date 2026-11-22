@@ -28,6 +28,11 @@ def thumbs_dir(book_id: str, root: str | Path | None = None) -> Path:
     return book_dir(book_id, root) / "thumbs"
 
 
+def voice_dir(book_id: str, root: str | Path | None = None) -> Path:
+    """Return the folder holding one audio file per spoken line."""
+    return book_dir(book_id, root) / "voice"
+
+
 def panel_name(page_name: str, index: int) -> str:
     """Return the panel image name for one page image name."""
     return f"{Path(page_name).stem}_{index}.jpg"
