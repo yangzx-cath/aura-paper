@@ -110,8 +110,8 @@ def main() -> int:
 # Print one page as soon as it is read.
 def _print_page(page: PageContent, elapsed: float) -> None:
     status = page.error or "ok"
-    setting = " / ".join(x for x in (page.place, page.light) if x)
-    print(f"{page.filename}  {elapsed:6.1f}s  {status}  {setting}", flush=True)
+    text = f"{page.filename}  {elapsed:6.1f}s  {status}  {page.light}"
+    print(text, flush=True)
 
 
 # Count the pages that carry an error.

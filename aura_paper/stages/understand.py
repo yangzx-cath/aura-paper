@@ -152,7 +152,6 @@ def _ask_page(
 def _apply_fields(content: PageContent, fields: dict) -> None:
     parsed = PageContent.from_dict(fields)
     content.meta_text = parsed.meta_text
-    content.place = parsed.place
     content.light = parsed.light
     content.panels = parsed.panels
     content.figures = parsed.figures
@@ -169,7 +168,6 @@ def _panel_text(panels: list[Panel]) -> str:
 def _page_fields(content: PageContent) -> dict:
     return {
         "meta_text": content.meta_text,
-        "place": content.place,
         "light": content.light,
         "panels": [panel.to_dict() for panel in content.panels],
         "figures": [figure.to_dict() for figure in content.figures],

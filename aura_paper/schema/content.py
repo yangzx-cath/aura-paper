@@ -154,7 +154,6 @@ class PageContent:
     height: int = 0
     page_text: str = ""
     meta_text: str = ""
-    place: str = ""
     light: str = ""
     description: str = ""
     panels: list[Panel] = field(default_factory=list)
@@ -174,7 +173,6 @@ class PageContent:
             "generated_at": now_iso(),
             "page_text": self.page_text,
             "meta_text": self.meta_text,
-            "place": self.place,
             "light": self.light,
             "description": self.description,
             "panels": [panel.to_dict() for panel in self.panels],
@@ -193,7 +191,6 @@ class PageContent:
             height=int(data.get("height") or 0),
             page_text=str(data.get("page_text") or ""),
             meta_text=str(data.get("meta_text") or ""),
-            place=str(data.get("place") or ""),
             light=str(data.get("light") or ""),
             description=str(data.get("description") or ""),
             panels=_panel_list(data.get("panels")),
