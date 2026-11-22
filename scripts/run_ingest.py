@@ -99,7 +99,7 @@ def main() -> int:
     print(f"dpi     {args.dpi}  pair_from={args.pair_from}")
     print(f"cache   {cache.root}  enabled={cache.enabled}")
     print()
-    print("Rendering pages, then checking every group", flush=True)
+    print("Rendering pages and checking every group", flush=True)
 
     started = time.perf_counter()
     try:
