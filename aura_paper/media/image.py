@@ -98,19 +98,22 @@ def _fit_height(image: Image.Image, height: int) -> Image.Image:
     return image.resize((width, height), Image.Resampling.LANCZOS)
 
 
-def crop_percent(
+def crop_box(
     image: Image.Image,
     box: tuple[int, int, int, int],
 ) -> Image.Image:
-    """Return the percent box [left, top, right, bottom] of an image."""
+    """Return the box [left, top, right, bottom] of an image.
+
+    Box values are per-mille: 1000 spans the whole image.
+    """
     width, height = image.size
     left, top, right, bottom = box
     return image.crop(
         (
-            round(left / 100 * width),
-            round(top / 100 * height),
-            round(right / 100 * width),
-            round(bottom / 100 * height),
+            round(left / 1000 * width),
+            round(top / 1000 * height),
+            round(right / 1000 * width),
+            round(bottom / 1000 * height),
         )
     )
 
