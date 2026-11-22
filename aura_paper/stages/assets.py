@@ -12,11 +12,17 @@ from ..cache import Cache, file_fingerprint, fingerprint
 from ..clients.llm import LLMClient, LLMError
 from ..media.image import crop_box, load_image, save_jpeg
 from ..output import write_json
-from ..prompts import cast_prompt
+from ..prompts import cast_prompt, location_prompt
 from ..schema.assets import Assets, FigurePick
 from ..schema.content import BookContent, Figure, PageContent
 from ..utils import extract_json
-from .paths import book_dir, figure_name, figures_dir
+from .paths import (
+    book_dir,
+    figure_name,
+    figures_dir,
+    panel_name,
+    panels_dir,
+)
 
 # A crop below this share of the page is too small to show a character.
 MIN_AREA = 0.05
@@ -72,6 +78,9 @@ def assets(
     result = Assets(id=book_id, model=llm.model)
     if picks:
         _fill(result, llm, pages, picks, cache, book_id, root)
+    full = _full_panels(pages)
+    if full:
+        _fill_locations(result, llm, pages, full, cache, book_id, root)
     write_json(book_id, "assets", result.to_dict(), root)
     return result
 
@@ -89,13 +98,100 @@ def _fill(
     prompt = cast_prompt(pages, picks)
     images = [figures_dir(book_id, root) / pick.file for pick in picks]
     try:
-        fields = _ask(llm, prompt, images, cache, book_id)
+        fields = _ask(llm, prompt, images, cache, book_id, "cast")
     except (LLMError, ValueError) as exc:
-        result.error = str(exc)
+        result.error = _joined(result.error, str(exc))
         return
     _apply(result, fields, picks)
     if not result.cast:
         result.error = "model returned no cast"
+
+
+# Return the panels that already show a whole environment.
+def _full_panels(pages: list[PageContent]) -> list[tuple[str, int, str]]:
+    full = []
+    for page in pages:
+        for panel in page.panels:
+            if panel.needs_scene or panel.box is None:
+                continue
+            crop = panel_name(page.filename, panel.index)
+            full.append((page.filename, panel.index, crop))
+    return full
+
+
+# Ask the model which panels share a place, then fill the result.
+def _fill_locations(
+    result: Assets,
+    llm: LLMClient,
+    pages: list[PageContent],
+    full: list[tuple[str, int, str]],
+    cache: Cache | None,
+    book_id: str,
+    root: str | Path | None,
+) -> None:
+    prompt = location_prompt(pages, full)
+    images = [panels_dir(book_id, root) / crop for _, _, crop in full]
+    try:
+        fields = _ask(llm, prompt, images, cache, book_id, "locations")
+    except (LLMError, ValueError) as exc:
+        result.error = _joined(result.error, str(exc))
+        return
+    _apply_locations(result, fields, pages, full)
+
+
+# Turn the place answer into locations and a place for every panel.
+def _apply_locations(
+    result: Assets,
+    fields: dict,
+    pages: list[PageContent],
+    full: list[tuple[str, int, str]],
+) -> None:
+    crops = {crop for _, _, crop in full}
+    entries = []
+    ids: dict[str, str] = {}
+    for entry in fields.get("locations") or []:
+        if not isinstance(entry, dict):
+            continue
+        location_id = f"l{len(entries) + 1}"
+        key = str(entry.get("key") or "").strip()
+        if key:
+            ids[key] = location_id
+        master = str(entry.get("master") or "").strip()
+        entries.append(
+            {
+                "id": location_id,
+                "name": entry.get("name"),
+                "light": entry.get("light"),
+                "master": master if master in crops else "",
+            }
+        )
+
+    owners: dict[tuple[str, int], str] = {}
+    for entry in fields.get("panel_locations") or []:
+        if not isinstance(entry, dict):
+            continue
+        page_name = str(entry.get("page") or "").strip()
+        index = _int(entry.get("panel"))
+        key = str(entry.get("key") or "").strip()
+        owners[(page_name, index)] = ids.get(key, "")
+
+    result.style = str(fields.get("style") or "").strip()
+    parsed = Assets.from_dict(
+        {
+            "locations": entries,
+            "panel_locations": [
+                {
+                    "page": page.filename,
+                    "panel": panel.index,
+                    "location": owners.get((page.filename, panel.index), ""),
+                }
+                for page in pages
+                for panel in page.panels
+            ],
+        }
+    )
+    result.locations = parsed.locations
+    result.panel_locations = parsed.panel_locations
 
 
 # Read the grouping answer, reusing the cached one when nothing changed.
@@ -105,18 +201,19 @@ def _ask(
     images: list[Path],
     cache: Cache | None,
     book_id: str,
+    name: str,
 ) -> dict:
     if cache is None:
         return _chat(llm, prompt, images)
 
     ns = f"assets/{book_id}"
     key = _key(images, prompt, llm)
-    entry = cache.load_json(ns, "cast", key)
+    entry = cache.load_json(ns, name, key)
     if entry is not None:
         return entry
 
     fields = _chat(llm, prompt, images)
-    cache.save_json(ns, "cast", key, fields)
+    cache.save_json(ns, name, key, fields)
     return fields
 
 
@@ -271,3 +368,18 @@ def _worst_overlap(
 # Sort key: faces before profiles, then the larger crop.
 def _rank(pick: FigurePick) -> tuple[int, float]:
     return (FACING_RANK[pick.facing], pick.area)
+
+
+# Read an integer, falling back to -1 when the value is unusable.
+def _int(value: object) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return -1
+
+
+# Join two error texts into one line.
+def _joined(first: str, second: str) -> str:
+    if not first:
+        return second
+    return f"{first}；{second}"

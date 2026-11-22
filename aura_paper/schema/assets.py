@@ -68,6 +68,61 @@ class FigureCast:
 
 
 @dataclass
+class Location:
+    """One place in the book and the crop that shows it whole."""
+
+    id: str = ""
+    name: str = ""
+    light: str = ""
+    master: str = ""
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this location."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "light": self.light,
+            "master": self.master,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Location:
+        """Build a location from its external JSON shape."""
+        return cls(
+            id=_text(data.get("id")),
+            name=_text(data.get("name")),
+            light=_text(data.get("light")),
+            master=_text(data.get("master")),
+        )
+
+
+@dataclass
+class PanelLocation:
+    """The place one panel happens in."""
+
+    page: str = ""
+    panel: int = 0
+    location: str = ""
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this panel place."""
+        return {
+            "page": self.page,
+            "panel": self.panel,
+            "location": self.location,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> PanelLocation:
+        """Build a panel place from its external JSON shape."""
+        return cls(
+            page=_text(data.get("page")),
+            panel=_int_value(data.get("panel")),
+            location=_text(data.get("location")),
+        )
+
+
+@dataclass
 class Resolution:
     """One identity question the book answered, or could not answer."""
 
@@ -108,6 +163,9 @@ class Assets:
     figure_cast: list[FigureCast] = field(default_factory=list)
     resolved: list[Resolution] = field(default_factory=list)
     open: list[Resolution] = field(default_factory=list)
+    style: str = ""
+    locations: list[Location] = field(default_factory=list)
+    panel_locations: list[PanelLocation] = field(default_factory=list)
     model: str = ""
     error: str = ""
 
@@ -121,6 +179,11 @@ class Assets:
             "figure_cast": [item.to_dict() for item in self.figure_cast],
             "resolved": [item.to_dict() for item in self.resolved],
             "open": [item.to_dict() for item in self.open],
+            "style": self.style,
+            "locations": [item.to_dict() for item in self.locations],
+            "panel_locations": [
+                item.to_dict() for item in self.panel_locations
+            ],
             "error": self.error,
         }
 
@@ -133,6 +196,9 @@ class Assets:
             figure_cast=_figure_cast_list(data.get("figure_cast")),
             resolved=_resolution_list(data.get("resolved")),
             open=_resolution_list(data.get("open")),
+            style=_text(data.get("style")),
+            locations=_location_list(data.get("locations")),
+            panel_locations=_panel_location_list(data.get("panel_locations")),
             model=_text(data.get("model")),
             error=_text(data.get("error")),
         )
@@ -192,3 +258,25 @@ def _resolution_list(value: object) -> list[Resolution]:
         Resolution.from_dict(item) for item in value if isinstance(item, dict)
     ]
     return [item for item in items if item.issue]
+
+
+# Read the location list, keeping entries that carry an id.
+def _location_list(value: object) -> list[Location]:
+    if not isinstance(value, list):
+        return []
+    items = [
+        Location.from_dict(item) for item in value if isinstance(item, dict)
+    ]
+    return [item for item in items if item.id]
+
+
+# Read the panel places, keeping one entry per named page.
+def _panel_location_list(value: object) -> list[PanelLocation]:
+    if not isinstance(value, list):
+        return []
+    items = [
+        PanelLocation.from_dict(item)
+        for item in value
+        if isinstance(item, dict)
+    ]
+    return [item for item in items if item.page]

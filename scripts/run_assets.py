@@ -17,7 +17,7 @@ from pathlib import Path
 from aura_paper.cache import Cache
 from aura_paper.clients.llm import LLMClient
 from aura_paper.config import cache_root, load_env, out_root
-from aura_paper.schema.assets import Cast
+from aura_paper.schema.assets import Cast, Location
 from aura_paper.stages.assets import assets
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -81,6 +81,13 @@ def main() -> int:
     print(f"resolved {len(result.resolved)}  open {len(result.open)}")
     for member in result.cast:
         print(_cast_line(member))
+    loose = sum(1 for item in result.panel_locations if not item.location)
+    print()
+    print(f"style    {result.style}")
+    print(f"places   {len(result.locations)}  unplaced {loose}")
+    for location in result.locations:
+        print(_location_line(location))
+    print()
     print(f"total    {elapsed:.1f}s")
     print(f"output   {root / args.book / 'assets.json'}")
     if result.error:
@@ -94,6 +101,13 @@ def _cast_line(member: Cast) -> str:
     name = member.name or "（无名）"
     pictures = "、".join(member.pictures) or "（无可用图）"
     return f"{member.id} {name}｜{member.look}｜{pictures}"
+
+
+# Print one place with the crop that backs it.
+def _location_line(location: Location) -> str:
+    name = location.name or "（无名）"
+    master = location.master or "（无母图）"
+    return f"{location.id} {name}｜{location.light}｜{master}"
 
 
 if __name__ == "__main__":
