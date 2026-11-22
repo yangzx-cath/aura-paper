@@ -1,4 +1,4 @@
-"""The scenes and shots one book's video is built from."""
+"""The shots of one book: what each clip covers and how it sounds."""
 
 from __future__ import annotations
 
@@ -9,11 +9,31 @@ from ..utils import now_iso
 # The three sounds a shot can carry.
 LINE_KINDS = ("旁白", "对白", "音效")
 
-# How the video for a shot is made from its panel.
+# How the video for a shot is made from its panels.
 SHOT_MODES = ("首帧", "扩景")
 
-# How a shot meets the shot after it.
+# How a shot meets the shot before it.
 SHOT_JOINS = ("硬切", "叠化")
+
+
+@dataclass
+class ShotPanel:
+    """One panel a shot is made from."""
+
+    page: str = ""
+    panel: int = 0
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this panel."""
+        return {"page": self.page, "panel": self.panel}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ShotPanel:
+        """Build a panel from its external JSON shape."""
+        return cls(
+            page=_text(data.get("page")),
+            panel=_int_value(data.get("panel")),
+        )
 
 
 @dataclass
@@ -35,55 +55,6 @@ class AudioLine:
             kind=_kind(data.get("kind")),
             text=_text(data.get("text")),
             cast=_text(data.get("cast")),
-        )
-
-
-@dataclass
-class Scene:
-    """One stretch of the story, in one place."""
-
-    id: str = ""
-    name: str = ""
-    location: str = ""
-    pages: list[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        """Return the external JSON shape of this scene."""
-        return {
-            "id": self.id,
-            "name": self.name,
-            "location": self.location,
-            "pages": self.pages,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict) -> Scene:
-        """Build a scene from its external JSON shape."""
-        return cls(
-            id=_text(data.get("id")),
-            name=_text(data.get("name")),
-            location=_text(data.get("location")),
-            pages=_text_list(data.get("pages")),
-        )
-
-
-@dataclass
-class ShotPanel:
-    """One panel a shot is made from."""
-
-    page: str = ""
-    panel: int = 0
-
-    def to_dict(self) -> dict:
-        """Return the external JSON shape of this panel."""
-        return {"page": self.page, "panel": self.panel}
-
-    @classmethod
-    def from_dict(cls, data: dict) -> ShotPanel:
-        """Build a panel from its external JSON shape."""
-        return cls(
-            page=_text(data.get("page")),
-            panel=_int_value(data.get("panel")),
         )
 
 
@@ -135,35 +106,32 @@ class Shot:
 
 
 @dataclass
-class BookStoryboard:
-    """The scenes and shots of one book."""
+class BookShots:
+    """The shots of one book, with the art style they are drawn in."""
 
     id: str = ""
     style: str = ""
-    scenes: list[Scene] = field(default_factory=list)
     shots: list[Shot] = field(default_factory=list)
     model: str = ""
     error: str = ""
 
     def to_dict(self) -> dict:
-        """Return the external JSON shape of this storyboard."""
+        """Return the external JSON shape of these shots."""
         return {
             "id": self.id,
             "generated_at": now_iso(),
             "model": self.model,
             "style": self.style,
-            "scenes": [item.to_dict() for item in self.scenes],
             "shots": [item.to_dict() for item in self.shots],
             "error": self.error,
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> BookStoryboard:
-        """Build a storyboard from its external JSON shape."""
+    def from_dict(cls, data: dict) -> BookShots:
+        """Build the shots from their external JSON shape."""
         return cls(
             id=_text(data.get("id")),
             style=_text(data.get("style")),
-            scenes=_scene_list(data.get("scenes")),
             shots=_shot_list(data.get("shots")),
             model=_text(data.get("model")),
             error=_text(data.get("error")),
@@ -205,14 +173,6 @@ def _audio_list(value: object) -> list[AudioLine]:
         AudioLine.from_dict(item) for item in value if isinstance(item, dict)
     ]
     return [item for item in items if item.text]
-
-
-# Read the scene list, keeping entries that carry an id.
-def _scene_list(value: object) -> list[Scene]:
-    if not isinstance(value, list):
-        return []
-    items = [Scene.from_dict(item) for item in value if isinstance(item, dict)]
-    return [item for item in items if item.id]
 
 
 # Read the shot list, keeping entries that carry at least one panel.

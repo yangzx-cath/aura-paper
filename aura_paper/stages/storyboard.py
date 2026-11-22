@@ -15,12 +15,8 @@ from ..prompts import storyboard_prompt
 from ..schema.cast import BookCast
 from ..schema.content import BookContent, PageContent
 from ..schema.location import BookLocations
-from ..schema.storyboard import (
-    SHOT_JOINS,
-    BookStoryboard,
-    Scene,
-    Shot,
-)
+from ..schema.scene import BookScenes, Scene
+from ..schema.shot import SHOT_JOINS, BookShots, Shot
 from ..utils import extract_json
 from .paths import (
     book_dir,
@@ -44,14 +40,15 @@ def storyboard(
     llm: LLMClient,
     root: str | Path | None = None,
     cache: Cache | None = None,
-) -> BookStoryboard:
-    """Read three artifacts, plan the scenes and shots, write the file."""
+) -> tuple[BookScenes, BookShots]:
+    """Read three artifacts, plan the scenes and shots, write two files."""
     directory = book_dir(book_id, root)
     pages = _read_content(directory).pages
     cast_book = _read_cast(directory)
     places = _read_locations(directory)
 
-    result = BookStoryboard(
+    scene_book = BookScenes(id=book_id, model=llm.model)
+    shot_book = BookShots(
         id=book_id,
         model=llm.model,
         style=places.style,
@@ -64,15 +61,31 @@ def storyboard(
     try:
         fields = _ask(llm, prompt, images, cache, book_id)
     except (LLMError, ValueError) as exc:
-        result.error = str(exc)
-        write_json(book_id, "storyboard", result.to_dict(), root)
-        return result
+        scene_book.error = str(exc)
+        shot_book.error = str(exc)
+        _write(book_id, scene_book, shot_book, root)
+        return scene_book, shot_book
 
-    _apply(result, fields, pages, cast_book)
-    if not result.shots:
-        result.error = _joined(result.error, "model returned no shot")
-    write_json(book_id, "storyboard", result.to_dict(), root)
-    return result
+    notes = _apply(fields, scene_book, shot_book, pages, cast_book)
+    if not scene_book.scenes:
+        notes.insert(0, "model returned no scene")
+    if not shot_book.shots:
+        notes.append("model returned no shot")
+    if notes:
+        shot_book.error = "；".join(notes)
+    _write(book_id, scene_book, shot_book, root)
+    return scene_book, shot_book
+
+
+# Write the two files the later stages read.
+def _write(
+    book_id: str,
+    scene_book: BookScenes,
+    shot_book: BookShots,
+    root: str | Path | None,
+) -> None:
+    write_json(book_id, "scene", scene_book.to_dict(), root)
+    write_json(book_id, "shot", shot_book.to_dict(), root)
 
 
 # List the panels that have a crop, in reading order.
@@ -168,11 +181,12 @@ def _key(images: list[Path], prompt: str, llm: LLMClient) -> str:
 
 # Turn the plan into scenes and shots, filling what the model left out.
 def _apply(
-    result: BookStoryboard,
     fields: dict,
+    scene_book: BookScenes,
+    shot_book: BookShots,
     pages: list[PageContent],
     cast_book: BookCast,
-) -> None:
+) -> list[str]:
     page_names = {page.filename for page in pages}
     panels = {
         (page.filename, panel.index): panel
@@ -184,15 +198,15 @@ def _apply(
     scenes, keys = _scenes(fields, page_names)
     shots, notes = _shots(fields, keys, panels, cast_ids)
 
-    result.scenes = scenes
-    result.shots = _joins(shots)
-    missed = _printed(result.shots, panels)
+    scene_book.scenes = scenes
+    shot_book.shots = _joins(shots)
+    missed = _printed(shot_book.shots, panels)
     unknown = sum(
-        1 for shot in result.shots for line in shot.audio if not line.kind
+        1 for shot in shot_book.shots for line in shot.audio if not line.kind
     )
     voiceless = sum(
         1
-        for shot in result.shots
+        for shot in shot_book.shots
         for line in shot.audio
         if line.kind == "对白" and not line.cast
     )
@@ -202,8 +216,7 @@ def _apply(
         notes.append(f"{voiceless} 句对白没有说话人")
     if missed:
         notes.append(f"{missed} 行文字在原文里找不到")
-    if notes:
-        result.error = _joined(result.error, "；".join(notes))
+    return notes
 
 
 # Number the scenes and remember the tags the shots point at.
@@ -232,7 +245,7 @@ def _scenes(
                 ],
             }
         )
-    parsed = BookStoryboard.from_dict({"scenes": entries})
+    parsed = BookScenes.from_dict({"scenes": entries})
     return parsed.scenes, keys
 
 
@@ -280,7 +293,7 @@ def _shots(
                     "continuity": entry.get("continuity"),
                 }
             )
-    parsed = BookStoryboard.from_dict({"shots": entries})
+    parsed = BookShots.from_dict({"shots": entries})
     return parsed.shots, notes
 
 
@@ -496,10 +509,3 @@ def _int(value: object) -> int:
         return int(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return -1
-
-
-# Join two error texts into one line.
-def _joined(first: str, second: str) -> str:
-    if not first:
-        return second
-    return f"{first}；{second}"

@@ -145,16 +145,18 @@ def test_numbers_scenes_and_shots(tmp_path):
         "shots": [shot("A", "p000.jpg", 0, cast=["c1", "c9"])],
     }
 
-    result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+    scene_book, shot_book = storyboard(
+        "demo", llm=FakeLLM(reply), root=tmp_path
+    )
 
-    assert [scene.id for scene in result.scenes] == ["s1"]
+    assert [scene.id for scene in scene_book.scenes] == ["s1"]
     # A page outside the book cannot belong to a scene.
-    assert result.scenes[0].pages == ["p000.jpg"]
-    assert [item.id for item in result.shots] == ["j1"]
-    assert result.shots[0].scene == "s1"
+    assert scene_book.scenes[0].pages == ["p000.jpg"]
+    assert [item.id for item in shot_book.shots] == ["j1"]
+    assert shot_book.shots[0].scene == "s1"
     # A character outside the cast cannot appear in a shot.
-    assert result.shots[0].cast == ["c1"]
-    assert result.error == ""
+    assert shot_book.shots[0].cast == ["c1"]
+    assert shot_book.error == ""
 
 
 def test_forces_a_widened_shot_for_a_blank_panel(tmp_path):
@@ -170,9 +172,11 @@ def test_forces_a_widened_shot_for_a_blank_panel(tmp_path):
         ],
     }
 
-    result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+    scene_book, shot_book = storyboard(
+        "demo", llm=FakeLLM(reply), root=tmp_path
+    )
 
-    assert [item.mode for item in result.shots] == ["首帧", "扩景"]
+    assert [item.mode for item in shot_book.shots] == ["首帧", "扩景"]
 
 
 def test_keeps_one_shot_for_several_panels_of_one_action(tmp_path):
@@ -198,13 +202,15 @@ def test_keeps_one_shot_for_several_panels_of_one_action(tmp_path):
         ],
     }
 
-    result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+    scene_book, shot_book = storyboard(
+        "demo", llm=FakeLLM(reply), root=tmp_path
+    )
 
-    assert [item.id for item in result.shots] == ["j1"]
-    covered = [(item.page, item.panel) for item in result.shots[0].panels]
+    assert [item.id for item in shot_book.shots] == ["j1"]
+    covered = [(item.page, item.panel) for item in shot_book.shots[0].panels]
     assert covered == [("p000.jpg", 0), ("p000.jpg", 1)]
     # Two panels cannot be one frame, so the shot widens even if asked for one.
-    assert result.shots[0].mode == "扩景"
+    assert shot_book.shots[0].mode == "扩景"
 
 
 def test_cuts_a_merged_shot_at_six_panels(tmp_path):
@@ -237,15 +243,17 @@ def test_cuts_a_merged_shot_at_six_panels(tmp_path):
         ],
     }
 
-    result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+    scene_book, shot_book = storyboard(
+        "demo", llm=FakeLLM(reply), root=tmp_path
+    )
 
-    assert [len(item.panels) for item in result.shots] == [6, 2]
-    assert [item.id for item in result.shots] == ["j1", "j2"]
+    assert [len(item.panels) for item in shot_book.shots] == [6, 2]
+    assert [item.id for item in shot_book.shots] == ["j1", "j2"]
     # Each line of sound travels with the panel it is printed on.
-    voices = [[line.text for line in item.audio] for item in result.shots]
+    voices = [[line.text for line in item.audio] for item in shot_book.shots]
     assert voices == [["第0块、"], ["第7块、"]]
     # The beats follow their own panels too.
-    assert result.shots[1].beats == ["第6步", "第7步"]
+    assert shot_book.shots[1].beats == ["第6步", "第7步"]
 
 
 def test_drops_a_shot_without_a_panel(tmp_path):
@@ -255,10 +263,12 @@ def test_drops_a_shot_without_a_panel(tmp_path):
         "shots": [shot("A", "p000.jpg", 0), shot("A", "p000.jpg", 9)],
     }
 
-    result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+    scene_book, shot_book = storyboard(
+        "demo", llm=FakeLLM(reply), root=tmp_path
+    )
 
-    assert [item.id for item in result.shots] == ["j1"]
-    assert "第 9 块不存在" in result.error
+    assert [item.id for item in shot_book.shots] == ["j1"]
+    assert "第 9 块不存在" in shot_book.error
 
 
 def test_fills_the_join_from_the_scene_change(tmp_path):
@@ -275,10 +285,12 @@ def test_fills_the_join_from_the_scene_change(tmp_path):
         ],
     }
 
-    result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+    scene_book, shot_book = storyboard(
+        "demo", llm=FakeLLM(reply), root=tmp_path
+    )
 
     # The first shot fades in, a scene change dissolves, staying cuts.
-    assert [item.join for item in result.shots] == ["叠化", "叠化", "硬切"]
+    assert [item.join for item in shot_book.shots] == ["叠化", "叠化", "硬切"]
 
 
 def test_records_a_sound_kind_it_does_not_know(tmp_path):
@@ -295,12 +307,14 @@ def test_records_a_sound_kind_it_does_not_know(tmp_path):
         ],
     }
 
-    result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+    scene_book, shot_book = storyboard(
+        "demo", llm=FakeLLM(reply), root=tmp_path
+    )
 
     # The text is kept, so nothing is lost, and the kind is left empty.
-    assert result.shots[0].audio[0].text == "三块、"
-    assert result.shots[0].audio[0].kind == ""
-    assert "1 条声音的类型不认识" in result.error
+    assert shot_book.shots[0].audio[0].text == "三块、"
+    assert shot_book.shots[0].audio[0].kind == ""
+    assert "1 条声音的类型不认识" in shot_book.error
 
 
 def test_keeps_one_voice_when_two_people_say_a_line(tmp_path):
@@ -317,9 +331,11 @@ def test_keeps_one_voice_when_two_people_say_a_line(tmp_path):
         ],
     }
 
-    result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+    scene_book, shot_book = storyboard(
+        "demo", llm=FakeLLM(reply), root=tmp_path
+    )
 
-    assert result.shots[0].audio[0].cast == "c1"
+    assert shot_book.shots[0].audio[0].cast == "c1"
 
 
 def test_matches_a_line_back_to_the_printed_text(tmp_path):
@@ -343,11 +359,13 @@ def test_matches_a_line_back_to_the_printed_text(tmp_path):
         ],
     }
 
-    result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+    scene_book, shot_book = storyboard(
+        "demo", llm=FakeLLM(reply), root=tmp_path
+    )
 
     # The space the model added is dropped, so the voice reads the page.
-    assert result.shots[0].audio[0].text == printed
-    assert result.error == ""
+    assert shot_book.shots[0].audio[0].text == printed
+    assert shot_book.error == ""
 
 
 def test_reports_a_line_the_page_does_not_hold(tmp_path):
@@ -364,10 +382,12 @@ def test_reports_a_line_the_page_does_not_hold(tmp_path):
         ],
     }
 
-    result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+    scene_book, shot_book = storyboard(
+        "demo", llm=FakeLLM(reply), root=tmp_path
+    )
 
-    assert result.shots[0].audio[0].text == "十块、"
-    assert "1 行文字在原文里找不到" in result.error
+    assert shot_book.shots[0].audio[0].text == "十块、"
+    assert "1 行文字在原文里找不到" in shot_book.error
 
 
 def test_reports_a_dialogue_without_a_voice(tmp_path):
@@ -384,9 +404,11 @@ def test_reports_a_dialogue_without_a_voice(tmp_path):
         ],
     }
 
-    result = storyboard("demo", llm=FakeLLM(reply), root=tmp_path)
+    scene_book, shot_book = storyboard(
+        "demo", llm=FakeLLM(reply), root=tmp_path
+    )
 
-    assert "1 句对白没有说话人" in result.error
+    assert "1 句对白没有说话人" in shot_book.error
 
 
 def test_reuses_the_cached_plan(tmp_path):
@@ -402,28 +424,32 @@ def test_reuses_the_cached_plan(tmp_path):
     second = storyboard("demo", llm=llm, root=tmp_path, cache=Cache(cache_dir))
 
     assert llm.calls == 1
-    assert [item.id for item in second.shots] == ["j1"]
-    assert second.shots == first.shots
+    assert [item.id for item in second[1].shots] == ["j1"]
+    assert second[1].shots == first[1].shots
     assert (cache_dir / "storyboard" / "demo").is_dir()
 
 
 def test_writes_the_file_when_the_call_fails(tmp_path):
     make_book(tmp_path, [{"panels": [panel(FULL_BOX)]}])
 
-    result = storyboard("demo", llm=BrokenLLM(), root=tmp_path)
+    scene_book, shot_book = storyboard("demo", llm=BrokenLLM(), root=tmp_path)
 
-    assert result.shots == []
-    assert result.error == "endpoint down"
-    assert (tmp_path / "demo" / "storyboard.json").is_file()
+    assert shot_book.shots == []
+    assert shot_book.error == "endpoint down"
+    assert scene_book.error == "endpoint down"
+    assert (tmp_path / "demo" / "scene.json").is_file()
+    assert (tmp_path / "demo" / "shot.json").is_file()
 
 
 def test_writes_the_file_when_the_reply_is_not_json(tmp_path):
     make_book(tmp_path, [{"panels": [panel(FULL_BOX)]}])
 
-    result = storyboard("demo", llm=RawLLM("抱歉，我看不清。"), root=tmp_path)
+    scene_book, shot_book = storyboard(
+        "demo", llm=RawLLM("抱歉，我看不清。"), root=tmp_path
+    )
 
-    assert "no JSON object found" in result.error
-    assert (tmp_path / "demo" / "storyboard.json").is_file()
+    assert "no JSON object found" in shot_book.error
+    assert (tmp_path / "demo" / "shot.json").is_file()
 
 
 def test_reads_the_thumbnail_images_it_sends(tmp_path):

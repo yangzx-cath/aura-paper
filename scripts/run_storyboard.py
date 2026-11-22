@@ -18,7 +18,8 @@ from pathlib import Path
 from aura_paper.cache import Cache
 from aura_paper.clients.llm import LLMClient
 from aura_paper.config import cache_root, load_env, out_root
-from aura_paper.schema.storyboard import BookStoryboard, Scene, Shot
+from aura_paper.schema.scene import Scene
+from aura_paper.schema.shot import BookShots, Shot
 from aura_paper.stages.storyboard import storyboard
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -77,26 +78,29 @@ def main() -> int:
 
     started = time.perf_counter()
 
-    result = storyboard(args.book, llm=llm, root=root, cache=cache)
+    scene_book, shot_book = storyboard(
+        args.book, llm=llm, root=root, cache=cache
+    )
     elapsed = time.perf_counter() - started
 
     print()
-    print(f"scenes   {len(result.scenes)}")
-    print(f"shots    {len(result.shots)}")
-    for scene in result.scenes:
-        print(_scene_line(scene, result.shots))
+    print(f"scenes   {len(scene_book.scenes)}")
+    print(f"shots    {len(shot_book.shots)}")
+    for scene in scene_book.scenes:
+        print(_scene_line(scene, shot_book.shots))
     print()
-    print(f"audio    {_kind_line(result.shots)}")
-    print(f"mode     {_mode_line(result.shots)}")
-    print(f"join     {_join_line(result.shots)}")
-    print(f"unused   {_unused_line(args.book, root, result)}")
+    print(f"audio    {_kind_line(shot_book.shots)}")
+    print(f"mode     {_mode_line(shot_book.shots)}")
+    print(f"join     {_join_line(shot_book.shots)}")
+    print(f"unused   {_unused_line(args.book, root, shot_book)}")
     print()
     print(f"total    {elapsed:.1f}s")
-    print(f"output   {root / args.book / 'storyboard.json'}")
-    if result.error:
-        print(f"error    {result.error}", file=sys.stderr)
-        return 1
-    return 0
+    print(f"output   {root / args.book / 'scene.json'}")
+    print(f"output   {root / args.book / 'shot.json'}")
+    errors = [text for text in (scene_book.error, shot_book.error) if text]
+    for text in errors:
+        print(f"error    {text}", file=sys.stderr)
+    return 1 if errors else 0
 
 
 # Print one scene with the shots that belong to it.
@@ -132,12 +136,12 @@ def _join_line(shots: list[Shot]) -> str:
 
 
 # Count the panels no shot uses.
-def _unused_line(book_id: str, root: Path, result: BookStoryboard) -> str:
+def _unused_line(book_id: str, root: Path, shot_book: BookShots) -> str:
     path = root / book_id / "understand.json"
     content = json.loads(path.read_text(encoding="utf-8"))
     used = {
         (item.page, item.panel)
-        for shot in result.shots
+        for shot in shot_book.shots
         for item in shot.panels
     }
     unused = [
