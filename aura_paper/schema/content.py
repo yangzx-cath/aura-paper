@@ -30,10 +30,15 @@ class CoverContent:
     def from_dict(cls, data: dict) -> CoverContent:
         """Build a cover from its external JSON shape."""
         return cls(
-            title=str(data.get("title") or ""),
-            author=str(data.get("author") or ""),
-            illustrator=str(data.get("illustrator") or ""),
+            title=_text(data.get("title")),
+            author=_text(data.get("author")),
+            illustrator=_text(data.get("illustrator")),
         )
+
+
+# Read one text field, trimming the whitespace around it.
+def _text(value: object) -> str:
+    return str(value or "").strip()
 
 
 @dataclass
@@ -69,12 +74,12 @@ class Figure:
         """Build a figure from its external JSON shape."""
         return cls(
             index=int(data.get("index") or 0),
-            name=str(data.get("name") or ""),
-            body=str(data.get("body") or ""),
-            outfit=str(data.get("outfit") or ""),
-            view=str(data.get("view") or ""),
-            facing=str(data.get("facing") or ""),
-            occlusion=str(data.get("occlusion") or ""),
+            name=_text(data.get("name")),
+            body=_text(data.get("body")),
+            outfit=_text(data.get("outfit")),
+            view=_text(data.get("view")),
+            facing=_text(data.get("facing")),
+            occlusion=_text(data.get("occlusion")),
             box=_box_value(data.get("box")),
             panel=_panel_index(data.get("panel")),
         )
@@ -129,8 +134,8 @@ class Panel:
         return cls(
             index=int(data.get("index") or 0),
             box=_box_value(data.get("box")),
-            text=str(data.get("text") or ""),
-            description=str(data.get("description") or ""),
+            text=_text(data.get("text")),
+            description=_text(data.get("description")),
             needs_scene=bool(data.get("needs_scene")),
         )
 
@@ -189,10 +194,10 @@ class PageContent:
             filename=str(data.get("filename") or ""),
             width=int(data.get("width") or 0),
             height=int(data.get("height") or 0),
-            page_text=str(data.get("page_text") or ""),
-            meta_text=str(data.get("meta_text") or ""),
-            light=str(data.get("light") or ""),
-            description=str(data.get("description") or ""),
+            page_text=_text(data.get("page_text")),
+            meta_text=_text(data.get("meta_text")),
+            light=_text(data.get("light")),
+            description=_text(data.get("description")),
             panels=_panel_list(data.get("panels")),
             figures=_figure_list(data.get("figures")),
             uncertain=_text_list(data.get("uncertain")),
