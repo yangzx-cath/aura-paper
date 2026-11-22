@@ -31,3 +31,4 @@ multi_line_output = 3
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+addopts = ["--import-mode=importlib"]
