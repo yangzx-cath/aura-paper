@@ -163,7 +163,7 @@ def _apply(
         if not isinstance(entry, dict):
             continue
         key = str(entry.get("key") or "").strip()
-        owners[str(entry.get("crop") or "").strip()] = ids.get(key, "")
+        owners[str(entry.get("file") or "").strip()] = ids.get(key, "")
 
     parsed = Assets.from_dict(
         {

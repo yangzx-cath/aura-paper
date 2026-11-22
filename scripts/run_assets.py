@@ -11,6 +11,7 @@ Usage:
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 from aura_paper.cache import Cache
@@ -66,7 +67,10 @@ def main() -> int:
     print()
     print("Grouping the figure crops", flush=True)
 
+    started = time.perf_counter()
+
     result = assets(args.book, llm=llm, root=root, cache=cache)
+    elapsed = time.perf_counter() - started
 
     print()
     print(f"cast     {len(result.cast)}")
@@ -74,6 +78,7 @@ def main() -> int:
     print(f"resolved {len(result.resolved)}  open {len(result.open)}")
     for member in result.cast:
         print(_cast_line(member))
+    print(f"total    {elapsed:.1f}s")
     print(f"output   {root / args.book / 'assets.json'}")
     if result.error:
         print(f"error    {result.error}", file=sys.stderr)
