@@ -188,6 +188,8 @@ def _read_cover(
     content = PageContent(
         index=page.index,
         filename=page.filename,
+        width=page.width,
+        height=page.height,
         model=llm.model,
     )
     cover = CoverContent()

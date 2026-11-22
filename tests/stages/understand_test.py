@@ -78,6 +78,8 @@ def test_reads_the_cover_and_one_page(tmp_path):
     assert content.page_count == 2
     assert content.title == "测试绘本"
     assert content.failed_count == 0
+    assert content.pages[0].width == 100
+    assert content.pages[0].height == 80
     assert content.pages[1].meta_text == "阅读指导"
     assert content.pages[1].page_text == "三块、"
     assert content.pages[1].place == "菜园"
