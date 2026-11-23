@@ -38,6 +38,7 @@ def render(
         result.shots.append(
             _render_one(job, directory, out_dir, client, cache)
         )
+    result.shots = _merged(result.shots, job_book.shots, directory)
 
     result.error = "；".join(
         f"{shot.shot}：{shot.error}" for shot in result.shots if shot.error
@@ -99,6 +100,30 @@ def _render_one(
         return record
     _keep(target, key, cache)
     return record
+
+
+# Keep the record of every shot, including the ones this run did not touch.
+def _merged(
+    fresh: list[ShotRender],
+    jobs: list[Job],
+    directory: Path,
+) -> list[ShotRender]:
+    done = {record.shot: record for record in fresh}
+    before = {record.shot: record for record in _read_before(directory).shots}
+    merged = []
+    for job in jobs:
+        record = done.get(job.shot) or before.get(job.shot)
+        if record is not None:
+            merged.append(record)
+    return merged
+
+
+# Read the record of an earlier run, so a one-shot run does not erase it.
+def _read_before(directory: Path) -> BookRender:
+    path = directory / "render.json"
+    if not path.is_file():
+        return BookRender()
+    return BookRender.from_dict(json.loads(path.read_text("utf-8")))
 
 
 # Return the cached video of one job, when it is still on disk.

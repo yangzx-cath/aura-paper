@@ -109,6 +109,25 @@ def test_records_a_failed_clip_and_keeps_going(tmp_path):
     assert (tmp_path / "demo" / "clips" / "j2.mp4").is_file()
 
 
+def test_keeps_the_records_of_shots_it_did_not_touch(tmp_path):
+    make_jobs(tmp_path, ["j1", "j2"])
+    client = FakeVideo()
+    cache = Cache(tmp_path / "cache")
+
+    first = render("demo", client=client, root=tmp_path, cache=cache)
+    second = render(
+        "demo", client=client, only="j2", root=tmp_path, cache=cache
+    )
+
+    assert [shot.shot for shot in first.shots] == ["j1", "j2"]
+    # The one-shot run keeps j1 in the record and does not call again.
+    assert [shot.shot for shot in second.shots] == ["j1", "j2"]
+    assert second.shots[1].cached is True
+    assert len(client.requests) == 2
+    saved = json.loads((tmp_path / "demo" / "render.json").read_text())
+    assert [shot["shot"] for shot in saved["shots"]] == ["j1", "j2"]
+
+
 def test_renders_one_shot_only(tmp_path):
     make_jobs(tmp_path, ["j1", "j2"])
     client = FakeVideo()
