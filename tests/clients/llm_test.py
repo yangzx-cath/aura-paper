@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from aura_paper.clients.llm import LLMClient, LLMError
+from aura_paper.clients.llm import RETRIES, LLMClient, LLMError
 from aura_paper.utils import data_url
 
 REPLY = {"choices": [{"message": {"content": "{}"}}]}
@@ -109,6 +109,15 @@ def test_sends_plain_text_when_there_is_no_image() -> None:
     assert client.payload["messages"][-1]["content"] == "读这一页"
 
 
+def test_without_json_mode_leaves_out_the_system_turn() -> None:
+    client = RecordingClient()
+
+    client.chat("读这一页", json_mode=False)
+
+    assert "response_format" not in client.payload
+    assert client.payload["messages"][0]["role"] == "user"
+
+
 def test_reports_a_cut_off_reply() -> None:
     reply = {
         "choices": [{"message": {"content": "{}"}, "finish_reason": "length"}]
@@ -150,6 +159,22 @@ def test_the_effort_argument_wins_over_the_environment(monkeypatch) -> None:
     assert client.reasoning_effort == "low"
 
 
+def test_from_env_reads_the_effort(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_REASONING_EFFORT", "high")
+
+    client = LLMClient.from_env()
+
+    assert client.reasoning_effort == "high"
+
+
+def test_from_env_leaves_the_effort_empty(monkeypatch) -> None:
+    monkeypatch.delenv("LLM_REASONING_EFFORT", raising=False)
+
+    client = LLMClient.from_env()
+
+    assert client.reasoning_effort == ""
+
+
 def test_signature_carries_the_effort() -> None:
     client = LLMClient("http://x/v1", "k", "m", reasoning_effort="low")
 
@@ -188,3 +213,12 @@ def test_retries_a_reply_cut_off_mid_read(monkeypatch) -> None:
 
     assert client.chat("读这一页") == "ok"
     assert len(calls) == 2
+
+
+def test_a_reply_that_keeps_dropping_ends_as_an_error(monkeypatch) -> None:
+    calls = fake_urlopen(monkeypatch, [ConnectionResetError("reset")])
+    client = LLMClient("http://x/v1", "k", "m")
+
+    with pytest.raises(LLMError, match="dropped connection"):
+        client.chat("读这一页")
+    assert len(calls) == RETRIES
