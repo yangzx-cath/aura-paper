@@ -4,6 +4,7 @@ from PIL import Image
 
 from aura_paper.output import write_json
 from aura_paper.schema.cast import BookCast
+from aura_paper.schema.identify import BookPeople
 from aura_paper.schema.location import BookLocations
 from aura_paper.schema.shot import BookShots
 from aura_paper.schema.voice import BookVoice
@@ -193,6 +194,33 @@ def test_keeps_each_crop_once_when_the_place_master_is_the_panel(tmp_path):
         "panels/p000_0.jpg",
         "figures/p000_f0.jpg",
     ]
+
+
+def test_notes_the_people_named_in_each_panel(tmp_path):
+    make_book(
+        tmp_path,
+        [shot([{"kind": "旁白", "text": "下"}])],
+        [spoken(0, 1000)],
+    )
+    people = BookPeople.from_dict(
+        {
+            "id": "demo",
+            "panels": [
+                {
+                    "page": "p000.jpg",
+                    "panel": 0,
+                    "people": [{"cast": "c1", "parts": "衣服和腿"}],
+                }
+            ],
+        }
+    )
+    write_json("demo", "identify", people.to_dict(), tmp_path)
+
+    job = jobs(
+        "demo", ratio="4:3", resolution="480p", audio=False, root=tmp_path
+    ).shots[0]
+
+    assert job.images[0].note == "第 1 格分镜（小满 衣服和腿）"
 
 
 def test_writes_the_jobs_back_out(tmp_path):

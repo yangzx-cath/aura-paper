@@ -43,6 +43,11 @@ def clips_dir(book_id: str, root: str | Path | None = None) -> Path:
     return book_dir(book_id, root) / "clips"
 
 
+def identify_dir(book_id: str, root: str | Path | None = None) -> Path:
+    """Return the folder holding the copies read to name the people."""
+    return book_dir(book_id, root) / "identify"
+
+
 def panel_name(page_name: str, index: int) -> str:
     """Return the panel image name for one page image name."""
     return f"{Path(page_name).stem}_{index}.jpg"

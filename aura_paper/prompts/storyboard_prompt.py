@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..schema.cast import BookCast
 from ..schema.content import PageContent
+from ..schema.identify import BookPeople
 from ..schema.location import BookLocations
 
 TEMPLATE = """你是一名儿童绘本动画的分镜导演。
@@ -20,6 +21,9 @@ __CAST__
 
 【场地】
 __PLACES__
+
+【每一格出现的人】
+__PEOPLE__
 
 【逐页画面】
 __PAGES__
@@ -66,7 +70,8 @@ __PAGES__
    动作连贯而并进别的镜头；只有「白底」的画面才需要几块合起来才演得完一个动作。
    一块画面就能讲完一个动作的，panels 里就只列它自己。
 4. cast 只写角色 id，不写名字。这一镜里出现的人都要写上，包括只露半身、被挡
-   住的；一镜里看不到人就写 []。
+   住的；一镜里看不到人就写 []。【每一格出现的人】已经写明的格子按它写，不要
+   自己改。
 5. audio 的 kind 只有三种：旁白、对白、音效。
    text 必须从这块画面的文字里逐字照抄，不改写、不合并、不补字、不省略。
    对白和旁白要写 cast，音效的 cast 留空。
@@ -85,6 +90,7 @@ def storyboard_prompt(
     places: BookLocations,
     panel_images: list[tuple[str, int, str]],
     ref_images: list[tuple[str, str]],
+    people: BookPeople | None = None,
 ) -> str:
     """Build the prompt that plans the scenes and shots of one book."""
     numbers = {
@@ -100,7 +106,21 @@ def storyboard_prompt(
     text = text.replace("__STYLE__", places.style or "（未写画风）")
     text = text.replace("__CAST__", _cast_text(cast_book, refs))
     text = text.replace("__PLACES__", _places_text(places))
+    text = text.replace("__PEOPLE__", _people_text(people))
     return text.replace("__PAGES__", _pages_text(pages, places, numbers))
+
+
+# List the panels whose people were named one by one.
+def _people_text(people: BookPeople | None) -> str:
+    if people is None or not people.panels:
+        return "（这一本没有单独认过的格子）"
+    lines = []
+    for panel in people.panels:
+        named = "；".join(
+            f"{person.cast} {person.parts}" for person in panel.people
+        )
+        lines.append(f"{panel.page} 第{panel.panel}格：{named or '没人'}")
+    return "\n".join(lines)
 
 
 # List every character with the image that shows it whole.

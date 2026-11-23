@@ -14,6 +14,7 @@ from ..output import write_json
 from ..prompts import spoken_prompt, storyboard_prompt
 from ..schema.cast import BookCast
 from ..schema.content import BookContent, PageContent
+from ..schema.identify import BookPeople
 from ..schema.location import BookLocations
 from ..schema.scene import BookScenes, Scene
 from ..schema.shot import SHOT_JOINS, BookShots, Shot
@@ -46,6 +47,7 @@ def storyboard(
     pages = _read_content(directory).pages
     cast_book = _read_cast(directory)
     places = _read_locations(directory)
+    people = _read_people(directory)
 
     scene_book = BookScenes(id=book_id, model=llm.model)
     shot_book = BookShots(
@@ -55,7 +57,7 @@ def storyboard(
     )
     panels = _panel_images(book_id, pages, root)
     refs = _ref_images(book_id, cast_book, root)
-    prompt = storyboard_prompt(pages, cast_book, places, panels, refs)
+    prompt = storyboard_prompt(pages, cast_book, places, panels, refs, people)
     images = _thumbs(book_id, panels, refs, root)
 
     try:
@@ -66,7 +68,7 @@ def storyboard(
         _write(book_id, scene_book, shot_book, root)
         return scene_book, shot_book
 
-    notes = _apply(fields, scene_book, shot_book, pages, cast_book)
+    notes = _apply(fields, scene_book, shot_book, pages, cast_book, people)
     if not scene_book.scenes:
         notes.insert(0, "model returned no scene")
     if not shot_book.shots:
@@ -77,6 +79,14 @@ def storyboard(
         shot_book.error = "；".join(notes)
     _write(book_id, scene_book, shot_book, root)
     return scene_book, shot_book
+
+
+# Read the identify stage's record of the people in each panel, if any.
+def _read_people(directory: Path) -> BookPeople:
+    path = directory / "identify.json"
+    if not path.is_file():
+        return BookPeople()
+    return BookPeople.from_dict(json.loads(path.read_text("utf-8")))
 
 
 # Write the two files the later stages read.
@@ -189,6 +199,7 @@ def _apply(
     shot_book: BookShots,
     pages: list[PageContent],
     cast_book: BookCast,
+    people: BookPeople,
 ) -> list[str]:
     page_names = {page.filename for page in pages}
     panels = {
@@ -203,6 +214,7 @@ def _apply(
 
     scene_book.scenes = scenes
     shot_book.shots = _joins(shots)
+    _fill_cast(shot_book.shots, people, cast_book)
     missed = _printed(shot_book.shots, panels)
     unknown = sum(
         1 for shot in shot_book.shots for line in shot.audio if not line.kind
@@ -220,6 +232,31 @@ def _apply(
     if missed:
         notes.append(f"{missed} 行文字在原文里找不到")
     return notes
+
+
+# Take the cast of a shot from the people named in its panels, when all of
+# them were named. A shot that covers a page nobody re-read keeps the
+# cast the model gave it.
+def _fill_cast(
+    shots: list[Shot],
+    people: BookPeople,
+    cast_book: BookCast,
+) -> None:
+    named = {(panel.page, panel.panel): panel for panel in people.panels}
+    order = [member.id for member in cast_book.cast]
+    for shot in shots:
+        found: list[str] = []
+        complete = True
+        for panel in shot.panels:
+            record = named.get((panel.page, panel.panel))
+            if record is None:
+                complete = False
+                break
+            for person in record.people:
+                if person.cast not in found:
+                    found.append(person.cast)
+        if complete:
+            shot.cast = [cast_id for cast_id in order if cast_id in found]
 
 
 # Number the scenes and remember the tags the shots point at.

@@ -13,6 +13,7 @@ from ..media.image import load_image, save_jpeg
 from ..output import write_json
 from ..prompts import job_prompt
 from ..schema.cast import BookCast, Cast
+from ..schema.identify import BookPeople, PanelPeople
 from ..schema.job import BookJobs, Job, JobImage, JobLine
 from ..schema.location import BookLocations
 from ..schema.shot import BookShots, Shot
@@ -56,6 +57,7 @@ def jobs(
     voice_book = _read_voice(directory)
     cast_book = _read_cast(directory)
     places = _read_locations(directory)
+    people = _read_people(directory)
     by_shot = {shot.shot: shot for shot in voice_book.shots}
 
     out_dir = jobs_dir(book_id, root)
@@ -73,6 +75,7 @@ def jobs(
                 cast=_cast_of(shot, cast_book),
                 place=_place(shot, places),
                 places=places,
+                people=people,
                 lines=lines,
                 ratio=ratio,
                 resolution=resolution,
@@ -98,6 +101,7 @@ def _build(
     cast: list[Cast],
     place: str,
     places: BookLocations,
+    people: BookPeople,
     lines: list[JobLine],
     ratio: str,
     resolution: str,
@@ -119,7 +123,7 @@ def _build(
     )
     job.duration = _seconds(job.audio_ms)
     job.images = _images(
-        job.shot, shot, cast, place, places, directory, out_dir
+        job.shot, shot, cast, place, places, people, directory, out_dir
     )
     job.prompt = job_prompt(
         shot,
@@ -226,21 +230,25 @@ def _images(
     cast: list[Cast],
     place: str,
     places: BookLocations,
+    people: BookPeople,
     directory: Path,
     out_dir: Path,
 ) -> list[JobImage]:
     images = []
     seen: set[Path] = set()
+    named = {(panel.page, panel.panel): panel for panel in people.panels}
+    names = {member.id: member.name or member.id for member in cast}
     folder = directory / "panels"
     for number, panel in enumerate(shot.panels, start=1):
         crop = folder / panel_name(panel.page, panel.panel)
         if not crop.is_file() or crop in seen:
             continue
         seen.add(crop)
+        people_text = _people_text(named.get((panel.page, panel.panel)), names)
         images.append(
             JobImage(
                 file=_fitted(crop, out_dir, f"{name}-{number}", directory),
-                note=f"第 {number} 格分镜，{panel.page} 的第 {panel.panel} 块",
+                note=f"第 {number} 格分镜{people_text}",
             )
         )
 
@@ -266,6 +274,20 @@ def _images(
             )
         )
     return images
+
+
+# Say who a panel shows, when somebody took a closer look at it.
+def _people_text(
+    record: PanelPeople | None,
+    names: dict[str, str],
+) -> str:
+    if record is None or not record.people:
+        return ""
+    said = "；".join(
+        f"{names.get(person.cast, person.cast)} {person.parts}"
+        for person in record.people
+    )
+    return f"（{said}）"
 
 
 # Return the first crop of a character that is still on disk.
@@ -351,3 +373,11 @@ def _read_cast(directory: Path) -> BookCast:
 def _read_locations(directory: Path) -> BookLocations:
     path = directory / "locations.json"
     return BookLocations.from_dict(json.loads(path.read_text("utf-8")))
+
+
+# Read the identify stage's record of the people, when it was run.
+def _read_people(directory: Path) -> BookPeople:
+    path = directory / "identify.json"
+    if not path.is_file():
+        return BookPeople()
+    return BookPeople.from_dict(json.loads(path.read_text("utf-8")))

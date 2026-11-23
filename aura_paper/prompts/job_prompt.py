@@ -30,7 +30,8 @@ __IMAGES__
 3. 画面铺满整个画幅，四周不要留白边，不要出现色块。
 4. 景别是__CAMERA__，__MOVE__。
 5. __SOUND__
-6. 这一镜大约 __SECONDS__ 秒，动作要在这个长度内做完。
+6. 图注里写了这一格是谁、露出哪些部位，按图注认人，不要换人。
+7. 这一镜大约 __SECONDS__ 秒，动作要在这个长度内做完。
 """
 
 # How the camera behaves for each framing the storyboard can pick.
