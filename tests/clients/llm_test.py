@@ -14,7 +14,7 @@ import pytest
 from PIL import Image
 
 from aura_paper.clients.llm import RETRIES, LLMClient, LLMError
-from aura_paper.utils import data_url
+from aura_paper.media.image import data_url
 
 REPLY = {"choices": [{"message": {"content": "{}"}}]}
 

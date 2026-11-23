@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-from ..utils import IMAGE_SUFFIXES
+from ..media.image import IMAGE_SUFFIXES
 
 # Status values returned by the supported providers.
 TASK_PENDING = ("queued", "running")

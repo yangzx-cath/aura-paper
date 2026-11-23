@@ -10,7 +10,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from ..utils import data_url
+from ..media.image import data_url
 
 # The endpoint drops calls when it runs out of capacity, so repeat those.
 RETRY_STATUS = (429, 500, 502, 503, 504)

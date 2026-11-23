@@ -1,12 +1,49 @@
+import base64
 import random
 
+import pytest
 from PIL import Image, ImageDraw
 
 from aura_paper.media.image import (
     crop_box,
+    data_url,
     save_jpeg,
     stitch_side_by_side,
 )
+
+
+def test_jpeg_prefix_and_payload(sample_jpeg):
+    url = data_url(sample_jpeg)
+
+    header, _, payload = url.partition(",")
+    assert header == "data:image/jpeg;base64"
+    assert base64.b64decode(payload) == sample_jpeg.read_bytes()
+
+
+def test_png_uses_png_mime(tmp_path):
+    target = tmp_path / "page.png"
+    target.write_bytes(b"\x89PNG\r\n\x1a\nnot really a png")
+
+    url = data_url(target)
+
+    assert url.startswith("data:image/png;base64,")
+
+
+def test_upper_suffix_uses_mime(tmp_path):
+    target = tmp_path / "page.JPG"
+    target.write_bytes(b"\xff\xd8fake")
+
+    url = data_url(target)
+
+    assert url.startswith("data:image/jpeg;base64,")
+
+
+def test_unknown_suffix_raises(tmp_path):
+    target = tmp_path / "page.xyz"
+    target.write_bytes(b"whatever")
+
+    with pytest.raises(ValueError, match="unsupported image type"):
+        data_url(target)
 
 
 # Write a page image of the given size.

@@ -16,7 +16,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from ..utils import data_url
+from ..media.image import data_url
 from .video import VideoError, VideoRequest, VideoTask
 
 DEFAULT_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"

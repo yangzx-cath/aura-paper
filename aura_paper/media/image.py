@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageStat
+
+# Supported image suffixes and their MIME types.
+MIME_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+}
+
+# Image suffixes accepted across the pipeline.
+IMAGE_SUFFIXES = set(MIME_TYPES)
 
 # Compare seam strips in steps of this many pixels.
 SEAM_STEP = 2
@@ -14,6 +25,15 @@ SEAM_LIMIT = 12.0
 
 # Pixels darker than this count as ink.
 INK_LEVEL = 235
+
+
+def data_url(path: Path) -> str:
+    """Convert a local image file to a data URL."""
+    mime = MIME_TYPES.get(path.suffix.lower())
+    if mime is None:
+        raise ValueError(f"unsupported image type: {path.suffix}")
+    payload = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{payload}"
 
 
 def load_image(path: str | Path) -> Image.Image:

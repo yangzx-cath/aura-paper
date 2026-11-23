@@ -1,43 +1,8 @@
-import base64
 from datetime import datetime, timezone
 
 import pytest
 
-from aura_paper.utils import data_url, extract_json, now_iso
-
-
-def test_jpeg_prefix_and_payload(sample_jpeg):
-    url = data_url(sample_jpeg)
-
-    header, _, payload = url.partition(",")
-    assert header == "data:image/jpeg;base64"
-    assert base64.b64decode(payload) == sample_jpeg.read_bytes()
-
-
-def test_png_uses_png_mime(tmp_path):
-    target = tmp_path / "page.png"
-    target.write_bytes(b"\x89PNG\r\n\x1a\nnot really a png")
-
-    url = data_url(target)
-
-    assert url.startswith("data:image/png;base64,")
-
-
-def test_upper_suffix_uses_mime(tmp_path):
-    target = tmp_path / "page.JPG"
-    target.write_bytes(b"\xff\xd8fake")
-
-    url = data_url(target)
-
-    assert url.startswith("data:image/jpeg;base64,")
-
-
-def test_unknown_suffix_raises(tmp_path):
-    target = tmp_path / "page.xyz"
-    target.write_bytes(b"whatever")
-
-    with pytest.raises(ValueError, match="unsupported image type"):
-        data_url(target)
+from aura_paper.utils import extract_json, now_iso
 
 
 def test_extract_plain_json():
