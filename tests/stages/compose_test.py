@@ -99,7 +99,7 @@ def make_book(
     write_json("demo", "jobs", jobs.to_dict(), root)
 
 
-def test_mixes_a_take_as_long_as_the_lines_run(tmp_path):
+def test_keeps_the_whole_clip_even_when_the_lines_are_short(tmp_path):
     make_book(tmp_path, audio_ms=1200)
 
     result = compose("demo", root=tmp_path)
@@ -108,18 +108,10 @@ def test_mixes_a_take_as_long_as_the_lines_run(tmp_path):
     assert take.error == ""
     assert take.file == "shots/j1.mp4"
     assert take.audio == "shots/j1.wav"
-    assert take.seconds == pytest.approx(1.2)
+    assert take.seconds == pytest.approx(2.5)
     info = ffmpeg.probe(tmp_path / "demo" / "shots" / "j1.mp4")
     assert info.has_audio is True
-    assert info.duration_ms == pytest.approx(1200, abs=120)
-
-
-def test_holds_the_picture_after_the_last_word(tmp_path):
-    make_book(tmp_path, audio_ms=1200, clip_seconds=3.0)
-
-    result = compose("demo", tail_seconds=0.5, root=tmp_path)
-
-    assert result.shots[0].seconds == pytest.approx(1.7)
+    assert info.duration_ms == pytest.approx(2500, abs=120)
 
 
 def test_leaves_the_dialogue_to_the_clip_that_was_sent_a_reference(tmp_path):
@@ -140,20 +132,12 @@ def test_leaves_the_dialogue_to_the_clip_that_was_sent_a_reference(tmp_path):
     assert result.shots[0].error == ""
 
 
-def test_a_short_line_still_keeps_a_readable_take(tmp_path):
-    make_book(tmp_path, audio_ms=600, clip_seconds=3.0)
-
-    result = compose("demo", min_seconds=2.5, root=tmp_path)
-
-    assert result.shots[0].seconds == pytest.approx(2.5)
-
-
-def test_a_take_never_runs_past_its_clip(tmp_path):
+def test_a_take_is_as_long_as_its_clip_and_its_hold(tmp_path):
     make_book(tmp_path, audio_ms=600, clip_seconds=1.0)
 
-    result = compose("demo", min_seconds=2.5, root=tmp_path)
+    result = compose("demo", root=tmp_path)
 
-    assert result.shots[0].seconds == pytest.approx(1.0, abs=0.1)
+    assert result.shots[0].seconds == pytest.approx(1.5, abs=0.1)
 
 
 def test_keeps_the_sound_the_clip_brought(tmp_path):
@@ -171,7 +155,7 @@ def test_keeps_the_whole_clip_when_nothing_is_spoken(tmp_path):
     result = compose("demo", root=tmp_path)
 
     # A sound effect alone must not cut the picture down to its slot.
-    assert result.shots[0].seconds == pytest.approx(2.0, abs=0.1)
+    assert result.shots[0].seconds == pytest.approx(2.5, abs=0.1)
 
 
 def test_joins_the_takes_into_a_film(tmp_path):
@@ -181,8 +165,8 @@ def test_joins_the_takes_into_a_film(tmp_path):
 
     assert result.film == "shots/film.mp4"
     assert (tmp_path / "demo" / "shots" / "film.mp4").is_file()
-    # Two one-second takes, cut together without losing anything.
-    assert result.seconds == pytest.approx(2.0, abs=0.1)
+    # Two whole clips and their holds, cut together without losing anything.
+    assert result.seconds == pytest.approx(5.0, abs=0.1)
     assert [join.after for join in result.joins] == ["j2"]
     assert result.joins[0].kind == "硬切"
 
@@ -192,7 +176,11 @@ def test_a_dissolve_costs_the_length_it_shares(tmp_path):
 
     result = compose("demo", root=tmp_path)
 
-    assert result.seconds == pytest.approx(1.5, abs=0.1)
+    assert result.seconds == pytest.approx(4.5, abs=0.1)
+    # The two sounds run into each other, so the film is as long as its
+    # picture and the sound is not cut short.
+    info = ffmpeg.probe(tmp_path / "demo" / "shots" / "film.mp4")
+    assert info.duration_ms == pytest.approx(4500, abs=120)
 
 
 def test_waits_for_every_shot_before_making_the_film(tmp_path):

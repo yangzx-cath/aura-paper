@@ -42,6 +42,7 @@ class MediaInfo:
     """What ffprobe says about one file."""
 
     duration_ms: int = 0
+    video_ms: int = 0
     width: int = 0
     height: int = 0
     fps: float = 0.0
@@ -95,6 +96,7 @@ def probe(path: str | Path) -> MediaInfo:
         kind = stream.get("codec_type")
         if kind == "video" and not info.has_video:
             info.has_video = True
+            info.video_ms = _video_ms(stream)
             info.width = int(stream.get("width") or 0)
             info.height = int(stream.get("height") or 0)
             info.fps = _fps(stream.get("r_frame_rate"))
@@ -109,10 +111,12 @@ def mux(
     target: str | Path,
     *,
     seconds: float = 0.0,
+    hold: float = 0.0,
 ) -> Path:
     """Put one audio track under one clip, cutting both to seconds.
 
-    The sound the model put in the clip is replaced, not mixed.
+    The sound the model put in the clip is replaced, not mixed. A hold
+    keeps the last picture on screen for that long, with silence under it.
     """
     target = Path(target)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -123,10 +127,21 @@ def mux(
         str(clip),
         "-i",
         str(audio),
-        "-map",
-        "0:v:0",
+    ]
+    if hold > 0:
+        args += [
+            "-filter_complex",
+            f"[0:v]tpad=stop_mode=clone:stop_duration={hold:.3f}[v]",
+            "-map",
+            "[v]",
+        ]
+    else:
+        args += ["-map", "0:v:0"]
+    args += [
         "-map",
         "1:a:0",
+        "-af",
+        "apad",
     ]
     if seconds > 0:
         args += ["-t", f"{seconds:.3f}"]
@@ -142,18 +157,27 @@ def mix(
     *,
     seconds: float = 0.0,
     background: float = BACKGROUND_VOLUME,
+    hold: float = 0.0,
 ) -> Path:
     """Put one track over the sound a clip already carries, cut to seconds.
 
     The clip has to bring its own sound; a silent clip goes through mux().
+    A hold keeps the last picture on screen for that long, with only the
+    local track under it.
     """
     target = Path(target)
     target.parent.mkdir(parents=True, exist_ok=True)
+    # The model's own sound can be shorter than the local track, so the
+    # mix runs to the longer of the two and the tail is padded with silence.
     graph = (
         f"[0:a]volume={background:g}[bg];"
-        "[bg][1:a]amix=inputs=2:duration=first:normalize=0,"
-        f"alimiter=limit={LIMIT:g}[a]"
+        "[bg][1:a]amix=inputs=2:duration=longest:normalize=0,"
+        f"apad,alimiter=limit={LIMIT:g}[a]"
     )
+    picture = "0:v:0"
+    if hold > 0:
+        graph += f";[0:v]tpad=stop_mode=clone:stop_duration={hold:.3f}[v]"
+        picture = "[v]"
     args = [
         FFMPEG,
         *COMMON,
@@ -164,7 +188,7 @@ def mix(
         "-filter_complex",
         graph,
         "-map",
-        "0:v:0",
+        picture,
         "-map",
         "[a]",
     ]
@@ -221,8 +245,9 @@ def join(
     hard cut, and a list of zeros takes the copy-only path of concat().
     Clips that hard cut into each other are joined with concat first, because
     a cross fade of zero length is not a hard cut.
-    The sound of a dissolve is cut at the overlap, not cross faded, so the
-    words of the next shot stay whole.
+    Nothing is thrown away: every take keeps its whole picture and its whole
+    sound. Each take ends with a held beat, so the stretch a dissolve shares
+    holds no words and the sound can be cut there without losing any.
     """
     sources = [Path(source) for source in sources]
     if not sources:
@@ -239,14 +264,17 @@ def join(
     size = probe(sources[0])
     runs = _runs(spreads)
     edges = []
-    for number in range(len(sources)):
+    for number, length in enumerate(lengths):
         tail = spreads[number] if number < len(spreads) else 0.0
         if number not in [group[-1] for group in runs]:
             tail = 0.0
-        keep = max(0.0, lengths[number] - tail)
+        keep = max(0.0, length - tail)
+        # Both streams are held at the length they keep, so a track that
+        # came out a frame short cannot pull the film out of step.
         edges.append(f"[{number}:v]{_fit(size)}[v{number}]")
         edges.append(
-            f"[{number}:a]atrim=0:{keep:.3f},asetpts=PTS-STARTPTS[a{number}]"
+            f"[{number}:a]atrim=0:{keep:.3f},"
+            f"apad=whole_dur={keep:.3f},asetpts=PTS-STARTPTS[a{number}]"
         )
 
     for number, group in enumerate(runs):
@@ -300,6 +328,7 @@ def title_card(
 ) -> Path:
     """Hold a card image for the given time, sounding its audio."""
     width, height = size
+    seconds = int(seconds * FILM_FPS) / FILM_FPS
     target = Path(target)
     target.parent.mkdir(parents=True, exist_ok=True)
     graph = (
@@ -324,6 +353,8 @@ def title_card(
             "[v]",
             "-map",
             "1:a:0",
+            "-af",
+            "apad",
             "-t",
             f"{seconds:.3f}",
             *VIDEO_CODEC,
@@ -398,6 +429,18 @@ def _ms(value: object) -> int:
         return round(float(value) * 1000)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return 0
+
+
+# Read a video stream's own length, or work it out from its frame count.
+def _video_ms(stream: dict) -> int:
+    direct = _ms(stream.get("duration"))
+    if direct:
+        return direct
+    frames = int(stream.get("nb_frames") or 0)
+    fps = _fps(stream.get("r_frame_rate"))
+    if frames and fps:
+        return round(frames * 1000 / fps)
+    return 0
 
 
 # Read a frame rate written as a fraction, like 24000/1001.

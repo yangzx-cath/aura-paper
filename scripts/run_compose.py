@@ -23,13 +23,6 @@ from aura_paper.store.cache import Cache
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# A shot shorter than this reads as a flash; the picture lingers a moment
-# after the words end instead.
-MIN_SECONDS = 2.5
-
-# Silence kept after the last word, so two shots never meet back to back.
-TAIL_SECONDS = 0.5
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Mix one take per shot.")
@@ -44,20 +37,6 @@ def main() -> int:
         default="",
         metavar="SHOT",
         help="mix one shot only",
-    )
-    parser.add_argument(
-        "--min",
-        type=float,
-        default=MIN_SECONDS,
-        metavar="SECONDS",
-        help=f"shortest take (default={MIN_SECONDS})",
-    )
-    parser.add_argument(
-        "--tail",
-        type=float,
-        default=TAIL_SECONDS,
-        metavar="SECONDS",
-        help=f"silence after the last word (default={TAIL_SECONDS})",
     )
     parser.add_argument(
         "--no-title-card",
@@ -98,8 +77,6 @@ def main() -> int:
 
     print(f"book     {args.book}")
     print(f"root     {root}")
-    print(f"min      {args.min}s")
-    print(f"tail     {args.tail}s")
     if args.shot:
         print(f"shot     {args.shot}")
     print()
@@ -109,8 +86,6 @@ def main() -> int:
     result = compose(
         args.book,
         only=args.shot,
-        min_seconds=args.min,
-        tail_seconds=args.tail,
         tts=tts,
         root=root,
         cache=cache,

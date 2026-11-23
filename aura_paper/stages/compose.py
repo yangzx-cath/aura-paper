@@ -38,6 +38,10 @@ UNASKED_SECONDS = 0.3
 # How long two shots share the screen when they dissolve into each other.
 OVERLAP = 0.5
 
+# How long a take holds its last picture after the clip ends. The hold is
+# the room a dissolve shares, so no word ever sits inside that stretch.
+HOLD = 0.5
+
 # The title is read slower than the story, with room to breathe either side.
 TITLE_SPEED = 0.8
 TITLE_LEAD_MS = 1500
@@ -69,8 +73,6 @@ def compose(
     book_id: str,
     *,
     only: str = "",
-    min_seconds: float = 0.0,
-    tail_seconds: float = 0.0,
     tts: TTSClient | None = None,
     root: str | Path | None = None,
     cache: Cache | None = None,
@@ -85,9 +87,7 @@ def compose(
     for job in job_book.shots:
         if only and job.shot != only:
             continue
-        result.shots.append(
-            _one(job, directory, out_dir, min_seconds, tail_seconds)
-        )
+        result.shots.append(_one(job, directory, out_dir))
 
     result.joins = _joins(job_book.shots, result.shots, out_dir)
     notes = []
@@ -231,8 +231,6 @@ def _one(
     job: Job,
     directory: Path,
     out_dir: Path,
-    min_seconds: float,
-    tail_seconds: float,
 ) -> ComposedShot:
     record = ComposedShot(shot=job.shot)
     source = f"clips/{job.shot}{SUFFIX}"
@@ -249,7 +247,7 @@ def _one(
         return record
     record.sound = info.has_audio
 
-    seconds = _seconds(job, info.duration_ms, min_seconds, tail_seconds)
+    seconds = round(_seconds(info) + HOLD, 3)
     track = out_dir / f"{job.shot}{TRACK_SUFFIX}"
     audio.write_track(track, _parts(job, directory), seconds)
     record.audio = f"shots/{track.name}"
@@ -260,9 +258,16 @@ def _one(
             # A clip that speaks the dialogue must not be turned down, since
             # the track under it only carries the narration.
             level = 1.0 if job.reference else BACKGROUND_VOLUME
-            ffmpeg.mix(clip, track, target, seconds=seconds, background=level)
+            ffmpeg.mix(
+                clip,
+                track,
+                target,
+                seconds=seconds,
+                background=level,
+                hold=HOLD,
+            )
         else:
-            ffmpeg.mux(clip, track, target, seconds=seconds)
+            ffmpeg.mux(clip, track, target, seconds=seconds, hold=HOLD)
     except ffmpeg.FFmpegError as exc:
         record.error = str(exc)
         return record
@@ -296,20 +301,12 @@ def _narration_sound(job: Job, clip: Path, out_dir: Path) -> float:
         heard.unlink(missing_ok=True)
 
 
-# Take the shot as long as its lines run plus a tail, so the picture holds a
-# moment after the last word instead of butting into the next shot. A shot
-# with nothing spoken keeps the whole clip, and no take runs past its clip.
-def _seconds(
-    job: Job,
-    clip_ms: int,
-    min_seconds: float,
-    tail_seconds: float,
-) -> float:
-    clip = clip_ms / 1000
-    if not any(line.file for line in job.lines):
-        return round(clip, 3)
-    wanted = max(job.audio_ms / 1000 + tail_seconds, min_seconds)
-    return round(min(clip, wanted), 3)
+# Take the shot at the whole length of its clip, cut to a whole number of
+# frames so its picture and its sound end on the same frame.
+def _seconds(info: ffmpeg.MediaInfo) -> float:
+    length = info.video_ms or info.duration_ms
+    frames = int(length * ffmpeg.FILM_FPS / 1000 + 1e-6)
+    return round(frames / ffmpeg.FILM_FPS, 3)
 
 
 # List the lines the local track has to carry. A shot that was sent a
