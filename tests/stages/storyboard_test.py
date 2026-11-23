@@ -207,13 +207,19 @@ def test_numbers_scenes_and_shots(tmp_path):
     assert shot_book.error == ""
 
 
-def test_cuts_a_merged_shot_at_six_panels(tmp_path):
+def test_cuts_a_shot_that_spans_pages_between_the_pages(tmp_path):
     pages = [
         {
             "panels": [
-                panel(BLANK_BOX, text=f"第{number}块、") for number in range(8)
+                panel(BLANK_BOX, text=f"第{number}块、") for number in range(3)
             ]
-        }
+        },
+        {
+            "panels": [
+                panel(BLANK_BOX, text=f"第{number}块、")
+                for number in range(3, 6)
+            ]
+        },
     ]
     make_book(tmp_path, pages)
     reply = {
@@ -223,15 +229,18 @@ def test_cuts_a_merged_shot_at_six_panels(tmp_path):
                 "scene": "A",
                 "panels": [
                     {"page": "p000.jpg", "panel": number}
-                    for number in range(8)
+                    for number in range(3)
+                ]
+                + [
+                    {"page": "p001.jpg", "panel": number}
+                    for number in range(3)
                 ],
                 "cast": ["c1"],
-                "mode": "扩景",
                 "camera": "中景",
-                "beats": [f"第{number}步" for number in range(8)],
+                "beats": [f"第{number}步" for number in range(6)],
                 "audio": [
                     {"kind": "旁白", "text": f"第{number}块、", "cast": ""}
-                    for number in (0, 7)
+                    for number in (0, 4)
                 ],
             }
         ],
@@ -243,13 +252,54 @@ def test_cuts_a_merged_shot_at_six_panels(tmp_path):
         root=tmp_path,
     )
 
-    assert [len(item.panels) for item in shot_book.shots] == [6, 2]
-    assert [item.id for item in shot_book.shots] == ["j1", "j2"]
+    # Six panels over two pages do not fit one clip, and the cut lands
+    # between the pages, so each clip covers one whole page.
+    assert [len(item.panels) for item in shot_book.shots] == [3, 3]
+    assert [item.page for item in shot_book.shots[1].panels] == [
+        "p001.jpg"
+    ] * 3
     # Each line of sound travels with the panel it is printed on.
     voices = [[line.text for line in item.audio] for item in shot_book.shots]
-    assert voices == [["第0块、"], ["第7块、"]]
+    assert voices == [["第0块、"], ["第4块、"]]
     # The beats follow their own panels too.
-    assert shot_book.shots[1].beats == ["第6步", "第7步"]
+    assert shot_book.shots[1].beats == ["第3步", "第4步", "第5步"]
+
+
+def test_keeps_a_whole_page_that_holds_more_panels_than_a_clip(tmp_path):
+    pages = [
+        {
+            "panels": [
+                panel(BLANK_BOX, text=f"第{number}块、") for number in range(5)
+            ]
+        }
+    ]
+    make_book(tmp_path, pages)
+    reply = {
+        "scenes": [{"key": "A", "name": "搭积木", "location": "l1"}],
+        "shots": [
+            {
+                "scene": "A",
+                "panels": [
+                    {"page": "p000.jpg", "panel": number}
+                    for number in range(5)
+                ],
+                "cast": ["c1"],
+                "camera": "中景",
+                "beats": [f"第{number}步" for number in range(5)],
+                "audio": [{"kind": "旁白", "text": "第0块、", "cast": ""}],
+            }
+        ],
+    }
+
+    scene_book, shot_book = storyboard(
+        "demo",
+        llm=FakeLLM(reply),
+        root=tmp_path,
+    )
+
+    # The page stays in one piece, however many panels it holds.
+    assert [len(item.panels) for item in shot_book.shots] == [5]
+    assert shot_book.error == ""
 
 
 def test_drops_a_shot_without_a_panel(tmp_path):

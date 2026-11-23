@@ -289,9 +289,10 @@ def _scenes(
     return parsed.scenes, keys
 
 
-# A clip holds at most this many panels: the service takes 4 to 15 seconds
-# and one counting line is about a second.
-MAX_PANELS = 6
+# One panel is one reference image, and the service takes nine images in one
+# request, so a shot keeps few panels and leaves room for the cast crops and
+# the place master.
+MAX_PANELS = 4
 
 # Characters that carry a number, which a rewrite must keep.
 NUMERALS = set("零一二三四五六七八九十百千万亿0123456789")
@@ -319,7 +320,9 @@ def _shots(
         ]
         beats = _texts(entry.get("beats"))
         lines = _audio(entry.get("audio"), cast_ids)
-        for group, group_lines in _groups(covered, beats, lines, panels):
+        for group, group_lines in _groups(
+            _packed(_pages(covered)), lines, panels
+        ):
             entries.append(
                 {
                     "id": f"j{len(entries) + 1}",
@@ -339,20 +342,38 @@ def _shots(
     return parsed.shots, notes
 
 
+# Return the panels of one shot page by page, in the order they are listed.
+def _pages(covered: list[dict]) -> list[list[dict]]:
+    pages: list[list[dict]] = []
+    for item in covered:
+        if pages and pages[-1][0]["page"] == item["page"]:
+            pages[-1].append(item)
+        else:
+            pages.append([item])
+    return pages
+
+
+# Pack the pages of one action into clips, cutting only between pages.
+def _packed(pages: list[list[dict]]) -> list[list[dict]]:
+    groups: list[list[dict]] = []
+    group: list[dict] = []
+    for page in pages:
+        if group and len(group) + len(page) > MAX_PANELS:
+            groups.append(group)
+            group = []
+        group = group + page
+    return groups + [group] if group else groups
+
+
 # Cut the panels of one action into clips the service can render.
 def _groups(
-    covered: list[dict],
-    beats: list[str],
+    groups: list[list[dict]],
     lines: list[dict],
     panels: dict[tuple[str, int], object],
 ) -> list[tuple[list[dict], list[dict]]]:
-    if len(covered) <= MAX_PANELS:
-        return [(covered, lines)]
+    if len(groups) == 1:
+        return [(groups[0], lines)]
 
-    groups = [
-        covered[start : start + MAX_PANELS]
-        for start in range(0, len(covered), MAX_PANELS)
-    ]
     carried: list[list[dict]] = [[] for _ in groups]
     for line in lines:
         carried[_group_of(str(line.get("text") or ""), groups, panels)].append(
@@ -387,9 +408,10 @@ def _beats_for(
 ) -> list[str]:
     if len(group) == len(covered) or not covered:
         return beats
-    start = covered.index(group[0])
+    mine = [item for item in group if item in covered]
     if len(beats) == len(covered):
-        return beats[start : start + len(group)]
+        return [beats[covered.index(item)] for item in mine]
+    start = covered.index(mine[0]) if mine else 0
     size = len(beats) / len(covered)
     first = round(start * size)
     last = round((start + len(group)) * size)
