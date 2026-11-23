@@ -21,6 +21,13 @@ from aura_paper.stages.compose import compose
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# A shot shorter than this reads as a flash; the picture lingers a moment
+# after the words end instead.
+MIN_SECONDS = 2.5
+
+# Silence kept after the last word, so two shots never meet back to back.
+TAIL_SECONDS = 0.5
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Mix one take per shot.")
@@ -35,6 +42,20 @@ def main() -> int:
         default="",
         metavar="镜号",
         help="mix one shot only",
+    )
+    parser.add_argument(
+        "--min",
+        type=float,
+        default=MIN_SECONDS,
+        metavar="秒",
+        help=f"shortest take (default={MIN_SECONDS})",
+    )
+    parser.add_argument(
+        "--tail",
+        type=float,
+        default=TAIL_SECONDS,
+        metavar="秒",
+        help=f"silence after the last word (default={TAIL_SECONDS})",
     )
     args = parser.parse_args()
 
@@ -55,13 +76,21 @@ def main() -> int:
 
     print(f"book     {args.book}")
     print(f"root     {root}")
+    print(f"min      {args.min}s")
+    print(f"tail     {args.tail}s")
     if args.shot:
         print(f"shot     {args.shot}")
     print()
     print("Mixing the takes", flush=True)
 
     started = time.perf_counter()
-    result = compose(args.book, only=args.shot, root=root)
+    result = compose(
+        args.book,
+        only=args.shot,
+        min_seconds=args.min,
+        tail_seconds=args.tail,
+        root=root,
+    )
     elapsed = time.perf_counter() - started
 
     print()

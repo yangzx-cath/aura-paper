@@ -55,12 +55,15 @@ def make_book(
     audio_ms=1000,
     shots=1,
     join="硬切",
+    clip_seconds=2.0,
 ):
     book = root / "demo"
     entries = []
     for number in range(shots):
         name = f"j{number + 1}"
-        make_clip(book / "clips" / f"{name}.mp4", seconds=2.0, tone=tone)
+        make_clip(
+            book / "clips" / f"{name}.mp4", seconds=clip_seconds, tone=tone
+        )
         lines = []
         if with_line:
             make_line(book / "voice" / f"{name}-0.wav")
@@ -108,6 +111,30 @@ def test_mixes_a_take_as_long_as_the_lines_run(tmp_path):
     info = ffmpeg.probe(tmp_path / "demo" / "shots" / "j1.mp4")
     assert info.has_audio is True
     assert info.duration_ms == pytest.approx(1200, abs=120)
+
+
+def test_holds_the_picture_after_the_last_word(tmp_path):
+    make_book(tmp_path, audio_ms=1200, clip_seconds=3.0)
+
+    result = compose("demo", tail_seconds=0.5, root=tmp_path)
+
+    assert result.shots[0].seconds == pytest.approx(1.7)
+
+
+def test_a_short_line_still_keeps_a_readable_take(tmp_path):
+    make_book(tmp_path, audio_ms=600, clip_seconds=3.0)
+
+    result = compose("demo", min_seconds=2.5, root=tmp_path)
+
+    assert result.shots[0].seconds == pytest.approx(2.5)
+
+
+def test_a_take_never_runs_past_its_clip(tmp_path):
+    make_book(tmp_path, audio_ms=600, clip_seconds=1.0)
+
+    result = compose("demo", min_seconds=2.5, root=tmp_path)
+
+    assert result.shots[0].seconds == pytest.approx(1.0, abs=0.1)
 
 
 def test_keeps_the_sound_the_clip_brought(tmp_path):

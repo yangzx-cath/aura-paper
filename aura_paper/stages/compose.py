@@ -39,6 +39,8 @@ def compose(
     book_id: str,
     *,
     only: str = "",
+    min_seconds: float = 0.0,
+    tail_seconds: float = 0.0,
     root: str | Path | None = None,
 ) -> BookCompose:
     """Read jobs.json, mix one take per shot, write compose.json."""
@@ -51,7 +53,9 @@ def compose(
     for job in job_book.shots:
         if only and job.shot != only:
             continue
-        result.shots.append(_one(job, directory, out_dir))
+        result.shots.append(
+            _one(job, directory, out_dir, min_seconds, tail_seconds)
+        )
 
     result.joins = _joins(job_book.shots, result.shots, out_dir)
     notes = []
@@ -70,7 +74,13 @@ def compose(
 
 
 # Mix one shot, or record why it could not be done.
-def _one(job: Job, directory: Path, out_dir: Path) -> ComposedShot:
+def _one(
+    job: Job,
+    directory: Path,
+    out_dir: Path,
+    min_seconds: float,
+    tail_seconds: float,
+) -> ComposedShot:
     record = ComposedShot(shot=job.shot)
     source = f"clips/{job.shot}{SUFFIX}"
     clip = directory / source
@@ -86,7 +96,7 @@ def _one(job: Job, directory: Path, out_dir: Path) -> ComposedShot:
         return record
     record.sound = info.has_audio
 
-    seconds = _seconds(job, info.duration_ms)
+    seconds = _seconds(job, info.duration_ms, min_seconds, tail_seconds)
     track = out_dir / f"{job.shot}{TRACK_SUFFIX}"
     _write_track(track, job, seconds, directory)
     record.audio = f"shots/{track.name}"
@@ -106,12 +116,20 @@ def _one(job: Job, directory: Path, out_dir: Path) -> ComposedShot:
     return record
 
 
-# Take the shot as long as its lines run, or as long as the clip when the
-# shot has nothing spoken: a sound effect alone must not cut the picture.
-def _seconds(job: Job, clip_ms: int) -> float:
+# Take the shot as long as its lines run plus a tail, so the picture holds a
+# moment after the last word instead of butting into the next shot. A shot
+# with nothing spoken keeps the whole clip, and no take runs past its clip.
+def _seconds(
+    job: Job,
+    clip_ms: int,
+    min_seconds: float,
+    tail_seconds: float,
+) -> float:
+    clip = clip_ms / 1000
     if not any(line.file for line in job.lines):
-        return round(clip_ms / 1000, 3)
-    return round(job.audio_ms / 1000, 3)
+        return round(clip, 3)
+    wanted = max(job.audio_ms / 1000 + tail_seconds, min_seconds)
+    return round(min(clip, wanted), 3)
 
 
 # Write one track with every line pasted at the offset jobs.json gives.
