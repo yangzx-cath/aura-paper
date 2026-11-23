@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ..utils import now_iso
+from .time import now_iso
 
 # A panel below this share of the page needs a scene behind it.
 NEEDS_SCENE_AREA = 0.5

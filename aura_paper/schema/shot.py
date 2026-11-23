@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ..utils import now_iso
+from .time import now_iso
 
 # The three sounds a shot can carry.
 LINE_KINDS = ("旁白", "对白", "音效")

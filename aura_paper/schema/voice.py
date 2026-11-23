@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from ..utils import now_iso
+from .time import now_iso
 
 # Ids and what each one sounds like, from the 豆包语音合成模型2.0 list.
 CHOICES = (

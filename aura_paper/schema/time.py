@@ -1,4 +1,4 @@
-"""Small helpers shared across the project."""
+"""The timestamp written into every stage artifact."""
 
 from __future__ import annotations
 

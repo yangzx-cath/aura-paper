@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from aura_paper.utils import now_iso
+from aura_paper.schema.time import now_iso
 
 
 def test_now_iso_is_utc():
