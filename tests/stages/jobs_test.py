@@ -20,9 +20,10 @@ def image(path, size):
 
 
 # Write the four artifacts the jobs stage reads, plus the images they name.
-def make_book(root, shots, voice_shots, size=SQUARE):
+def make_book(root, shots, voice_shots, size=SQUARE, master="p000_1.jpg"):
     book = root / "demo"
     image(book / "panels" / "p000_0.jpg", size)
+    image(book / "panels" / "p000_1.jpg", SQUARE)
     image(book / "figures" / "p000_f0.jpg", SQUARE)
 
     shot_book = BookShots.from_dict(
@@ -52,7 +53,7 @@ def make_book(root, shots, voice_shots, size=SQUARE):
                     "id": "l1",
                     "name": "客厅",
                     "light": "白天",
-                    "master": "p000_0.jpg",
+                    "master": master,
                 }
             ],
             "panel_locations": [
@@ -173,6 +174,25 @@ def test_names_the_place_and_every_reference_image(tmp_path):
     ]
     assert "客厅，白天" in job.prompt
     assert job.prompt.count("图2") == 1
+
+
+def test_keeps_each_crop_once_when_the_place_master_is_the_panel(tmp_path):
+    make_book(
+        tmp_path,
+        [shot([{"kind": "旁白", "text": "下"}])],
+        [spoken(0, 1000)],
+        master="p000_0.jpg",
+    )
+
+    job = jobs(
+        "demo", ratio="4:3", resolution="480p", audio=False, root=tmp_path
+    ).shots[0]
+
+    # The master of l1 is p000_0.jpg, which is also the only panel here.
+    assert [image.file for image in job.images] == [
+        "panels/p000_0.jpg",
+        "figures/p000_f0.jpg",
+    ]
 
 
 def test_writes_the_jobs_back_out(tmp_path):

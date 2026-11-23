@@ -190,6 +190,8 @@ class SeedanceClient:
         }
         if request.ratio is not None:
             payload["ratio"] = request.ratio
+        if request.generate_audio is not None:
+            payload["generate_audio"] = request.generate_audio
         return payload
 
     @staticmethod

@@ -230,11 +230,13 @@ def _images(
     out_dir: Path,
 ) -> list[JobImage]:
     images = []
+    seen: set[Path] = set()
     folder = directory / "panels"
     for number, panel in enumerate(shot.panels, start=1):
         crop = folder / panel_name(panel.page, panel.panel)
-        if not crop.is_file():
+        if not crop.is_file() or crop in seen:
             continue
+        seen.add(crop)
         images.append(
             JobImage(
                 file=_fitted(crop, out_dir, f"{name}-{number}", directory),
@@ -245,8 +247,9 @@ def _images(
     figures = directory / "figures"
     for member in cast:
         crop = _first_existing(figures, member.pictures)
-        if crop is None:
+        if crop is None or crop in seen:
             continue
+        seen.add(crop)
         images.append(
             JobImage(
                 file=_fitted(crop, out_dir, f"{name}-{member.id}", directory),
@@ -255,7 +258,7 @@ def _images(
         )
 
     master = _master(place, places, directory)
-    if master is not None:
+    if master is not None and master not in seen:
         images.append(
             JobImage(
                 file=_fitted(master, out_dir, f"{name}-place", directory),

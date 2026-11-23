@@ -34,6 +34,7 @@ class VideoRequest:
     duration: int = DEFAULT_DURATION
     resolution: str | None = None
     ratio: str | None = None
+    generate_audio: bool | None = None
 
     def __post_init__(self) -> None:
         if not self.prompt.strip():
