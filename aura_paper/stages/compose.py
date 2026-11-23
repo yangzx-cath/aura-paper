@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import json
-import struct
 from pathlib import Path
 
 from PIL import Image, ImageChops
 
 from ..clients.tts import DEFAULT_RATE, TTSClient, TTSError
-from ..media import ffmpeg
+from ..media import audio, ffmpeg
 from ..media.image import extend_sides, load_image, save_jpeg
 from ..schema.compose import BookCompose, ComposedJoin, ComposedShot
 from ..schema.content import BookContent
@@ -24,6 +23,9 @@ BYTES_PER_FRAME = 2
 
 # The speech client writes a plain header in front of its samples.
 WAV_HEADER = 44
+
+# How loud the sound a clip carries sits under the local track.
+BACKGROUND_VOLUME = ffmpeg.BACKGROUND_VOLUME
 
 # Every take is encoded the same way, so the takes can be joined later.
 SUFFIX = ".mp4"
@@ -195,10 +197,8 @@ def _pad_speech(
     lead_ms: int,
     tail_ms: int,
 ) -> None:
-    samples = bytearray(_silence(lead_ms / 1000))
-    samples += speech.read_bytes()[WAV_HEADER:]
-    samples += _silence(tail_ms / 1000)
-    _write_wav(target, bytes(samples))
+    seconds = (lead_ms + _file_ms(speech) + tail_ms) / 1000
+    audio.write_track(target, [(lead_ms, speech)], seconds)
 
 
 # Return how long a WAV the speech client wrote lasts, in milliseconds.
@@ -247,13 +247,16 @@ def _one(
 
     seconds = _seconds(job, info.duration_ms, min_seconds, tail_seconds)
     track = out_dir / f"{job.shot}{TRACK_SUFFIX}"
-    write_track(track, job, seconds, directory)
+    audio.write_track(track, _parts(job, directory), seconds)
     record.audio = f"shots/{track.name}"
 
     target = out_dir / f"{job.shot}{SUFFIX}"
     try:
         if info.has_audio:
-            ffmpeg.mix(clip, track, target, seconds=seconds)
+            # A clip that speaks the dialogue must not be turned down, since
+            # the track under it only carries the narration.
+            level = 1.0 if job.reference else BACKGROUND_VOLUME
+            ffmpeg.mix(clip, track, target, seconds=seconds, background=level)
         else:
             ffmpeg.mux(clip, track, target, seconds=seconds)
     except ffmpeg.FFmpegError as exc:
@@ -281,47 +284,22 @@ def _seconds(
     return round(min(clip, wanted), 3)
 
 
-# Write one track with every line pasted at the offset jobs.json gives.
-def write_track(
-    target: Path,
+# List the lines the local track has to carry. A shot that was sent a
+# reference track lets the clip speak its dialogue, so those lines stay out.
+def _parts(
     job: Job,
-    seconds: float,
     directory: Path,
-) -> None:
-    samples = bytearray(_silence(seconds))
-    for line in job.lines:
-        if not line.file:
-            continue
-        source = directory / line.file
-        if not source.is_file():
-            continue
-        start = line.start_ms * DEFAULT_RATE // 1000 * BYTES_PER_FRAME
-        audio = source.read_bytes()[WAV_HEADER:]
-        room = max(0, len(samples) - start)
-        samples[start : start + len(audio)] = audio[:room]
-    _write_wav(target, bytes(samples))
+) -> list[tuple[int, Path]]:
+    return [
+        (line.start_ms, directory / line.file)
+        for line in job.lines
+        if line.file and not (job.reference and line.kind == "对白")
+    ]
 
 
-# Return a silent track of the given length.
+# Return a silent stretch of the given length.
 def _silence(seconds: float) -> bytes:
     return b"\x00\x00" * int(DEFAULT_RATE * seconds)
-
-
-# Wrap raw samples in a WAV container.
-def _write_wav(path: Path, pcm: bytes) -> None:
-    header = b"RIFF" + struct.pack("<I", 36 + len(pcm)) + b"WAVEfmt "
-    header += struct.pack(
-        "<IHHIIHH",
-        16,
-        1,
-        1,
-        DEFAULT_RATE,
-        DEFAULT_RATE * BYTES_PER_FRAME,
-        BYTES_PER_FRAME,
-        16,
-    )
-    header += b"data" + struct.pack("<I", len(pcm))
-    path.write_bytes(header + pcm)
 
 
 # Measure every join between two takes that are both on disk.

@@ -1,3 +1,4 @@
+import json
 import struct
 import wave
 
@@ -119,6 +120,24 @@ def test_holds_the_picture_after_the_last_word(tmp_path):
     result = compose("demo", tail_seconds=0.5, root=tmp_path)
 
     assert result.shots[0].seconds == pytest.approx(1.7)
+
+
+def test_leaves_the_dialogue_to_the_clip_that_was_sent_a_reference(tmp_path):
+    make_book(tmp_path, tone=True)
+    path = tmp_path / "demo" / "jobs.json"
+    data = json.loads(path.read_text("utf-8"))
+    data["shots"][0]["reference"] = "jobs/j1-ref.wav"
+    data["shots"][0]["lines"][0]["kind"] = "对白"
+    path.write_text(json.dumps(data), "utf-8")
+
+    result = compose("demo", root=tmp_path)
+
+    # The model spoke that line itself, so the local track stays silent.
+    track = (tmp_path / "demo" / "shots" / "j1.wav").read_bytes()[44:]
+    assert set(track) == {0}
+    info = ffmpeg.probe(tmp_path / "demo" / "shots" / "j1.mp4")
+    assert info.has_audio is True
+    assert result.shots[0].error == ""
 
 
 def test_a_short_line_still_keeps_a_readable_take(tmp_path):
