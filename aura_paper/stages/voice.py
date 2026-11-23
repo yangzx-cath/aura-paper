@@ -8,11 +8,13 @@ from pathlib import Path
 
 from ..clients.tts import DEFAULT_RATE, TTSClient, TTSError
 from ..schema.cast import BookCast
+from ..schema.content import language_of
 from ..schema.shot import BookShots, Shot
 from ..schema.voice import (
     BookVoice,
     VoiceLine,
     VoiceShot,
+    language_of_voice,
     narrator_for,
 )
 from ..store.cache import Cache, fingerprint
@@ -69,6 +71,7 @@ def voice(
 
     out_dir = voice_dir(book_id, root)
     shutil.rmtree(out_dir, ignore_errors=True)
+    failures: list[str] = []
 
     for shot in shots:
         record = VoiceShot(shot=shot.id, gap_ms=gap_ms)
@@ -77,11 +80,12 @@ def voice(
                 shot, out_dir, tts, voices, rates, cache
             )
         except TTSError as exc:
-            result.error = f"{shot.id} 配音失败：{exc}"
-            break
+            failures.append(f"{shot.id} 配音失败：{exc}")
+            continue
         record.duration_ms = _shot_length(record.lines, gap_ms)
         result.shots.append(record)
 
+    result.error = "；".join(failures)
     write_json(book_id, "voice", result.to_dict(), root)
     return result
 
@@ -126,6 +130,17 @@ def _speaker(kind: str, cast: str) -> str:
     return ""
 
 
+# Return whether a line holds words the voice cannot pronounce. An English
+# voice answers such a line with an empty stream, which costs three calls
+# and says nothing, so the line is refused first.
+def _unreadable(text: str, voice_id: str) -> bool:
+    if language_of_voice(voice_id) != "en":
+        return False
+    if language_of(text) != "zh":
+        return False
+    return any("\u4e00" <= char <= "\u9fff" for char in text)
+
+
 # Speak every audible line of one shot.
 def _speak_shot(
     shot: Shot,
@@ -145,6 +160,11 @@ def _speak_shot(
             continue
         voice_id = voices[speaker]
         speed = rates.get(speaker, 1.0)
+        if _unreadable(text, voice_id):
+            raise TTSError(
+                f"第 {index} 句有中文，{voice_id} 读不出来，先改成英文："
+                f"{text[:24]}"
+            )
         target = out_dir / f"{shot.id}-{index}{FILE_SUFFIX}"
         _speak(text, voice_id, speed, target, tts, cache)
         spoken.append(

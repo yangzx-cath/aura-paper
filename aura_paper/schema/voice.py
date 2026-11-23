@@ -77,6 +77,12 @@ def narrator_for(language: str) -> str:
     return NARRATOR_BY_LANGUAGE.get(language, NARRATOR)
 
 
+# Return the language a voice speaks, read off the prefix of its id.
+def language_of_voice(voice_id: str) -> str:
+    """Return "zh" or "en" from a voice id."""
+    return "en" if voice_id.startswith("en_") else "zh"
+
+
 # Every id a character may be given, in either language.
 ALL = frozenset(voice for voice, _ in CHINESE_CHOICES + ENGLISH_CHOICES)
 

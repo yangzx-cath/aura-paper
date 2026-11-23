@@ -36,6 +36,9 @@ CHUNK_CODE = 0
 # The code that means the whole line was synthesized.
 DONE_CODE = 20000000
 
+# Codes from here up are the service's own trouble, not a bad request.
+SERVER_ERROR_CODE = 50000000
+
 # Speech rate is a percentage offset from normal speed.
 MIN_RATE_OFFSET = -50
 MAX_RATE_OFFSET = 100
@@ -51,6 +54,10 @@ RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 
 class TTSError(Exception):
     """Error for speech synthesis calls."""
+
+
+class TransientError(TTSError):
+    """A failure that is worth asking for again."""
 
 
 @dataclass
@@ -134,7 +141,7 @@ class TTSClient:
             raise TTSError("text is required")
         if not voice.strip():
             raise TTSError("voice is required")
-        pcm = self._audio(self._post(_payload(text, voice, speed, emotion)))
+        pcm = self._send(_payload(text, voice, speed, emotion))
         return Speech(
             text=text,
             voice=voice,
@@ -143,35 +150,36 @@ class TTSClient:
             sample_rate=DEFAULT_RATE,
         )
 
-    def _post(self, payload: dict) -> str:
+    def _send(self, payload: dict) -> bytes:
+        """Return the audio of one request, asking again when needed."""
         if not self.api_key or not self.resource_id:
             raise TTSError("speech endpoint is not configured")
 
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        request = urllib.request.Request(
-            self.base_url.rstrip("/") + DEFAULT_PATH,
-            data=body,
-            method="POST",
-            headers={
-                "X-Api-Key": self.api_key,
-                "X-Api-Resource-Id": self.resource_id,
-                "X-Api-Request-Id": uuid.uuid4().hex,
-                "Content-Type": "application/json",
-            },
-        )
-
         delay = RETRY_DELAY
         last = "cannot reach the endpoint"
         for attempt in range(1, RETRIES + 1):
+            request = urllib.request.Request(
+                self.base_url.rstrip("/") + DEFAULT_PATH,
+                data=body,
+                method="POST",
+                headers={
+                    "X-Api-Key": self.api_key,
+                    "X-Api-Resource-Id": self.resource_id,
+                    "X-Api-Request-Id": uuid.uuid4().hex,
+                    "Content-Type": "application/json",
+                },
+            )
             try:
                 with urllib.request.urlopen(
                     request, timeout=self.timeout
                 ) as response:
-                    return response.read().decode("utf-8", errors="replace")
+                    reply = response.read().decode("utf-8", errors="replace")
             except urllib.error.HTTPError as exc:
                 detail = exc.read().decode("utf-8", errors="replace")
                 if exc.code not in RETRY_STATUS or attempt == RETRIES:
                     raise TTSError(f"HTTP {exc.code}: {detail[:200]}") from exc
+                last = f"HTTP {exc.code}"
             except (
                 urllib.error.URLError,
                 TimeoutError,
@@ -181,6 +189,14 @@ class TTSClient:
                 last = _reason(exc)
                 if attempt == RETRIES:
                     raise TTSError(last) from exc
+            else:
+                try:
+                    return self._audio(reply)
+                except TransientError as exc:
+                    # The endpoint answered but gave nothing to speak with.
+                    last = str(exc)
+                    if attempt == RETRIES:
+                        raise
             time.sleep(delay)
             delay *= 2
         raise TTSError(last)
@@ -208,6 +224,8 @@ class TTSClient:
                 break
             if code not in (CHUNK_CODE, None):
                 message = piece.get("message") or f"code {code}"
+                if isinstance(code, int) and code >= SERVER_ERROR_CODE:
+                    raise TransientError(f"synthesis failed: {message}")
                 raise TTSError(f"synthesis failed: {message}")
 
             encoded = piece.get("data") or ""
@@ -219,7 +237,7 @@ class TTSClient:
                 raise TTSError("reply audio is not base64") from exc
 
         if not audio:
-            raise TTSError("reply carries no audio")
+            raise TransientError("reply carries no audio")
         return bytes(audio)
 
 

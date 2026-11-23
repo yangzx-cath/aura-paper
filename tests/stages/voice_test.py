@@ -231,6 +231,45 @@ def test_records_a_failed_line_and_keeps_the_file(tmp_path):
     assert (tmp_path / "demo" / "voice.json").is_file()
 
 
+def test_keeps_speaking_after_a_failed_line(tmp_path):
+    make_shots(
+        tmp_path,
+        [
+            shot("j1", [line("旁白", "好")]),
+            shot("j2", [line("旁白", "坏")]),
+            shot("j3", [line("旁白", "下")]),
+        ],
+    )
+    tts = FakeTTS(failing={"坏"})
+    make_cast(tmp_path, {})
+
+    result = voice("demo", tts=tts, root=tmp_path)
+
+    # One bad line does not leave the rest of the book unspoken.
+    assert [item.shot for item in result.shots] == ["j1", "j3"]
+    assert "j2" in result.error
+
+
+def test_refuses_a_chinese_line_for_an_english_voice(tmp_path):
+    make_shots(
+        tmp_path,
+        [
+            shot("j1", [line("旁白", "The party goes on.")]),
+            shot("j2", [line("旁白", "派对还在继续。")]),
+        ],
+    )
+    tts = FakeTTS()
+    make_cast(tmp_path, {}, language="en")
+
+    result = voice("demo", tts=tts, root=tmp_path)
+
+    # The voice cannot read the line, so it is never sent.
+    assert [item.shot for item in result.shots] == ["j1"]
+    assert "j2" in result.error
+    assert "中文" in result.error
+    assert all("派对" not in text for text, _, _ in tts.texts)
+
+
 def test_reads_its_own_artifact_back(tmp_path):
     make_shots(tmp_path, [shot("j1", [line("旁白", "下")])])
     make_cast(tmp_path, {"c1": GIRL})

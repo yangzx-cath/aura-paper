@@ -174,6 +174,28 @@ def test_reports_a_reply_without_audio(monkeypatch):
     assert "no audio" in str(error.value)
 
 
+def test_asks_again_when_the_reply_has_no_audio(monkeypatch):
+    empty = reply(done())
+    spoken = reply(chunk(HALF_SECOND), done())
+    calls = sequence(monkeypatch, [empty, spoken])
+
+    speech = client().synthesize("三块、", voice="v")
+
+    assert speech.duration_ms == 500
+    assert len(calls) == 2
+
+
+def test_asks_again_when_the_service_fails(monkeypatch):
+    broken = reply({"code": 55000000, "message": "internal error"})
+    spoken = reply(chunk(HALF_SECOND), done())
+    calls = sequence(monkeypatch, [broken, broken, spoken])
+
+    speech = client().synthesize("三块、", voice="v")
+
+    assert speech.duration_ms == 500
+    assert len(calls) == 3
+
+
 def test_reports_a_reply_that_is_not_json(monkeypatch):
     capture(monkeypatch, "抱歉，我看不清。")
 

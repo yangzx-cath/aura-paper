@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..schema.cast import BookCast
-from ..schema.content import PageContent
+from ..schema.content import PageContent, language_of
 from ..schema.identify import BookPeople
 from ..schema.location import BookLocations
 
@@ -86,6 +86,7 @@ __PAGES__
    挪走后后一镜不再念它；后一镜只剩一句时不挪。
    补的话要像讲给孩子听：短句、具体、口语，一句说一件事；不用"做手工""玩"这类
    笼统的词带过，也不写画面里看不出的心情和道理。
+   旁白和补的话都用画面文字同一种语言写（这本书是__LANG__），不要翻成中文。
    相邻两镜不念同一句。
 9. join 只有两种：同一场的下一镜写"硬切"，换场的第一镜写"叠化"。
 10. camera 从「全景、中景、近景、特写」里挑一个，相邻镜头别连着用同一个景别。
@@ -117,7 +118,22 @@ def storyboard_prompt(
     text = text.replace("__CAST__", _cast_text(cast_book, refs))
     text = text.replace("__PLACES__", _places_text(places))
     text = text.replace("__PEOPLE__", _people_text(people))
+    text = text.replace(
+        "__LANG__", _language_name(_book_language(pages, cast_book))
+    )
     return text.replace("__PAGES__", _pages_text(pages, places, numbers))
+
+
+# Read the language of the book, from the cast or from its own words.
+def _book_language(pages: list[PageContent], cast_book: BookCast) -> str:
+    if cast_book.language:
+        return cast_book.language
+    return language_of("".join(page.page_text for page in pages))
+
+
+# Name the language a book is written in, for the prompt.
+def _language_name(language: str) -> str:
+    return "英语" if language == "en" else "中文"
 
 
 # List the panels whose people were named one by one.
