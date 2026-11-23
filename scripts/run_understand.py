@@ -15,12 +15,12 @@ import time
 from functools import partial
 from pathlib import Path
 
-from aura_paper.cache import Cache
 from aura_paper.clients.llm import LLMClient
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.media.image import ink_coverage, load_image
 from aura_paper.schema.content import PageContent
 from aura_paper.stages.understand import understand
+from aura_paper.store.cache import Cache
 
 ROOT = Path(__file__).resolve().parent.parent
 

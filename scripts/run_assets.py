@@ -14,12 +14,12 @@ import sys
 import time
 from pathlib import Path
 
-from aura_paper.cache import Cache
 from aura_paper.clients.llm import LLMClient
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.schema.cast import Cast
 from aura_paper.schema.location import Location
 from aura_paper.stages.assets import assets
+from aura_paper.store.cache import Cache
 
 ROOT = Path(__file__).resolve().parent.parent
 

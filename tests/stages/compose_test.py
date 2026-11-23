@@ -4,9 +4,9 @@ import wave
 import pytest
 
 from aura_paper.media import ffmpeg
-from aura_paper.output import write_json
 from aura_paper.schema.job import BookJobs
 from aura_paper.stages.compose import compose
+from aura_paper.store.output import write_json
 
 # These tests run the real tools, so skip them where they are missing.
 pytestmark = pytest.mark.skipif(

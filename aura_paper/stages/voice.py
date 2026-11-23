@@ -6,12 +6,12 @@ import json
 import shutil
 from pathlib import Path
 
-from ..cache import Cache, fingerprint
 from ..clients.tts import DEFAULT_RATE, TTSClient, TTSError
-from ..output import write_json
 from ..schema.cast import BookCast
 from ..schema.shot import BookShots, Shot
 from ..schema.voice import NARRATOR, BookVoice, VoiceLine, VoiceShot
+from ..store.cache import Cache, fingerprint
+from ..store.output import write_json
 from .paths import book_dir, voice_dir
 
 # A short rest between two lines of the same shot.

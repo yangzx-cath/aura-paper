@@ -10,7 +10,6 @@ from pathlib import Path
 from PIL import Image
 
 from ..media.image import load_image, save_jpeg
-from ..output import write_json
 from ..prompts import job_prompt
 from ..schema.cast import BookCast, Cast
 from ..schema.identify import BookPeople, PanelPeople
@@ -18,6 +17,7 @@ from ..schema.job import BookJobs, Job, JobImage, JobLine
 from ..schema.location import BookLocations
 from ..schema.shot import BookShots, Shot
 from ..schema.voice import BookVoice, VoiceShot
+from ..store.output import write_json
 from .paths import book_dir, jobs_dir, panel_name
 from .voice import DEFAULT_GAP_MS
 

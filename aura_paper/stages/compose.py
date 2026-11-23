@@ -10,9 +10,9 @@ from PIL import Image, ImageChops
 
 from ..clients.tts import DEFAULT_RATE
 from ..media import ffmpeg
-from ..output import write_json
 from ..schema.compose import BookCompose, ComposedJoin, ComposedShot
 from ..schema.job import BookJobs, Job
+from ..store.output import write_json
 from .paths import book_dir, shots_dir
 
 # 16-bit mono, so one second holds rate * 2 bytes.

@@ -1,6 +1,6 @@
 import json
 
-from aura_paper.output import write_json
+from aura_paper.store.output import write_json
 
 
 def test_json_puts_the_file_under_book_id(tmp_path):

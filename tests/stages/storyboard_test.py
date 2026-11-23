@@ -2,13 +2,13 @@ import json
 
 from PIL import Image
 
-from aura_paper.cache import Cache
 from aura_paper.clients.llm import LLMClient, LLMError
-from aura_paper.output import write_json
 from aura_paper.schema.cast import BookCast
 from aura_paper.schema.content import BookContent
 from aura_paper.schema.location import BookLocations
 from aura_paper.stages.storyboard import storyboard
+from aura_paper.store.cache import Cache
+from aura_paper.store.output import write_json
 
 # A box that covers most of the page, so the panel shows a whole scene.
 FULL_BOX = [0, 0, 800, 800]

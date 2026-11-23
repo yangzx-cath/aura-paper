@@ -5,7 +5,7 @@ from threading import Thread
 
 import pytest
 
-from aura_paper.cache import Cache, file_fingerprint, fingerprint
+from aura_paper.store.cache import Cache, file_fingerprint, fingerprint
 
 
 def test_returns_16_hex_characters():

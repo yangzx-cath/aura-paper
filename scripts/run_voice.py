@@ -14,11 +14,11 @@ import sys
 import time
 from pathlib import Path
 
-from aura_paper.cache import Cache
 from aura_paper.clients.tts import TTSClient
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.schema.voice import BookVoice, VoiceShot
 from aura_paper.stages.voice import DEFAULT_GAP_MS, voice, voices_for
+from aura_paper.store.cache import Cache
 
 ROOT = Path(__file__).resolve().parent.parent
 

@@ -2,13 +2,13 @@ import json
 
 from PIL import Image
 
-from aura_paper.output import write_json
 from aura_paper.schema.cast import BookCast
 from aura_paper.schema.identify import BookPeople
 from aura_paper.schema.location import BookLocations
 from aura_paper.schema.shot import BookShots
 from aura_paper.schema.voice import BookVoice
 from aura_paper.stages.jobs import jobs
+from aura_paper.store.output import write_json
 
 # A panel wider than the 2.5 the service accepts, and one it takes as is.
 WIDE = (1000, 200)

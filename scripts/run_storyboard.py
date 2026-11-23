@@ -15,12 +15,12 @@ import sys
 import time
 from pathlib import Path
 
-from aura_paper.cache import Cache
 from aura_paper.clients.llm import LLMClient
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.schema.scene import Scene
 from aura_paper.schema.shot import BookShots, Shot
 from aura_paper.stages.storyboard import storyboard
+from aura_paper.store.cache import Cache
 
 ROOT = Path(__file__).resolve().parent.parent
 

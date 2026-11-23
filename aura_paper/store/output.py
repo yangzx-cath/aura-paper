@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from .config import out_root
+from ..config import out_root
 
 
 def write_json(

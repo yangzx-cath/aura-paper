@@ -15,11 +15,11 @@ import sys
 import time
 from pathlib import Path
 
-from aura_paper.cache import Cache
 from aura_paper.clients.providers import make_video_client
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.schema.render import ShotRender
 from aura_paper.stages.render import render
+from aura_paper.store.cache import Cache
 
 ROOT = Path(__file__).resolve().parent.parent
 
