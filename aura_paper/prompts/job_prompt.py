@@ -91,7 +91,7 @@ def audio_prompt(
         cast=cast,
         images=images,
         seconds=seconds,
-        sound=_track_text(quiet),
+        sound=_track_text(quiet, voice_only),
         script=_script_text(cast, lines, voice_only),
     )
 
@@ -123,13 +123,14 @@ def _build(
 
 
 # Say that the wording and the order come from the sent track.
-def _track_text(quiet: bool = False) -> str:
-    said = (
-        "声音照音频1：台词内容和顺序都不改，说话的人对上口型，"
-        "画外音时谁都不张口。"
-    )
+def _track_text(quiet: bool = False, voice_only: bool = False) -> str:
+    said = "声音照音频1：谁说话、说什么、按什么顺序，都不改。"
+    if voice_only:
+        said += "音频1 没有人声的段落，画面里也不许有任何人说话。"
+    else:
+        said += "画外音时谁都不张口。"
     if quiet:
-        said += "除了人声，不要生成任何音效、音乐和环境声。"
+        said += "整段不要生成任何音效、音乐和环境声。"
     return said
 
 
@@ -155,12 +156,20 @@ def _script_text(
         else:
             said.append(f"{number}. 画外音，画面上的人不张口")
     body = "\n".join(said)
-    return (
-        "【配音】\n"
-        "音频1 是本镜的配音，台词的字由音频1 念，不要写到画面上。\n"
-        "说话的顺序、人声和节奏都照音频1，不要自己另写台词或多说话。\n"
-        f"{body}\n\n"
-    )
+    if voice_only:
+        intro = (
+            "【配音】\n"
+            "音频1 只在对白处有人声，其余时段是空的。\n"
+            "人声照音频1，顺序照音频1；空的时段不许说话，也不许把台词写到\n"
+            "画面上。\n"
+        )
+    else:
+        intro = (
+            "【配音】\n"
+            "音频1 是本镜的配音，台词的字由音频1 念，不要写到画面上。\n"
+            "说话的顺序、人声和节奏都照音频1，不要自己另写台词或多说话。\n"
+        )
+    return f"{intro}{body}\n\n"
 
 
 # Say what the sound of the shot should be.
