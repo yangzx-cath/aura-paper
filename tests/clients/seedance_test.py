@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from aura_paper.seedance import (
+from aura_paper.clients.seedance import (
     DEFAULT_MODEL,
     SeedanceClient,
     SeedanceError,
 )
-from aura_paper.video_types import VideoRequest, VideoTask
+from aura_paper.clients.video import VideoRequest, VideoTask
 
 
 def write_png(path: Path) -> Path:
@@ -91,7 +91,7 @@ def test_payload_rejects_an_unknown_resolution():
 
 
 def test_payload_rejects_oversized_image(monkeypatch, tmp_path):
-    monkeypatch.setattr("aura_paper.seedance._MAX_IMAGE_BYTES", 1)
+    monkeypatch.setattr("aura_paper.clients.seedance._MAX_IMAGE_BYTES", 1)
     target = tmp_path / "page.png"
     target.write_bytes(b"xx")
 
@@ -241,7 +241,7 @@ def test_check_raises_on_error_reply():
 
 
 def test_post_rejects_a_large_body(monkeypatch):
-    monkeypatch.setattr("aura_paper.seedance._MAX_BODY_BYTES", 10)
+    monkeypatch.setattr("aura_paper.clients.seedance._MAX_BODY_BYTES", 10)
     client = SeedanceClient(api_key="key")
 
     with pytest.raises(ValueError, match="exceeds 64MB"):
@@ -317,7 +317,7 @@ def test_send_wraps_an_http_error_message(monkeypatch):
         raise http_error(400, body)
 
     monkeypatch.setattr(
-        "aura_paper.seedance.urllib.request.urlopen", fake_urlopen
+        "aura_paper.clients.seedance.urllib.request.urlopen", fake_urlopen
     )
 
     with pytest.raises(SeedanceError, match="InvalidParameter: bad"):
@@ -331,7 +331,7 @@ def test_send_falls_back_to_the_http_status(monkeypatch):
         raise http_error(503, b'{"error":{}}')
 
     monkeypatch.setattr(
-        "aura_paper.seedance.urllib.request.urlopen", fake_urlopen
+        "aura_paper.clients.seedance.urllib.request.urlopen", fake_urlopen
     )
 
     with pytest.raises(SeedanceError, match="HTTP 503"):
@@ -345,7 +345,7 @@ def test_send_wraps_a_connection_error(monkeypatch):
         raise urllib.error.URLError("down")
 
     monkeypatch.setattr(
-        "aura_paper.seedance.urllib.request.urlopen", fake_urlopen
+        "aura_paper.clients.seedance.urllib.request.urlopen", fake_urlopen
     )
 
     with pytest.raises(SeedanceError, match="cannot reach"):
@@ -359,7 +359,7 @@ def test_send_wraps_a_timeout(monkeypatch):
         raise TimeoutError()
 
     monkeypatch.setattr(
-        "aura_paper.seedance.urllib.request.urlopen", fake_urlopen
+        "aura_paper.clients.seedance.urllib.request.urlopen", fake_urlopen
     )
 
     with pytest.raises(SeedanceError, match="timeout after 3s"):
@@ -369,7 +369,7 @@ def test_send_wraps_a_timeout(monkeypatch):
 def test_send_rejects_a_non_json_reply(monkeypatch):
     client = SeedanceClient(api_key="key")
     monkeypatch.setattr(
-        "aura_paper.seedance.urllib.request.urlopen",
+        "aura_paper.clients.seedance.urllib.request.urlopen",
         lambda *args, **kwargs: FakeResponse(b"<html>"),
     )
 
@@ -380,7 +380,7 @@ def test_send_rejects_a_non_json_reply(monkeypatch):
 def test_send_rejects_a_non_object_reply(monkeypatch):
     client = SeedanceClient(api_key="key")
     monkeypatch.setattr(
-        "aura_paper.seedance.urllib.request.urlopen",
+        "aura_paper.clients.seedance.urllib.request.urlopen",
         lambda *args, **kwargs: FakeResponse(b"[]"),
     )
 
@@ -406,7 +406,7 @@ def test_download_wraps_an_http_error(monkeypatch, tmp_path):
         raise http_error(404, b"")
 
     monkeypatch.setattr(
-        "aura_paper.seedance.urllib.request.urlopen", fake_urlopen
+        "aura_paper.clients.seedance.urllib.request.urlopen", fake_urlopen
     )
 
     with pytest.raises(SeedanceError, match="download HTTP 404"):
@@ -424,7 +424,7 @@ def test_download_wraps_a_connection_error(monkeypatch, tmp_path):
         raise urllib.error.URLError("down")
 
     monkeypatch.setattr(
-        "aura_paper.seedance.urllib.request.urlopen", fake_urlopen
+        "aura_paper.clients.seedance.urllib.request.urlopen", fake_urlopen
     )
 
     with pytest.raises(SeedanceError, match="cannot download video"):

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from aura_paper.minimax import (
+from aura_paper.clients.minimax import (
     MiniMaxClient,
     MiniMaxError,
     VideoRequest,
@@ -55,7 +55,7 @@ def test_payload_rejects_last_frame_without_first(tmp_path):
 
 
 def test_payload_rejects_oversized_image(monkeypatch, tmp_path):
-    monkeypatch.setattr("aura_paper.minimax._MAX_IMAGE_BYTES", 1)
+    monkeypatch.setattr("aura_paper.clients.minimax._MAX_IMAGE_BYTES", 1)
     target = tmp_path / "page.png"
     target.write_bytes(b"xx")
 
@@ -161,7 +161,7 @@ def test_check_raises_on_error_reply():
 
 
 def test_post_rejects_large_body(monkeypatch):
-    monkeypatch.setattr("aura_paper.minimax._MAX_BODY_BYTES", 10)
+    monkeypatch.setattr("aura_paper.clients.minimax._MAX_BODY_BYTES", 10)
     client = MiniMaxClient(api_key="key")
 
     with pytest.raises(ValueError, match="exceeds 64MB"):

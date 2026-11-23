@@ -1,8 +1,8 @@
 import pytest
 
-from aura_paper.minimax import MiniMaxClient
-from aura_paper.providers import make_video_client
-from aura_paper.seedance import SeedanceClient
+from aura_paper.clients.minimax import MiniMaxClient
+from aura_paper.clients.providers import make_video_client
+from aura_paper.clients.seedance import SeedanceClient
 
 
 def test_seedance_is_the_default(monkeypatch):
