@@ -206,6 +206,100 @@ def concat(sources: list[str | Path], target: str | Path) -> Path:
     return target
 
 
+def join(
+    sources: list[str | Path],
+    target: str | Path,
+    *,
+    overlaps: list[float] | None = None,
+) -> Path:
+    """Join clips, dissolving where the overlaps say so.
+
+    overlaps[i] is the length shared by clip i and clip i+1; zero means a
+    hard cut, and a list of zeros takes the copy-only path of concat().
+    The sound of a dissolve is cut at the overlap, not cross faded, so the
+    words of the next shot stay whole.
+    """
+    sources = [Path(source) for source in sources]
+    if not sources:
+        raise FFmpegError("nothing to join")
+    spreads = list(overlaps or [0.0] * (len(sources) - 1))
+    if len(spreads) != len(sources) - 1:
+        raise FFmpegError("one overlap per join is required")
+    if not any(spreads):
+        return concat(sources, target)
+
+    target = Path(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    lengths = [probe(source).duration_ms / 1000 for source in sources]
+    size = probe(sources[0])
+    edges = []
+    audio = []
+    for number, source in enumerate(sources):
+        spread = spreads[number] if number < len(spreads) else 0.0
+        keep = max(0.0, lengths[number] - spread)
+        edges.append(f"[{number}:v]{_fit(size)}[v{number}]")
+        edges.append(f"[{number}:a]atrim=0:{keep:.3f}[a{number}]")
+        audio.append(f"[a{number}]")
+
+    label = "v0"
+    end = lengths[0]
+    for number in range(1, len(sources)):
+        spread = spreads[number - 1]
+        offset = end - spread
+        nxt = f"x{number}"
+        edges.append(
+            f"[{label}][v{number}]xfade=transition=fade"
+            f":duration={spread:.3f}:offset={offset:.3f}[{nxt}]"
+        )
+        label = nxt
+        end = offset + lengths[number]
+
+    edges.append("".join(audio) + f"concat=n={len(sources)}:v=0:a=1[a]")
+    args = [FFMPEG, *COMMON]
+    for source in sources:
+        args += ["-i", str(source)]
+    args += [
+        "-filter_complex",
+        ";".join(edges),
+        "-map",
+        f"[{label}]",
+        "-map",
+        "[a]",
+        *VIDEO_CODEC,
+        *AUDIO_CODEC,
+        *FASTSTART,
+        str(target),
+    ]
+    run(args)
+    return target
+
+
+def frame(
+    path: str | Path,
+    target: str | Path,
+    *,
+    last: bool = False,
+) -> Path:
+    """Write the first or the last picture of a clip to target."""
+    target = Path(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    args = [FFMPEG, *COMMON]
+    if last:
+        length = probe(path).duration_ms / 1000
+        args += ["-sseof", f"-{min(length, 0.2):.3f}"]
+    args += ["-i", str(path), "-frames:v", "1", "-update", "1", str(target)]
+    run(args)
+    return target
+
+
+# Fit one input to the size and frame rate the film uses.
+def _fit(size: MediaInfo) -> str:
+    return (
+        f"fps=24,scale={size.width}:{size.height},setsar=1,"
+        "format=yuv420p,setpts=PTS-STARTPTS"
+    )
+
+
 # Read a duration in seconds into whole milliseconds.
 def _ms(value: object) -> int:
     try:
