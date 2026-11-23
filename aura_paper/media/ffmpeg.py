@@ -23,6 +23,12 @@ FASTSTART = ("-movflags", "+faststart")
 # How much of a failing call's output is worth keeping in the error.
 ERROR_TAIL = 400
 
+# The sound a clip comes with is usually the effect itself, not music.
+BACKGROUND_VOLUME = 0.8
+
+# Two tracks added together can pass full scale, so cap the sum.
+LIMIT = 0.95
+
 
 class FFmpegError(Exception):
     """Error for a failed ffmpeg or ffprobe call."""
@@ -118,6 +124,46 @@ def mux(
         "0:v:0",
         "-map",
         "1:a:0",
+    ]
+    if seconds > 0:
+        args += ["-t", f"{seconds:.3f}"]
+    args += [*VIDEO_CODEC, *AUDIO_CODEC, *FASTSTART, str(target)]
+    run(args)
+    return target
+
+
+def mix(
+    clip: str | Path,
+    audio: str | Path,
+    target: str | Path,
+    *,
+    seconds: float = 0.0,
+    background: float = BACKGROUND_VOLUME,
+) -> Path:
+    """Put one track over the sound a clip already carries, cut to seconds.
+
+    The clip has to bring its own sound; a silent clip goes through mux().
+    """
+    target = Path(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    graph = (
+        f"[0:a]volume={background:g}[bg];"
+        "[bg][1:a]amix=inputs=2:duration=first:normalize=0,"
+        f"alimiter=limit={LIMIT:g}[a]"
+    )
+    args = [
+        FFMPEG,
+        *COMMON,
+        "-i",
+        str(clip),
+        "-i",
+        str(audio),
+        "-filter_complex",
+        graph,
+        "-map",
+        "0:v:0",
+        "-map",
+        "[a]",
     ]
     if seconds > 0:
         args += ["-t", f"{seconds:.3f}"]

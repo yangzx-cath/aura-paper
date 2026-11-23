@@ -1,4 +1,6 @@
+import array
 import struct
+import wave
 
 import pytest
 
@@ -19,22 +21,21 @@ RATE = 24000
 
 
 # Write a plain clip, the way the video model would hand one back.
-def make_clip(path, seconds=1.0, size=SIZE):
-    ffmpeg.run(
-        [
-            ffmpeg.FFMPEG,
-            *ffmpeg.COMMON,
-            "-f",
-            "lavfi",
-            "-i",
-            f"color=c=gray:s={size}:d={seconds}:r=24",
-            "-c:v",
-            "libx264",
-            "-pix_fmt",
-            "yuv420p",
-            str(path),
-        ]
-    )
+def make_clip(path, seconds=1.0, size=SIZE, tone=False):
+    args = [
+        ffmpeg.FFMPEG,
+        *ffmpeg.COMMON,
+        "-f",
+        "lavfi",
+        "-i",
+        f"color=c=gray:s={size}:d={seconds}:r=24",
+    ]
+    if tone:
+        args += ["-f", "lavfi", "-i", f"sine=frequency=440:duration={seconds}"]
+    args += ["-c:v", "libx264", "-pix_fmt", "yuv420p"]
+    if tone:
+        args += ["-c:a", "aac", "-shortest"]
+    ffmpeg.run([*args, str(path)])
 
 
 # Write a WAV of silence, like the ones the voice stage builds.
@@ -72,6 +73,21 @@ def test_puts_a_track_under_a_clip_and_cuts_it(tmp_path):
     assert info.duration_ms == pytest.approx(1000, abs=80)
 
 
+def test_keeps_the_sound_of_a_clip_under_the_track(tmp_path):
+    clip = tmp_path / "clip.mp4"
+    wav = tmp_path / "line.wav"
+    make_clip(clip, seconds=1.0, tone=True)
+    make_wav(wav)
+
+    target = ffmpeg.mix(clip, wav, tmp_path / "shot.mp4", seconds=1.0)
+
+    info = ffmpeg.probe(target)
+    assert info.has_audio is True
+    assert info.duration_ms == pytest.approx(1000, abs=80)
+    # The track is silent, so any sound left is the one the clip came with.
+    assert _peak(target, tmp_path) > 0
+
+
 def test_joins_clips_that_share_their_parameters(tmp_path):
     first = tmp_path / "a.mp4"
     second = tmp_path / "b.mp4"
@@ -86,3 +102,28 @@ def test_joins_clips_that_share_their_parameters(tmp_path):
 def test_reports_a_bad_call(tmp_path):
     with pytest.raises(FFmpegError):
         ffmpeg.probe(tmp_path / "missing.mp4")
+
+
+# Return the loudest sample of a file's audio, read back as plain PCM.
+def _peak(path, folder):
+    raw = folder / "raw.wav"
+    ffmpeg.run(
+        [
+            ffmpeg.FFMPEG,
+            *ffmpeg.COMMON,
+            "-i",
+            str(path),
+            "-vn",
+            "-c:a",
+            "pcm_s16le",
+            "-ac",
+            "1",
+            "-ar",
+            str(RATE),
+            str(raw),
+        ]
+    )
+    with wave.open(str(raw)) as handle:
+        frames = handle.readframes(handle.getnframes())
+    samples = array.array("h", frames)
+    return max(abs(value) for value in samples)
