@@ -81,7 +81,8 @@ def _render_one(
         return record
 
     images = [directory / image.file for image in job.images]
-    key = _key(job, images, client)
+    reference = directory / job.reference if job.reference else None
+    key = _key(job, images, reference, client)
     saved = _cached(key, cache)
     if saved is not None:
         _copy(saved, target)
@@ -95,6 +96,7 @@ def _render_one(
         request = VideoRequest(
             prompt=job.prompt,
             reference_images=images,
+            reference_audios=[reference] if reference else [],
             duration=job.duration,
             resolution=job.resolution,
             ratio=job.ratio,
@@ -163,8 +165,15 @@ def _copy(source: Path, target: Path) -> None:
 
 
 # Fingerprint the job, its images and the model, so the key is exact.
-def _key(job: Job, images: list[Path], client: VideoClient) -> str:
+def _key(
+    job: Job,
+    images: list[Path],
+    reference: Path | None,
+    client: VideoClient,
+) -> str:
     digests = [file_fingerprint(path) for path in images]
+    if reference is not None:
+        digests.append(file_fingerprint(reference))
     return fingerprint(
         job.prompt,
         *digests,
