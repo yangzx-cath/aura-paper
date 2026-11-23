@@ -8,10 +8,14 @@ from pathlib import Path
 
 from PIL import Image, ImageChops
 
-from ..clients.tts import DEFAULT_RATE
+from ..clients.tts import DEFAULT_RATE, TTSClient, TTSError
 from ..media import ffmpeg
+from ..media.image import extend_sides, load_image, save_jpeg
 from ..schema.compose import BookCompose, ComposedJoin, ComposedShot
+from ..schema.content import BookContent
 from ..schema.job import BookJobs, Job
+from ..schema.voice import NARRATOR, BookVoice
+from ..store.cache import Cache, fingerprint
 from ..store.output import write_json
 from .paths import book_dir, shots_dir
 
@@ -28,6 +32,26 @@ TRACK_SUFFIX = ".wav"
 # How long two shots share the screen when they dissolve into each other.
 OVERLAP = 0.5
 
+# The title is read slower than the story, with room to breathe either side.
+TITLE_SPEED = 0.8
+TITLE_LEAD_MS = 1500
+TITLE_TAIL_MS = 1000
+
+# How long the card takes to appear and to leave.
+TITLE_FADE = 0.4
+
+# What the card and its track are called.
+TITLE_CARD = "title_card"
+
+# The card image is written as JPEG, like the pages.
+IMAGE_SUFFIX = ".jpg"
+CARD_QUALITY = 95
+
+# How much the mirrored edge filling is blurred behind the page. The
+# page's own watermark reaches its edges, so the filling is softened
+# until that text no longer reads backwards.
+CARD_SOFTEN = 40
+
 # A shot with no clip yet is expected while the render is still running.
 MISSING = "还没有生成这一镜"
 
@@ -41,7 +65,9 @@ def compose(
     only: str = "",
     min_seconds: float = 0.0,
     tail_seconds: float = 0.0,
+    tts: TTSClient | None = None,
     root: str | Path | None = None,
+    cache: Cache | None = None,
 ) -> BookCompose:
     """Read jobs.json, mix one take per shot, write compose.json."""
     directory = book_dir(book_id, root)
@@ -60,7 +86,17 @@ def compose(
     result.joins = _joins(job_book.shots, result.shots, out_dir)
     notes = []
     if not only:
-        _film(job_book.shots, result, out_dir, notes)
+        _film(
+            book_id,
+            job_book.shots,
+            result,
+            notes,
+            directory,
+            out_dir,
+            root,
+            tts,
+            cache,
+        )
     result.error = "；".join(
         [
             f"{shot.shot}：{shot.error}"
@@ -71,6 +107,119 @@ def compose(
     )
     write_json(book_id, "compose", result.to_dict(), root)
     return result
+
+
+def title_card(
+    book_id: str,
+    *,
+    tts: TTSClient,
+    size: tuple[int, int],
+    root: str | Path | None = None,
+    cache: Cache | None = None,
+    speed: float = TITLE_SPEED,
+    lead_ms: int = TITLE_LEAD_MS,
+    tail_ms: int = TITLE_TAIL_MS,
+) -> str:
+    """Speak the cover title and put it on a card built from the cover.
+
+    The card lasts as long as the spoken title plus the silence before
+    and after it, so the words never crowd the edges.
+    """
+    directory = book_dir(book_id, root)
+    content = _read_content(directory)
+    title = content.title.strip()
+    cover = content.cover_page
+    if not title:
+        raise ValueError("封面没有书名")
+    if cover is None:
+        raise ValueError("还没有封面图")
+
+    voice_id = _voice_for(directory, "旁白", NARRATOR)
+    out_dir = shots_dir(book_id, root)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    speech = out_dir / f"{TITLE_CARD}_speech{TRACK_SUFFIX}"
+    _speak_title(title, voice_id, speed, speech, tts, cache)
+    seconds = (lead_ms + _file_ms(speech) + tail_ms) / 1000
+    track = out_dir / f"{TITLE_CARD}{TRACK_SUFFIX}"
+    _pad_speech(track, speech, lead_ms, tail_ms)
+    speech.unlink(missing_ok=True)
+
+    image = out_dir / f"{TITLE_CARD}{IMAGE_SUFFIX}"
+    still = load_image(directory / "pages" / cover.filename)
+    save_jpeg(
+        extend_sides(still, size, soften=CARD_SOFTEN),
+        image,
+        CARD_QUALITY,
+    )
+
+    target = out_dir / f"{TITLE_CARD}{SUFFIX}"
+    ffmpeg.title_card(
+        image,
+        track,
+        target,
+        size=size,
+        seconds=seconds,
+        fade=TITLE_FADE,
+    )
+    return f"shots/{target.name}"
+
+
+# Speak the title, reusing the cached audio when nothing changed.
+def _speak_title(
+    text: str,
+    voice_id: str,
+    speed: float,
+    target: Path,
+    tts: TTSClient,
+    cache: Cache | None,
+) -> None:
+    key = fingerprint(text, voice_id, speed, *tts.signature)
+    if cache is not None and cache.enabled:
+        cached = cache.file_path("voice", key, TRACK_SUFFIX)
+        if cached.is_file():
+            target.write_bytes(cached.read_bytes())
+            return
+
+    tts.synthesize(text, voice=voice_id, speed=speed).save(target)
+    if cache is not None and cache.enabled:
+        cached = cache.file_path("voice", key, TRACK_SUFFIX)
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        cached.write_bytes(target.read_bytes())
+
+
+# Put the lead and tail silence around the spoken title.
+def _pad_speech(
+    target: Path,
+    speech: Path,
+    lead_ms: int,
+    tail_ms: int,
+) -> None:
+    samples = bytearray(_silence(lead_ms / 1000))
+    samples += speech.read_bytes()[WAV_HEADER:]
+    samples += _silence(tail_ms / 1000)
+    _write_wav(target, bytes(samples))
+
+
+# Return how long a WAV the speech client wrote lasts, in milliseconds.
+def _file_ms(path: Path) -> int:
+    size = max(0, path.stat().st_size - WAV_HEADER)
+    return round(size * 1000 / (DEFAULT_RATE * BYTES_PER_FRAME))
+
+
+# Read the understand stage's record of the book.
+def _read_content(directory: Path) -> BookContent:
+    path = directory / "understand.json"
+    return BookContent.from_dict(json.loads(path.read_text("utf-8")))
+
+
+# Return the voice of one speaker, using the fallback when it is unset.
+def _voice_for(directory: Path, speaker: str, fallback: str) -> str:
+    path = directory / "voice.json"
+    if not path.is_file():
+        return fallback
+    book = BookVoice.from_dict(json.loads(path.read_text("utf-8")))
+    return book.voices.get(speaker) or fallback
 
 
 # Mix one shot, or record why it could not be done.
@@ -98,7 +247,7 @@ def _one(
 
     seconds = _seconds(job, info.duration_ms, min_seconds, tail_seconds)
     track = out_dir / f"{job.shot}{TRACK_SUFFIX}"
-    _write_track(track, job, seconds, directory)
+    write_track(track, job, seconds, directory)
     record.audio = f"shots/{track.name}"
 
     target = out_dir / f"{job.shot}{SUFFIX}"
@@ -133,7 +282,7 @@ def _seconds(
 
 
 # Write one track with every line pasted at the offset jobs.json gives.
-def _write_track(
+def write_track(
     target: Path,
     job: Job,
     seconds: float,
@@ -217,10 +366,15 @@ def _jump(before: Path, after: Path, folder: Path) -> float:
 
 # Join every take into one film, once all of them are on disk.
 def _film(
+    book_id: str,
     jobs: list[Job],
     result: BookCompose,
-    out_dir: Path,
     notes: list[str],
+    directory: Path,
+    out_dir: Path,
+    root: str | Path | None,
+    tts: TTSClient | None,
+    cache: Cache | None,
 ) -> None:
     takes = [take for take in result.shots if take.file]
     if len(takes) != len(jobs):
@@ -231,6 +385,11 @@ def _film(
 
     paths = [out_dir / f"{job.shot}{SUFFIX}" for job in jobs]
     overlaps = [OVERLAP if job.join == "叠化" else 0.0 for job in jobs[1:]]
+    card = _card(book_id, paths[0], root, notes, tts, cache)
+    if card:
+        paths = [directory / card] + paths
+        overlaps = [OVERLAP] + overlaps
+        result.title_card = card
     target = out_dir / f"film{SUFFIX}"
     try:
         ffmpeg.join(paths, target, overlaps=overlaps)
@@ -239,6 +398,36 @@ def _film(
         return
     result.film = f"shots/{target.name}"
     result.seconds = round(ffmpeg.probe(target).duration_ms / 1000, 2)
+
+
+# Build the title card, or note why it was left out.
+def _card(
+    book_id: str,
+    first: Path,
+    root: str | Path | None,
+    notes: list[str],
+    tts: TTSClient | None,
+    cache: Cache | None,
+) -> str:
+    if tts is None:
+        return ""
+    try:
+        return title_card(
+            book_id,
+            tts=tts,
+            size=_frame_size(first),
+            root=root,
+            cache=cache,
+        )
+    except (TTSError, ffmpeg.FFmpegError, ValueError, OSError) as exc:
+        notes.append(f"片头没做成：{exc}")
+        return ""
+
+
+# Return the size the film uses, read off its first take.
+def _frame_size(path: Path) -> tuple[int, int]:
+    info = ffmpeg.probe(path)
+    return info.width, info.height
 
 
 # Read the jobs stage's record of the shots.

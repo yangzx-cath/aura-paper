@@ -80,6 +80,7 @@ class BookCompose:
 
     id: str = ""
     film: str = ""
+    title_card: str = ""
     seconds: float = 0.0
     shots: list[ComposedShot] = field(default_factory=list)
     joins: list[ComposedJoin] = field(default_factory=list)
@@ -91,6 +92,7 @@ class BookCompose:
             "id": self.id,
             "generated_at": now_iso(),
             "film": self.film,
+            "title_card": self.title_card,
             "seconds": self.seconds,
             "shots": [shot.to_dict() for shot in self.shots],
             "joins": [join.to_dict() for join in self.joins],
@@ -103,6 +105,7 @@ class BookCompose:
         return cls(
             id=_text(data.get("id")),
             film=_text(data.get("film")),
+            title_card=_text(data.get("title_card")),
             seconds=_float_value(data.get("seconds")),
             shots=_shot_list(data.get("shots")),
             joins=_join_list(data.get("joins")),

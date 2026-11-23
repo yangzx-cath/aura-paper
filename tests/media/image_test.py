@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 from aura_paper.media.image import (
     crop_box,
     data_url,
+    extend_sides,
     save_jpeg,
     stitch_side_by_side,
 )
@@ -44,6 +45,23 @@ def test_unknown_suffix_raises(tmp_path):
 
     with pytest.raises(ValueError, match="unsupported image type"):
         data_url(target)
+
+
+def test_mirrors_the_sides_to_fill_the_frame():
+    image = Image.new("RGB", (40, 60), "white")
+    for x in range(40):
+        colour = (x * 5, 0, 0)
+        for y in range(60):
+            image.putpixel((x, y), colour)
+
+    whole = extend_sides(image, (100, 60))
+
+    assert whole.size == (100, 60)
+    # The page is centred and mirrored outward, so both seams match.
+    assert whole.getpixel((30, 0)) == (0, 0, 0)
+    assert whole.getpixel((69, 0)) == (195, 0, 0)
+    assert whole.getpixel((29, 0)) == (0, 0, 0)
+    assert whole.getpixel((70, 0)) == (195, 0, 0)
 
 
 # Write a page image of the given size.

@@ -14,10 +14,12 @@ import sys
 import time
 from pathlib import Path
 
-from aura_paper.config import load_env, out_root
+from aura_paper.clients.tts import TTSClient
+from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.media import ffmpeg
 from aura_paper.schema.compose import ComposedShot
 from aura_paper.stages.compose import compose
+from aura_paper.store.cache import Cache
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -57,6 +59,16 @@ def main() -> int:
         metavar="SECONDS",
         help=f"silence after the last word (default={TAIL_SECONDS})",
     )
+    parser.add_argument(
+        "--no-title-card",
+        action="store_true",
+        help="leave the title card off the film",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="ignore the cache and do not write it",
+    )
     args = parser.parse_args()
 
     load_env(ROOT / ".env")
@@ -74,6 +86,16 @@ def main() -> int:
         print("missing tools: " + ", ".join(missing), file=sys.stderr)
         return 2
 
+    cache = Cache(cache_root(), enabled=not args.no_cache)
+    tts = None if args.no_title_card else TTSClient.from_env()
+    if tts is not None and tts.missing_settings():
+        print(
+            "missing config for the title card: "
+            + ", ".join(tts.missing_settings()),
+            file=sys.stderr,
+        )
+        tts = None
+
     print(f"book     {args.book}")
     print(f"root     {root}")
     print(f"min      {args.min}s")
@@ -89,7 +111,9 @@ def main() -> int:
         only=args.shot,
         min_seconds=args.min,
         tail_seconds=args.tail,
+        tts=tts,
         root=root,
+        cache=cache,
     )
     elapsed = time.perf_counter() - started
 
@@ -109,6 +133,8 @@ def main() -> int:
     print(f"takes    {len(done)}")
     print(f"seconds  {sum(shot.seconds for shot in done):.1f}")
     print(f"sound    {sum(1 for shot in done if shot.sound)} 镜带原声")
+    if result.title_card:
+        print(f"title    {result.title_card}")
     if result.film:
         print(f"film     {result.film}  {result.seconds:.1f}s")
     print()

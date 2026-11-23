@@ -20,6 +20,9 @@ VIDEO_CODEC = ("-c:v", "libx264", "-pix_fmt", "yuv420p")
 AUDIO_CODEC = ("-c:a", "aac", "-ar", "48000", "-ac", "2")
 FASTSTART = ("-movflags", "+faststart")
 
+# Every clip in the film runs at this frame rate.
+FILM_FPS = 24
+
 # How much of a failing call's output is worth keeping in the error.
 ERROR_TAIL = 400
 
@@ -285,6 +288,53 @@ def join(
     return target
 
 
+# Hold one card image for a while, its sound under it.
+def title_card(
+    still: str | Path,
+    audio: str | Path,
+    target: str | Path,
+    *,
+    size: tuple[int, int],
+    seconds: float,
+    fade: float = 0.4,
+) -> Path:
+    """Hold a card image for the given time, sounding its audio."""
+    width, height = size
+    target = Path(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    graph = (
+        f"fade=t=in:st=0:d={fade:g},"
+        f"fade=t=out:st={seconds - fade:.3f}:d={fade:g},"
+        f"fps={FILM_FPS},scale={width}:{height},setsar=1,"
+        "format=yuv420p"
+    )
+    run(
+        [
+            FFMPEG,
+            *COMMON,
+            "-loop",
+            "1",
+            "-i",
+            str(still),
+            "-i",
+            str(audio),
+            "-filter_complex",
+            f"[0:v]{graph}[v]",
+            "-map",
+            "[v]",
+            "-map",
+            "1:a:0",
+            "-t",
+            f"{seconds:.3f}",
+            *VIDEO_CODEC,
+            *AUDIO_CODEC,
+            *FASTSTART,
+            str(target),
+        ]
+    )
+    return target
+
+
 # Split the takes into runs that hard cut into each other.
 def _runs(spreads: list[float]) -> list[list[int]]:
     runs = [[0]]
@@ -337,7 +387,7 @@ def frame(
 # Fit one input to the size and frame rate the film uses.
 def _fit(size: MediaInfo) -> str:
     return (
-        f"fps=24,scale={size.width}:{size.height},setsar=1,"
+        f"fps={FILM_FPS},scale={size.width}:{size.height},setsar=1,"
         "format=yuv420p,setpts=PTS-STARTPTS"
     )
 

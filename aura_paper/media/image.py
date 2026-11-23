@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageStat
+from PIL import Image, ImageChops, ImageFilter, ImageStat
 
 # Supported image suffixes and their MIME types.
 MIME_TYPES = {
@@ -34,6 +34,42 @@ def data_url(path: Path) -> str:
         raise ValueError(f"unsupported image type: {path.suffix}")
     payload = base64.b64encode(path.read_bytes()).decode("ascii")
     return f"data:{mime};base64,{payload}"
+
+
+def extend_sides(
+    image: Image.Image,
+    size: tuple[int, int],
+    *,
+    soften: int = 0,
+) -> Image.Image:
+    """Fit one image inside size, then mirror it outward to fill the sides.
+
+    The image keeps its whole height and sits in the middle. Each side is
+    filled with the image and its mirror laid side by side, so a page with
+    a white or lightly patterned border continues past its own edge. A
+    soften radius blurs the filling only, leaving the page itself sharp.
+    """
+    width, height = size
+    fitted = _contain(image.convert("RGB"), size)
+    canvas = Image.new("RGB", size, "white")
+    left = (width - fitted.width) // 2
+    top = (height - fitted.height) // 2
+
+    pair = Image.new("RGB", (fitted.width * 2, fitted.height))
+    pair.paste(fitted, (0, 0))
+    pair.paste(
+        fitted.transpose(Image.Transpose.FLIP_LEFT_RIGHT),
+        (fitted.width, 0),
+    )
+
+    at = left - pair.width
+    while at < width:
+        canvas.paste(pair, (at, top))
+        at += pair.width
+    if soften:
+        canvas = canvas.filter(ImageFilter.GaussianBlur(soften))
+    canvas.paste(fitted, (left, top))
+    return canvas
 
 
 def load_image(path: str | Path) -> Image.Image:
@@ -111,6 +147,19 @@ def _seam_overlap(
     if best_width <= SEAM_STEP:
         return 0
     return best_width
+
+
+# Scale an image so it fits inside a box, keeping its shape.
+def _contain(image: Image.Image, size: tuple[int, int]) -> Image.Image:
+    width, height = size
+    scale = min(width / image.width, height / image.height)
+    return image.resize(
+        (
+            max(1, round(image.width * scale)),
+            max(1, round(image.height * scale)),
+        ),
+        Image.Resampling.LANCZOS,
+    )
 
 
 # Scale an image to the given height, keeping its shape.
