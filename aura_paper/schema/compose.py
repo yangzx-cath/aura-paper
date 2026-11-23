@@ -46,11 +46,43 @@ class ComposedShot:
 
 
 @dataclass
+class ComposedJoin:
+    """Where one take meets the take before it."""
+
+    before: str = ""
+    after: str = ""
+    kind: str = ""
+    jump: float = 0.0
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this join."""
+        return {
+            "before": self.before,
+            "after": self.after,
+            "kind": self.kind,
+            "jump": self.jump,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ComposedJoin:
+        """Build a join from its external JSON shape."""
+        return cls(
+            before=_text(data.get("before")),
+            after=_text(data.get("after")),
+            kind=_text(data.get("kind")),
+            jump=_float_value(data.get("jump")),
+        )
+
+
+@dataclass
 class BookCompose:
-    """Every take of one book, in shot order."""
+    """Every take of one book, in shot order, and the film they make."""
 
     id: str = ""
+    film: str = ""
+    seconds: float = 0.0
     shots: list[ComposedShot] = field(default_factory=list)
+    joins: list[ComposedJoin] = field(default_factory=list)
     error: str = ""
 
     def to_dict(self) -> dict:
@@ -58,7 +90,10 @@ class BookCompose:
         return {
             "id": self.id,
             "generated_at": now_iso(),
+            "film": self.film,
+            "seconds": self.seconds,
             "shots": [shot.to_dict() for shot in self.shots],
+            "joins": [join.to_dict() for join in self.joins],
             "error": self.error,
         }
 
@@ -67,7 +102,10 @@ class BookCompose:
         """Build the takes from their external JSON shape."""
         return cls(
             id=_text(data.get("id")),
+            film=_text(data.get("film")),
+            seconds=_float_value(data.get("seconds")),
             shots=_shot_list(data.get("shots")),
+            joins=_join_list(data.get("joins")),
             error=_text(data.get("error")),
         )
 
@@ -95,3 +133,15 @@ def _shot_list(value: object) -> list[ComposedShot]:
         if isinstance(item, dict)
     ]
     return [shot for shot in shots if shot.shot]
+
+
+# Read the join list, keeping the entries that name both sides.
+def _join_list(value: object) -> list[ComposedJoin]:
+    if not isinstance(value, list):
+        return []
+    joins = [
+        ComposedJoin.from_dict(item)
+        for item in value
+        if isinstance(item, dict)
+    ]
+    return [join for join in joins if join.before and join.after]

@@ -6,10 +6,12 @@ import json
 import struct
 from pathlib import Path
 
+from PIL import Image, ImageChops
+
 from ..clients.tts import DEFAULT_RATE
 from ..media import ffmpeg
 from ..output import write_json
-from ..schema.compose import BookCompose, ComposedShot
+from ..schema.compose import BookCompose, ComposedJoin, ComposedShot
 from ..schema.job import BookJobs, Job
 from .paths import book_dir, shots_dir
 
@@ -22,6 +24,15 @@ WAV_HEADER = 44
 # Every take is encoded the same way, so the takes can be joined later.
 SUFFIX = ".mp4"
 TRACK_SUFFIX = ".wav"
+
+# How long two shots share the screen when they dissolve into each other.
+OVERLAP = 0.5
+
+# A shot with no clip yet is expected while the render is still running.
+MISSING = "还没有生成这一镜"
+
+# The frames either side of a join are compared at this size.
+JUMP_BOX = (64, 64)
 
 
 def compose(
@@ -42,8 +53,17 @@ def compose(
             continue
         result.shots.append(_one(job, directory, out_dir))
 
+    result.joins = _joins(job_book.shots, result.shots, out_dir)
+    notes = []
+    if not only:
+        _film(job_book.shots, result, out_dir, notes)
     result.error = "；".join(
-        f"{shot.shot}：{shot.error}" for shot in result.shots if shot.error
+        [
+            f"{shot.shot}：{shot.error}"
+            for shot in result.shots
+            if shot.error and shot.error != MISSING
+        ]
+        + notes
     )
     write_json(book_id, "compose", result.to_dict(), root)
     return result
@@ -55,7 +75,7 @@ def _one(job: Job, directory: Path, out_dir: Path) -> ComposedShot:
     source = f"clips/{job.shot}{SUFFIX}"
     clip = directory / source
     if not clip.is_file():
-        record.error = "还没有生成这一镜"
+        record.error = MISSING
         return record
 
     record.source = source
@@ -135,6 +155,72 @@ def _write_wav(path: Path, pcm: bytes) -> None:
     )
     header += b"data" + struct.pack("<I", len(pcm))
     path.write_bytes(header + pcm)
+
+
+# Measure every join between two takes that are both on disk.
+def _joins(
+    jobs: list[Job],
+    takes: list[ComposedShot],
+    out_dir: Path,
+) -> list[ComposedJoin]:
+    found = {take.shot: take for take in takes if take.file}
+    joins = []
+    for number, job in enumerate(jobs[:-1]):
+        after = jobs[number + 1]
+        if job.shot not in found or after.shot not in found:
+            continue
+        joins.append(
+            ComposedJoin(
+                before=job.shot,
+                after=after.shot,
+                kind=after.join,
+                jump=round(
+                    _jump(
+                        out_dir / f"{job.shot}{SUFFIX}",
+                        out_dir / f"{after.shot}{SUFFIX}",
+                        out_dir,
+                    ),
+                    1,
+                ),
+            )
+        )
+    return joins
+
+
+# Compare the last picture of one take with the first of the next.
+def _jump(before: Path, after: Path, folder: Path) -> float:
+    first = ffmpeg.frame(before, folder / "tail.jpg", last=True)
+    second = ffmpeg.frame(after, folder / "head.jpg")
+    left = Image.open(first).convert("L").resize(JUMP_BOX)
+    right = Image.open(second).convert("L").resize(JUMP_BOX)
+    data = ImageChops.difference(left, right).tobytes()
+    return sum(data) / len(data)
+
+
+# Join every take into one film, once all of them are on disk.
+def _film(
+    jobs: list[Job],
+    result: BookCompose,
+    out_dir: Path,
+    notes: list[str],
+) -> None:
+    takes = [take for take in result.shots if take.file]
+    if len(takes) != len(jobs):
+        notes.append(f"还有 {len(jobs) - len(takes)} 镜没出片，先不拼整片")
+        return
+    if not takes:
+        return
+
+    paths = [out_dir / f"{job.shot}{SUFFIX}" for job in jobs]
+    overlaps = [OVERLAP if job.join == "叠化" else 0.0 for job in jobs[1:]]
+    target = out_dir / f"film{SUFFIX}"
+    try:
+        ffmpeg.join(paths, target, overlaps=overlaps)
+    except ffmpeg.FFmpegError as exc:
+        notes.append(f"整片拼接失败：{exc}")
+        return
+    result.film = f"shots/{target.name}"
+    result.seconds = round(ffmpeg.probe(target).duration_ms / 1000, 2)
 
 
 # Read the jobs stage's record of the shots.

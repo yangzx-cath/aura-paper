@@ -69,9 +69,19 @@ def main() -> int:
         print(_shot_line(shot))
     done = [shot for shot in result.shots if shot.file]
     print()
+    if result.joins:
+        print("joins")
+        for join in result.joins:
+            print(
+                f"  {join.before}→{join.after}"
+                f"  {join.kind}  帧差 {join.jump:5.1f}"
+            )
+        print()
     print(f"takes    {len(done)}")
     print(f"seconds  {sum(shot.seconds for shot in done):.1f}")
     print(f"sound    {sum(1 for shot in done if shot.sound)} 镜带原声")
+    if result.film:
+        print(f"film     {result.film}  {result.seconds:.1f}s")
     print()
     print(f"total    {elapsed:.1f}s")
     print(f"output   {root / args.book / 'compose.json'}")

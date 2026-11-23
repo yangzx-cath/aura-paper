@@ -47,22 +47,41 @@ def make_line(path, seconds=0.5):
 
 
 # Write what the jobs and render stages would have left behind.
-def make_book(root, *, tone=False, with_line=True, audio_ms=1000):
+def make_book(
+    root,
+    *,
+    tone=False,
+    with_line=True,
+    audio_ms=1000,
+    shots=1,
+    join="硬切",
+):
     book = root / "demo"
-    make_clip(book / "clips" / "j1.mp4", seconds=2.0, tone=tone)
-    if with_line:
-        make_line(book / "voice" / "j1-0.wav")
-
-    lines = []
-    if with_line:
-        lines.append(
+    entries = []
+    for number in range(shots):
+        name = f"j{number + 1}"
+        make_clip(book / "clips" / f"{name}.mp4", seconds=2.0, tone=tone)
+        lines = []
+        if with_line:
+            make_line(book / "voice" / f"{name}-0.wav")
+            lines.append(
+                {
+                    "index": 0,
+                    "kind": "旁白",
+                    "text": "下",
+                    "file": f"voice/{name}-0.wav",
+                    "start_ms": 0,
+                    "duration_ms": 500,
+                }
+            )
+        entries.append(
             {
-                "index": 0,
-                "kind": "旁白",
-                "text": "下",
-                "file": "voice/j1-0.wav",
-                "start_ms": 0,
-                "duration_ms": 500,
+                "shot": name,
+                "prompt": "p",
+                "duration": 2,
+                "audio_ms": audio_ms,
+                "join": join if number else "叠化",
+                "lines": lines,
             }
         )
     jobs = BookJobs.from_dict(
@@ -70,15 +89,7 @@ def make_book(root, *, tone=False, with_line=True, audio_ms=1000):
             "id": "demo",
             "ratio": "4:3",
             "resolution": "480p",
-            "shots": [
-                {
-                    "shot": "j1",
-                    "prompt": "p",
-                    "duration": 2,
-                    "audio_ms": audio_ms,
-                    "lines": lines,
-                }
-            ],
+            "shots": entries,
         }
     )
     write_json("demo", "jobs", jobs.to_dict(), root)
@@ -117,6 +128,37 @@ def test_keeps_the_whole_clip_when_nothing_is_spoken(tmp_path):
     assert result.shots[0].seconds == pytest.approx(2.0, abs=0.1)
 
 
+def test_joins_the_takes_into_a_film(tmp_path):
+    make_book(tmp_path, shots=2, join="硬切", audio_ms=1000)
+
+    result = compose("demo", root=tmp_path)
+
+    assert result.film == "shots/film.mp4"
+    assert (tmp_path / "demo" / "shots" / "film.mp4").is_file()
+    # Two one-second takes, cut together without losing anything.
+    assert result.seconds == pytest.approx(2.0, abs=0.1)
+    assert [join.after for join in result.joins] == ["j2"]
+    assert result.joins[0].kind == "硬切"
+
+
+def test_a_dissolve_costs_the_length_it_shares(tmp_path):
+    make_book(tmp_path, shots=2, join="叠化", audio_ms=1000)
+
+    result = compose("demo", root=tmp_path)
+
+    assert result.seconds == pytest.approx(1.5, abs=0.1)
+
+
+def test_waits_for_every_shot_before_making_the_film(tmp_path):
+    make_book(tmp_path, shots=2, audio_ms=1000)
+    (tmp_path / "demo" / "clips" / "j2.mp4").unlink()
+
+    result = compose("demo", root=tmp_path)
+
+    assert result.film == ""
+    assert "没出片" in result.error
+
+
 def test_records_a_shot_that_has_no_clip_yet(tmp_path):
     make_book(tmp_path)
     (tmp_path / "demo" / "clips" / "j1.mp4").unlink()
@@ -124,7 +166,8 @@ def test_records_a_shot_that_has_no_clip_yet(tmp_path):
     result = compose("demo", root=tmp_path)
 
     assert result.shots[0].error == "还没有生成这一镜"
-    assert "还没有生成这一镜" in result.error
+    # A clip that is still being made is not a failure of this stage.
+    assert result.error == "还有 1 镜没出片，先不拼整片"
 
 
 # Return the loudest sample of a file's audio, read back as plain PCM.
