@@ -156,6 +156,27 @@ def test_reports_a_shot_that_cannot_fit_the_length_limit(tmp_path):
     assert "上限" in job.error
 
 
+def test_reports_a_line_that_has_no_audio_yet(tmp_path):
+    make_book(
+        tmp_path,
+        [
+            shot(
+                [
+                    {"kind": "旁白", "text": "下"},
+                    {"kind": "对白", "text": "好", "cast": "c1"},
+                ]
+            )
+        ],
+        [spoken(0, 1000)],
+    )
+
+    job = jobs(
+        "demo", ratio="4:3", resolution="480p", audio=False, root=tmp_path
+    ).shots[0]
+
+    assert "run_voice.py" in job.error
+
+
 def test_names_the_place_and_every_reference_image(tmp_path):
     make_book(
         tmp_path,

@@ -139,6 +139,13 @@ def _build(
         job.error = _joined(
             job.error, f"参考图超过 {MAX_IMAGES} 张，只留前面几张"
         )
+    wanted = sum(1 for line in shot.audio if line.kind != "音效")
+    found = sum(1 for line in lines if line.kind != "音效")
+    if found < wanted:
+        job.error = _joined(
+            job.error,
+            f"配音少了 {wanted - found} 句，先重跑 run_voice.py",
+        )
     if job.audio_ms + TAIL_MS > MAX_SECONDS * 1000:
         job.error = _joined(
             job.error,

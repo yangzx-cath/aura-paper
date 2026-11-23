@@ -6,6 +6,9 @@ from dataclasses import dataclass, field
 
 from ..utils import now_iso
 
+# Parts words that mean the character is only inside a picture on the page.
+PICTURE_WORDS = ("照片", "相框", "画中", "画里", "海报", "卡片")
+
 
 @dataclass
 class PanelPerson:

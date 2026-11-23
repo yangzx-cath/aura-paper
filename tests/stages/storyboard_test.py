@@ -54,7 +54,7 @@ def panel(box, text="三块、", description="搭积木"):
 
 
 # Write the three artifacts the stage reads, plus the images they name.
-def make_book(root, pages):
+def make_book(root, pages, members=None):
     folder = root / "demo"
     for name in ("pages", "panels", "figures"):
         (folder / name).mkdir(parents=True, exist_ok=True)
@@ -82,7 +82,8 @@ def make_book(root, pages):
     cast = BookCast.from_dict(
         {
             "id": "demo",
-            "cast": [
+            "cast": members
+            or [
                 {
                     "id": "c1",
                     "name": "小满",
@@ -93,9 +94,9 @@ def make_book(root, pages):
         }
     )
     write_json("demo", "cast", cast.to_dict(), root)
-    Image.new("RGB", (40, 60), "white").save(
-        folder / "figures" / "p000_f0.jpg"
-    )
+    for member in cast.cast:
+        for name in member.pictures:
+            Image.new("RGB", (40, 60), "white").save(folder / "figures" / name)
 
     places = BookLocations.from_dict(
         {

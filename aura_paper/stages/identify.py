@@ -16,7 +16,7 @@ from ..output import write_json
 from ..prompts import identify_prompt
 from ..schema.cast import BookCast
 from ..schema.content import BookContent, Figure, PageContent
-from ..schema.identify import BookPeople, PanelPeople
+from ..schema.identify import PICTURE_WORDS, BookPeople, PanelPeople
 from ..utils import extract_json
 from .paths import (
     book_dir,
@@ -229,7 +229,7 @@ def _apply(
                 continue
             cast_id = str(item.get("cast") or "").strip()
             parts = str(item.get("parts") or "").strip()
-            if cast_id in known and parts:
+            if cast_id in known and parts and not _in_picture(parts):
                 people.append({"cast": cast_id, "parts": parts})
         kept.append(
             PanelPeople.from_dict(
@@ -249,6 +249,11 @@ def _int(value: object) -> int:
         return int(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return -1
+
+
+# Tell whether a named part is a picture inside the scene, not a person.
+def _in_picture(parts: str) -> bool:
+    return any(word in parts for word in PICTURE_WORDS)
 
 
 # Join two notes into the error text of the stage.

@@ -132,6 +132,25 @@ def test_drops_a_panel_that_is_not_on_the_page(tmp_path):
     assert [panel.panel for panel in result.panels] == [0]
 
 
+def test_drops_a_person_that_only_shows_inside_a_picture(tmp_path):
+    make_book(tmp_path, [page("p002.jpg", figure(view="半身"))])
+    llm = FakeLLM(
+        [
+            {
+                "panel": 0,
+                "people": [
+                    {"cast": "c1", "parts": "衣服和腿"},
+                    {"cast": "c1", "parts": "照片中的头部和上半身"},
+                ],
+            }
+        ]
+    )
+
+    result = identify("demo", llm=llm, root=tmp_path)
+
+    assert [person.parts for person in result.panels[0].people] == ["衣服和腿"]
+
+
 def test_reads_one_page_only(tmp_path):
     make_book(
         tmp_path,
