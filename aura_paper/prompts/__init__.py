@@ -5,7 +5,7 @@ Prompts for the video pipeline.
 from .cast_prompt import cast_prompt
 from .cover_prompt import cover_prompt
 from .identify_prompt import identify_prompt
-from .job_prompt import job_prompt
+from .job_prompt import audio_prompt, job_prompt
 from .layout_prompt import layout_prompt
 from .location_prompt import location_prompt
 from .page_prompt import page_prompt
@@ -16,6 +16,7 @@ __all__ = [
     "cast_prompt",
     "cover_prompt",
     "identify_prompt",
+    "audio_prompt",
     "job_prompt",
     "layout_prompt",
     "location_prompt",
