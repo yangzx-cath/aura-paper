@@ -448,6 +448,135 @@ def test_reports_a_line_the_page_does_not_hold(tmp_path):
     assert "1 行文字在原文里找不到" in shot_book.error
 
 
+def test_writes_a_narration_for_a_page_without_words(tmp_path):
+    make_book(tmp_path, [{"panels": [panel(FULL_BOX, text="")]}])
+    reply = {
+        "scenes": [{"key": "A", "name": "画卡片", "location": "l1"}],
+        "shots": [
+            shot(
+                "A",
+                "p000.jpg",
+                0,
+                audio=[
+                    {"kind": "旁白", "text": "小满画好生日卡片", "cast": ""}
+                ],
+            )
+        ],
+    }
+
+    scene_book, shot_book = storyboard(
+        "demo",
+        llm=FakeLLM(reply),
+        root=tmp_path,
+    )
+
+    # Nothing is printed on the page, so the line is not a quotation.
+    assert shot_book.shots[0].audio[0].text == "小满画好生日卡片"
+    assert shot_book.error == ""
+
+
+def test_reports_the_same_narration_in_two_shots_in_a_row(tmp_path):
+    make_book(tmp_path, [{"panels": [panel(FULL_BOX, text="三块、")]}])
+    reply = {
+        "scenes": [{"key": "A", "name": "搭积木", "location": "l1"}],
+        "shots": [shot("A", "p000.jpg", 0), shot("A", "p000.jpg", 0)],
+    }
+
+    scene_book, shot_book = storyboard(
+        "demo",
+        llm=FakeLLM(reply),
+        root=tmp_path,
+    )
+
+    assert "1 处相邻两镜的旁白一样" in shot_book.error
+
+
+def test_drops_the_narration_a_bare_page_took_over(tmp_path):
+    printed = "小满画好了生日卡片。\n“黄米团，你去哪儿？”"
+    pages = [
+        {"panels": [panel(BLANK_BOX, text="")]},
+        {"panels": [panel(FULL_BOX, text=printed)]},
+    ]
+    make_book(tmp_path, pages)
+    plan = {
+        "scenes": [{"key": "A", "name": "画卡片", "location": "l1"}],
+        "shots": [
+            shot(
+                "A",
+                "p000.jpg",
+                0,
+                audio=[
+                    {
+                        "kind": "旁白",
+                        "text": "小满画好了生日卡片。",
+                        "cast": "",
+                    }
+                ],
+            ),
+            shot(
+                "A",
+                "p001.jpg",
+                0,
+                audio=[
+                    {
+                        "kind": "旁白",
+                        "text": "小满画好了生日卡片。",
+                        "cast": "",
+                    },
+                    {
+                        "kind": "对白",
+                        "text": "“黄米团，你去哪儿？”",
+                        "cast": "c1",
+                    },
+                ],
+            ),
+        ],
+    }
+
+    scene_book, shot_book = storyboard(
+        "demo",
+        llm=TwoLLM(plan, {"lines": []}),
+        root=tmp_path,
+    )
+
+    # The first page has no words of its own, so it keeps the line and the
+    # page it was taken from only keeps what it still has to say.
+    assert [line.text for line in shot_book.shots[0].audio] == [
+        "小满画好了生日卡片。"
+    ]
+    assert [line.text for line in shot_book.shots[1].audio] == [
+        "“黄米团，你去哪儿？”"
+    ]
+    assert "后一镜删掉 1 句挪过来的声音" in shot_book.error
+
+
+def test_keeps_the_last_line_of_the_next_shot(tmp_path):
+    pages = [
+        {"panels": [panel(BLANK_BOX, text="")]},
+        {"panels": [panel(FULL_BOX, text="小满画好了生日卡片。")]},
+    ]
+    make_book(tmp_path, pages)
+    line = {"kind": "旁白", "text": "小满画好了生日卡片。", "cast": ""}
+    plan = {
+        "scenes": [{"key": "A", "name": "画卡片", "location": "l1"}],
+        "shots": [
+            shot("A", "p000.jpg", 0, audio=[line]),
+            shot("A", "p001.jpg", 0, audio=[line]),
+        ],
+    }
+
+    scene_book, shot_book = storyboard(
+        "demo",
+        llm=TwoLLM(plan, {"lines": []}),
+        root=tmp_path,
+    )
+
+    # Moving the only line would leave the next shot silent, so it stays
+    # and the repeat is told instead.
+    assert len(shot_book.shots[1].audio) == 1
+    assert "1 处相邻两镜的旁白一样" in shot_book.error
+
+
 def test_reports_a_dialogue_without_a_voice(tmp_path):
     make_book(tmp_path, [{"panels": [panel(FULL_BOX)]}])
     reply = {

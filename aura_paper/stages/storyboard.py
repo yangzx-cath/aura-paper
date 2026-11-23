@@ -215,7 +215,7 @@ def _apply(
     scene_book.scenes = scenes
     shot_book.shots = _joins(shots)
     _fill_cast(shot_book.shots, people, cast_book)
-    missed = _printed(shot_book.shots, panels)
+    missed, repeated, moved = _printed(shot_book.shots, panels)
     unknown = sum(
         1 for shot in shot_book.shots for line in shot.audio if not line.kind
     )
@@ -231,6 +231,10 @@ def _apply(
         notes.append(f"{voiceless} 句对白没有说话人")
     if missed:
         notes.append(f"{missed} 行文字在原文里找不到")
+    if moved:
+        notes.append(f"后一镜删掉 {moved} 句挪过来的声音")
+    if repeated:
+        notes.append(f"{repeated} 处相邻两镜的旁白一样")
     return notes
 
 
@@ -293,6 +297,10 @@ def _scenes(
 # request, so a shot keeps few panels and leaves room for the cast crops and
 # the place master.
 MAX_PANELS = 4
+
+# The two kinds a person says. A shot whose picture carries no words may
+# hold either of them, but never a sound effect, which has to be printed.
+SPOKEN = ("旁白", "对白")
 
 # Characters that carry a number, which a rewrite must keep.
 NUMERALS = set("零一二三四五六七八九十百千万亿0123456789")
@@ -622,14 +630,19 @@ def _numerals(text: str) -> list[str]:
     return sorted(char for char in text if char in NUMERALS)
 
 
-# Match every sound back to the printed text, so nothing is paraphrased.
-def _printed(shots: list[Shot], panels: dict) -> int:
+# Match every sound back to the printed text, so nothing is paraphrased. A
+# shot whose panels carry no printed text may hold a written line, and the
+# shot after it then loses the line that was taken over. Two shots in a row
+# that still say the same narration are counted.
+def _printed(shots: list[Shot], panels: dict) -> tuple[int, int, int]:
     missed = 0
+    bare = []
     for shot in shots:
         sources = [
             getattr(panels.get((item.page, item.panel)), "text", "") or ""
             for item in shot.panels
         ]
+        bare.append(not any(source.strip() for source in sources))
         for line in shot.audio:
             exact = next(
                 (
@@ -639,11 +652,43 @@ def _printed(shots: list[Shot], panels: dict) -> int:
                 ),
                 None,
             )
-            if exact is None:
+            if exact is not None:
+                line.text = exact
+            elif line.kind not in SPOKEN or not bare[-1]:
                 missed += 1
-                continue
-            line.text = exact
-    return missed
+
+    moved = _taken(shots, bare)
+    repeated = 0
+    for number in range(1, len(shots)):
+        said = _squeeze(_narration(shots[number - 1]))
+        if said and said == _squeeze(_narration(shots[number])):
+            repeated += 1
+    return missed, repeated, moved
+
+
+# Drop the sound a shot took over from the shot after it, unless that shot
+# would be left with nothing to say.
+def _taken(shots: list[Shot], bare: list[bool]) -> int:
+    dropped = 0
+    for number in range(1, len(shots)):
+        now = shots[number]
+        if not bare[number - 1] or len(now.audio) < 2:
+            continue
+        said = {_squeeze(line.text) for line in shots[number - 1].audio}
+        kept = [line for line in now.audio if _squeeze(line.text) not in said]
+        dropped += len(now.audio) - len(kept)
+        now.audio = kept
+    return dropped
+
+
+# Join the narration of one shot into a single string for comparison.
+def _narration(shot: Shot) -> str:
+    return "".join(line.text for line in shot.audio if line.kind == "旁白")
+
+
+# Drop every space, so two spellings of the same line compare equal.
+def _squeeze(text: str) -> str:
+    return "".join(char for char in text if not char.isspace())
 
 
 # Return the printed form of a line, or None when the page does not hold it.
