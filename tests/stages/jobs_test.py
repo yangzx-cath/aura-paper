@@ -1,4 +1,5 @@
 import json
+import struct
 
 from PIL import Image
 
@@ -68,6 +69,16 @@ def make_book(root, shots, voice_shots, size=SQUARE, master="p000_1.jpg"):
     write_json("demo", "locations", places.to_dict(), root)
 
 
+# Write a spoken line the way the speech client does.
+def make_line(path, seconds=1.0):
+    pcm = b"\x01\x02" * int(24000 * seconds)
+    header = b"RIFF" + struct.pack("<I", 36 + len(pcm)) + b"WAVEfmt "
+    header += struct.pack("<IHHIIHH", 16, 1, 1, 24000, 48000, 2, 16)
+    header += b"data" + struct.pack("<I", len(pcm))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(header + pcm)
+
+
 # One shot that covers the single panel of the book.
 def shot(audio, shot_id="j1"):
     return {
@@ -99,6 +110,58 @@ def spoken(index, duration_ms, shot_id="j1"):
             }
         ],
     }
+
+
+def test_sends_the_dialogue_as_a_reference_track(tmp_path):
+    make_book(
+        tmp_path,
+        [shot([{"kind": "对白", "text": "走吧", "cast": "c1"}])],
+        [
+            {
+                "shot": "j1",
+                "gap_ms": 300,
+                "duration_ms": 1000,
+                "lines": [
+                    {
+                        "index": 0,
+                        "kind": "对白",
+                        "cast": "c1",
+                        "text": "走吧",
+                        "voice": "v",
+                        "file": "voice/j1-0.wav",
+                        "duration_ms": 1000,
+                    }
+                ],
+            }
+        ],
+    )
+    make_line(tmp_path / "demo" / "voice" / "j1-0.wav")
+
+    job = jobs(
+        "demo", ratio="4:3", resolution="480p", audio=False, root=tmp_path
+    ).shots[0]
+
+    # The dialogue goes out as a track, and the prompt names who says it.
+    assert job.reference == "jobs/j1-ref.wav"
+    assert (tmp_path / "demo" / job.reference).is_file()
+    assert job.audio is True
+    assert "【配音】" in job.prompt
+    assert "小满说" in job.prompt
+
+
+def test_sends_no_reference_for_a_shot_with_a_sound_effect(tmp_path):
+    make_book(
+        tmp_path,
+        [shot([{"kind": "音效", "text": "阿嚏"}])],
+        [],
+    )
+
+    job = jobs(
+        "demo", ratio="4:3", resolution="480p", audio=False, root=tmp_path
+    ).shots[0]
+
+    assert job.reference == ""
+    assert "【配音】" not in job.prompt
 
 
 def test_places_the_sounds_and_rounds_the_length(tmp_path):

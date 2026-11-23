@@ -75,6 +75,7 @@ class Job:
     location: str = ""
     join: str = ""
     prompt: str = ""
+    reference: str = ""
     images: list[JobImage] = field(default_factory=list)
     lines: list[JobLine] = field(default_factory=list)
     panels: list[ShotPanel] = field(default_factory=list)
@@ -93,6 +94,7 @@ class Job:
             "location": self.location,
             "join": self.join,
             "prompt": self.prompt,
+            "reference": self.reference,
             "images": [image.to_dict() for image in self.images],
             "lines": [line.to_dict() for line in self.lines],
             "panels": [panel.to_dict() for panel in self.panels],
@@ -113,6 +115,7 @@ class Job:
             location=_text(data.get("location")),
             join=_text(data.get("join")),
             prompt=_text(data.get("prompt")),
+            reference=_text(data.get("reference")),
             images=_image_list(data.get("images")),
             lines=_line_list(data.get("lines")),
             panels=_panel_list(data.get("panels")),

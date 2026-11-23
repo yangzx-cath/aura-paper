@@ -9,8 +9,9 @@ from pathlib import Path
 
 from PIL import Image
 
+from ..media.audio import write_track
 from ..media.image import load_image, save_jpeg
-from ..prompts import job_prompt
+from ..prompts import audio_prompt, job_prompt
 from ..schema.cast import BookCast, Cast
 from ..schema.identify import BookPeople, PanelPeople
 from ..schema.job import BookJobs, Job, JobImage, JobLine
@@ -33,6 +34,9 @@ SFX_MS = 600
 
 # The service takes at most nine reference images in one request.
 MAX_IMAGES = 9
+
+# What the dialogue-only track the model speaks along to is called.
+REFERENCE_SUFFIX = "-ref.wav"
 
 # A reference image must be between 0.4 and 2.5 times as wide as it is tall.
 MAX_ASPECT = 2.5
@@ -92,6 +96,64 @@ def jobs(
     return result
 
 
+# Write the dialogue alone as the reference track and return its path. The
+# model speaks those lines so the mouths move with them, and long narration
+# stays out of it because the model reads that wrong.
+#
+# A shot with a sound effect keeps no reference: the effect has no audio of
+# its own to send, so the model brings the sound and the local track joins it.
+def _reference(
+    job: Job,
+    shot: Shot,
+    directory: Path,
+    out_dir: Path,
+) -> str:
+    if any(line.kind == "音效" for line in shot.audio):
+        return ""
+    parts = [
+        (line.start_ms, directory / line.file)
+        for line in job.lines
+        if line.kind == "对白" and line.file
+    ]
+    if not parts:
+        return ""
+    target = out_dir / f"{job.shot}{REFERENCE_SUFFIX}"
+    write_track(target, parts, job.duration)
+    return f"jobs/{target.name}"
+
+
+# Build the prompt for one job, with or without a reference track.
+def _prompt(
+    shot: Shot,
+    style: str,
+    place: str,
+    places: BookLocations,
+    cast: list[Cast],
+    job: Job,
+) -> str:
+    if not job.reference:
+        return job_prompt(
+            shot,
+            style=style,
+            place=_place_text(place, places),
+            cast=cast,
+            images=job.images,
+            seconds=job.duration,
+            audio=job.audio,
+        )
+    return audio_prompt(
+        shot,
+        style=style,
+        place=_place_text(place, places),
+        cast=cast,
+        images=job.images,
+        lines=job.lines,
+        seconds=job.duration,
+        quiet=True,
+        voice_only=True,
+    )
+
+
 # Fill one job from the shot and the artifacts around it.
 def _build(
     *,
@@ -125,15 +187,9 @@ def _build(
     job.images = _images(
         job.shot, shot, cast, place, places, people, directory, out_dir
     )
-    job.prompt = job_prompt(
-        shot,
-        style=style,
-        place=_place_text(place, places),
-        cast=cast,
-        images=job.images,
-        seconds=job.duration,
-        audio=job.audio,
-    )
+    job.reference = _reference(job, shot, directory, out_dir)
+    job.audio = job.audio or bool(job.reference)
+    job.prompt = _prompt(shot, style, place, places, cast, job)
     if len(job.images) > MAX_IMAGES:
         job.images = job.images[:MAX_IMAGES]
         job.error = _joined(
