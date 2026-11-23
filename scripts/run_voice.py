@@ -35,14 +35,14 @@ def main() -> int:
         "--voice",
         action="append",
         default=[],
-        metavar="说话人=音色",
+        metavar="CAST=VOICE",
         help="voice of one speaker, overriding the cast stage",
     )
     parser.add_argument(
         "--speed",
         action="append",
         default=[],
-        metavar="说话人=倍率",
+        metavar="CAST=RATE",
         help="speaking speed of one speaker, 1.0 is normal",
     )
     parser.add_argument(

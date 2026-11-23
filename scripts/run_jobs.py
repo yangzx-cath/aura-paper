@@ -55,7 +55,7 @@ def main() -> int:
     parser.add_argument(
         "--shot",
         default="",
-        metavar="镜号",
+        metavar="SHOT",
         help="print one job in full",
     )
     args = parser.parse_args()

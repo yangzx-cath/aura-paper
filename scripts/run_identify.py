@@ -46,7 +46,7 @@ def main() -> int:
     parser.add_argument(
         "--page",
         default="",
-        metavar="页号",
+        metavar="PAGE",
         help="read one page only, like p002",
     )
     parser.add_argument(

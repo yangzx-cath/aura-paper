@@ -41,7 +41,7 @@ def main() -> int:
     parser.add_argument(
         "--shot",
         default="",
-        metavar="镜号",
+        metavar="SHOT",
         help="generate one shot only",
     )
     parser.add_argument(

@@ -40,21 +40,21 @@ def main() -> int:
     parser.add_argument(
         "--shot",
         default="",
-        metavar="镜号",
+        metavar="SHOT",
         help="mix one shot only",
     )
     parser.add_argument(
         "--min",
         type=float,
         default=MIN_SECONDS,
-        metavar="秒",
+        metavar="SECONDS",
         help=f"shortest take (default={MIN_SECONDS})",
     )
     parser.add_argument(
         "--tail",
         type=float,
         default=TAIL_SECONDS,
-        metavar="秒",
+        metavar="SECONDS",
         help=f"silence after the last word (default={TAIL_SECONDS})",
     )
     args = parser.parse_args()
