@@ -244,6 +244,22 @@ def test_notes_the_people_named_in_each_panel(tmp_path):
     assert job.images[0].note == "第 1 格分镜（小满 衣服和腿）"
 
 
+def test_asks_for_the_sound_of_a_shot_with_an_effect(tmp_path):
+    make_book(
+        tmp_path,
+        [shot([{"kind": "音效", "text": "阿嚏！"}])],
+        [],
+    )
+
+    job = jobs(
+        "demo", ratio="4:3", resolution="480p", audio=False, root=tmp_path
+    ).shots[0]
+
+    assert job.audio is True
+    assert "阿嚏" in job.prompt
+    assert job.duration == 4
+
+
 def test_writes_the_jobs_back_out(tmp_path):
     make_book(
         tmp_path,

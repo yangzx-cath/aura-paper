@@ -117,7 +117,7 @@ def _build(
         panels=list(shot.panels),
         ratio=ratio,
         resolution=resolution,
-        audio=audio,
+        audio=audio or any(line.kind == "音效" for line in shot.audio),
         lines=lines,
         audio_ms=_length(lines),
     )
@@ -132,7 +132,7 @@ def _build(
         cast=cast,
         images=job.images,
         seconds=job.duration,
-        audio=audio,
+        audio=job.audio,
     )
     if len(job.images) > MAX_IMAGES:
         job.images = job.images[:MAX_IMAGES]

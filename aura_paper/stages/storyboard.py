@@ -74,7 +74,7 @@ def storyboard(
     if not shot_book.shots:
         notes.append("model returned no shot")
     _merge(shot_book.shots)
-    notes += _spoken(shot_book.shots, cast_book, llm, cache, book_id)
+    notes += _spoken(shot_book.shots, cast_book, llm, cache, book_id, pages)
     if notes:
         shot_book.error = "；".join(notes)
     _write(book_id, scene_book, shot_book, root)
@@ -487,15 +487,19 @@ def _spoken(
     llm: LLMClient,
     cache: Cache | None,
     book_id: str,
+    pages: list[PageContent],
 ) -> list[str]:
     for shot in shots:
         for line in shot.audio:
             line.spoken = _clean(line.text)
 
-    if not any(line.kind == "旁白" for shot in shots for line in shot.audio):
+    sound = any(
+        line.kind in ("旁白", "音效") for shot in shots for line in shot.audio
+    )
+    if not sound:
         return []
 
-    prompt = spoken_prompt(shots)
+    prompt = spoken_prompt(shots, pages)
     try:
         fields = _ask(llm, prompt, [], cache, book_id, "spoken")
     except (LLMError, ValueError) as exc:
@@ -521,7 +525,30 @@ def _spoken(
             line.spoken = spoken
         else:
             notes.append(f"{shot_id} 的旁白改写不合格，用了原句")
-    return notes
+    return notes + _drop_sounds(shots, fields)
+
+
+# Drop the sound effects the review could not explain from the picture.
+def _drop_sounds(shots: list[Shot], fields: dict) -> list[str]:
+    dropped = set()
+    for entry in fields.get("sounds") or []:
+        if not isinstance(entry, dict) or entry.get("keep", True):
+            continue
+        shot_id = str(entry.get("shot") or "").strip()
+        dropped.add((shot_id, _int(entry.get("index"))))
+    if not dropped:
+        return []
+
+    removed = 0
+    for shot in shots:
+        kept = []
+        for number, line in enumerate(shot.audio):
+            if line.kind == "音效" and (shot.id, number) in dropped:
+                removed += 1
+                continue
+            kept.append(line)
+        shot.audio = kept
+    return [f"去掉 {removed} 条说不通的音效"] if removed else []
 
 
 # Return the text as it should be read aloud.

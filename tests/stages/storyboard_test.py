@@ -146,6 +146,37 @@ def shot(scene, page, index, **extra):
     return entry
 
 
+def test_drops_a_sound_effect_the_review_cannot_explain(tmp_path):
+    make_book(tmp_path, [{"panels": [panel(FULL_BOX, text="吱呀——")]}])
+    reply = {
+        "scenes": [
+            {
+                "key": "A",
+                "name": "跑开",
+                "location": "l1",
+                "pages": ["p000.jpg"],
+            }
+        ],
+        "shots": [
+            shot(
+                "A",
+                "p000.jpg",
+                0,
+                audio=[{"kind": "音效", "text": "吱呀——", "cast": ""}],
+            )
+        ],
+    }
+    spoken = {
+        "lines": [],
+        "sounds": [{"shot": "j1", "index": 0, "keep": False}],
+    }
+
+    _, shot_book = storyboard("demo", llm=TwoLLM(reply, spoken), root=tmp_path)
+
+    assert shot_book.shots[0].audio == []
+    assert "音效" in shot_book.error
+
+
 def test_numbers_scenes_and_shots(tmp_path):
     make_book(tmp_path, [{"panels": [panel(FULL_BOX)]}])
     reply = {
