@@ -1,11 +1,13 @@
 import base64
 import io
 import json
+import ssl
+import time
 import urllib.error
 
 import pytest
 
-from aura_paper.clients.tts import TTSClient, TTSError
+from aura_paper.clients.tts import RETRIES, TTSClient, TTSError
 
 # 24000 bytes of 16-bit mono at 24000 Hz is exactly half a second.
 HALF_SECOND = b"\x01\x02" * 12000
@@ -61,7 +63,27 @@ def capture(monkeypatch, body: str) -> dict:
     monkeypatch.setattr(
         "aura_paper.clients.tts.urllib.request.urlopen", fake_urlopen
     )
+    monkeypatch.setattr(time, "sleep", lambda seconds: None)
     return seen
+
+
+# Answer each call with the next answer, which may be an exception.
+def sequence(monkeypatch, answers: list) -> list:
+    calls = []
+    queue = list(answers)
+
+    def fake_urlopen(request, timeout=None):
+        calls.append(request.full_url)
+        answer = queue[min(len(calls) - 1, len(queue) - 1)]
+        if isinstance(answer, BaseException):
+            raise answer
+        return FakeResponse(answer.encode("utf-8"))
+
+    monkeypatch.setattr(
+        "aura_paper.clients.tts.urllib.request.urlopen", fake_urlopen
+    )
+    monkeypatch.setattr(time, "sleep", lambda seconds: None)
+    return calls
 
 
 # A configured client pointing at the fake endpoint.
@@ -162,33 +184,51 @@ def test_reports_a_reply_that_is_not_json(monkeypatch):
 
 
 def test_reports_an_http_error(monkeypatch):
-    def fake_urlopen(request, timeout=None):
-        raise urllib.error.HTTPError(
-            request.full_url, 401, "Unauthorized", {}, io.BytesIO(b"bad key")
-        )
-
-    monkeypatch.setattr(
-        "aura_paper.clients.tts.urllib.request.urlopen", fake_urlopen
+    calls = sequence(
+        monkeypatch,
+        [
+            urllib.error.HTTPError(
+                "https://example/v3", 401, "Unauthorized", {}, io.BytesIO()
+            )
+        ],
     )
 
     with pytest.raises(TTSError) as error:
         client().synthesize("三块、", voice="v")
 
+    # A rejected key will be rejected again, so it is asked once.
     assert "HTTP 401" in str(error.value)
+    assert len(calls) == 1
+
+
+def test_retries_a_dropped_handshake(monkeypatch):
+    body = reply(chunk(HALF_SECOND), done())
+    calls = sequence(
+        monkeypatch,
+        [
+            urllib.error.URLError(
+                ssl.SSLError("UNEXPECTED_EOF_WHILE_READING")
+            ),
+            body,
+        ],
+    )
+
+    speech = client().synthesize("三块、", voice="v")
+
+    assert speech.duration_ms == 500
+    assert len(calls) == 2
 
 
 def test_reports_a_dead_endpoint(monkeypatch):
-    def fake_urlopen(request, timeout=None):
-        raise urllib.error.URLError("name resolution failed")
-
-    monkeypatch.setattr(
-        "aura_paper.clients.tts.urllib.request.urlopen", fake_urlopen
+    calls = sequence(
+        monkeypatch, [urllib.error.URLError("name resolution failed")]
     )
 
     with pytest.raises(TTSError) as error:
         client().synthesize("三块、", voice="v")
 
     assert "cannot reach" in str(error.value)
+    assert len(calls) == RETRIES
 
 
 def test_needs_an_empty_text_or_a_voice(monkeypatch):

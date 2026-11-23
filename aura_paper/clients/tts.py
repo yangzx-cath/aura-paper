@@ -9,9 +9,11 @@ caller never has to decode the file to learn how long the line takes.
 from __future__ import annotations
 
 import base64
+import http.client
 import json
 import os
 import struct
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -37,6 +39,14 @@ DONE_CODE = 20000000
 # Speech rate is a percentage offset from normal speed.
 MIN_RATE_OFFSET = -50
 MAX_RATE_OFFSET = 100
+
+# The endpoint drops connections and handshakes now and then, so one line
+# is worth asking for again.
+RETRIES = 3
+RETRY_DELAY = 1.0
+
+# Statuses that mean "ask again later" instead of "your request is wrong".
+RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 
 
 class TTSError(Exception):
@@ -149,18 +159,31 @@ class TTSClient:
                 "Content-Type": "application/json",
             },
         )
-        try:
-            with urllib.request.urlopen(
-                request, timeout=self.timeout
-            ) as response:
-                return response.read().decode("utf-8", errors="replace")
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")
-            raise TTSError(f"HTTP {exc.code}: {detail[:200]}") from exc
-        except urllib.error.URLError as exc:
-            raise TTSError(f"cannot reach the endpoint: {exc.reason}") from exc
-        except TimeoutError as exc:
-            raise TTSError("request timed out") from exc
+
+        delay = RETRY_DELAY
+        last = "cannot reach the endpoint"
+        for attempt in range(1, RETRIES + 1):
+            try:
+                with urllib.request.urlopen(
+                    request, timeout=self.timeout
+                ) as response:
+                    return response.read().decode("utf-8", errors="replace")
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")
+                if exc.code not in RETRY_STATUS or attempt == RETRIES:
+                    raise TTSError(f"HTTP {exc.code}: {detail[:200]}") from exc
+            except (
+                urllib.error.URLError,
+                TimeoutError,
+                http.client.HTTPException,
+                ConnectionError,
+            ) as exc:
+                last = _reason(exc)
+                if attempt == RETRIES:
+                    raise TTSError(last) from exc
+            time.sleep(delay)
+            delay *= 2
+        raise TTSError(last)
 
     @staticmethod
     def _audio(reply: str) -> bytes:
@@ -198,6 +221,15 @@ class TTSClient:
         if not audio:
             raise TTSError("reply carries no audio")
         return bytes(audio)
+
+
+# Name a transport failure in the words the caller already prints.
+def _reason(exc: BaseException) -> str:
+    if isinstance(exc, TimeoutError):
+        return "request timed out"
+    if isinstance(exc, urllib.error.URLError):
+        return f"cannot reach the endpoint: {exc.reason}"
+    return f"dropped connection ({type(exc).__name__})"
 
 
 # Build the request body for one line.
