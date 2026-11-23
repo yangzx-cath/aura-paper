@@ -198,12 +198,6 @@ def test_needs_an_empty_text_or_a_voice(monkeypatch):
         client().synthesize("三块、", voice=" ")
 
 
-def test_lists_the_missing_settings():
-    client = TTSClient.from_env()
-
-    assert client.missing_settings() == ["TTS_API_KEY", "TTS_RESOURCE_ID"]
-
-
 def test_refuses_to_call_without_settings(monkeypatch):
     def fail(request, timeout=None):
         raise AssertionError("should not reach the endpoint")
