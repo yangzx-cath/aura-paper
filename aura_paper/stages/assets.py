@@ -9,6 +9,7 @@ from pathlib import Path
 from PIL import Image
 
 from ..clients.llm import LLMClient, LLMError
+from ..clients.reply import extract_json
 from ..media.image import crop_box, load_image, save_jpeg
 from ..prompts import cast_prompt, location_prompt
 from ..schema.cast import BookCast, FigurePick
@@ -16,7 +17,6 @@ from ..schema.content import BookContent, Figure, PageContent
 from ..schema.location import BookLocations
 from ..store.cache import Cache, file_fingerprint, fingerprint
 from ..store.output import write_json
-from ..utils import extract_json
 from .paths import (
     book_dir,
     figure_name,

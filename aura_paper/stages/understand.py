@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..clients.llm import LLMClient, LLMError
+from ..clients.reply import extract_json
 from ..media.image import crop_box, load_image, save_jpeg
 from ..prompts import cover_prompt, page_prompt
 from ..schema.book import Book as IngestBook
@@ -17,7 +18,6 @@ from ..schema.book import Page as IngestPage
 from ..schema.content import BookContent, CoverContent, PageContent, Panel
 from ..store.cache import Cache, file_fingerprint, fingerprint
 from ..store.output import write_json
-from ..utils import extract_json
 from .paths import book_dir, panel_name, panels_dir
 
 # Panels are cropped from the page once, so keep the second encode clean.

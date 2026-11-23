@@ -9,6 +9,7 @@ from typing import Callable
 from PIL import Image
 
 from ..clients.llm import LLMClient, LLMError
+from ..clients.reply import extract_json
 from ..media.image import (
     crop_box,
     load_image,
@@ -26,7 +27,6 @@ from ..prompts import layout_prompt
 from ..schema.book import Book, Page
 from ..store.cache import Cache, file_fingerprint, fingerprint
 from ..store.output import write_json
-from ..utils import extract_json
 from .paths import book_dir
 
 # A spread is about twice as wide as one page.

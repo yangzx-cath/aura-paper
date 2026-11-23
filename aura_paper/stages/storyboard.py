@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 
 from ..clients.llm import LLMClient, LLMError
+from ..clients.reply import extract_json
 from ..media.image import load_image, save_jpeg, thumbnail
 from ..prompts import spoken_prompt, storyboard_prompt
 from ..schema.cast import BookCast
@@ -18,7 +19,6 @@ from ..schema.scene import BookScenes, Scene
 from ..schema.shot import SHOT_JOINS, BookShots, Shot
 from ..store.cache import Cache, file_fingerprint, fingerprint
 from ..store.output import write_json
-from ..utils import extract_json
 from .paths import (
     book_dir,
     figures_dir,
