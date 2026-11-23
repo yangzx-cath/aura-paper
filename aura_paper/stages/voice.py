@@ -14,8 +14,9 @@ from ..store.cache import Cache, fingerprint
 from ..store.output import write_json
 from .paths import book_dir, voice_dir
 
-# A short rest between two lines of the same shot.
-DEFAULT_GAP_MS = 300
+# The rest between two lines of the same shot. A finished sentence needs a
+# breath before the next one starts, or the lines run into each other.
+DEFAULT_GAP_MS = 600
 
 # Bytes of the WAV header the client puts in front of the samples.
 WAV_HEADER = 44
