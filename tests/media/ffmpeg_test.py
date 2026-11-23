@@ -99,6 +99,20 @@ def test_joins_clips_that_share_their_parameters(tmp_path):
     assert ffmpeg.probe(target).duration_ms == pytest.approx(1500, abs=120)
 
 
+def test_joins_a_mix_of_cuts_and_dissolves(tmp_path):
+    clips = []
+    for number, seconds in enumerate((1.0, 1.5, 2.0), start=1):
+        path = tmp_path / f"s{number}.mp4"
+        make_clip(path, seconds=seconds, tone=True)
+        clips.append(path)
+
+    target = ffmpeg.join(clips, tmp_path / "film.mp4", overlaps=[0.5, 0.0])
+
+    # A zero length cross fade is not a hard cut, so the middle join must
+    # stay a cut and the whole film must keep the length it should have.
+    assert ffmpeg.probe(target).duration_ms == pytest.approx(4000, abs=150)
+
+
 def test_reports_a_bad_call(tmp_path):
     with pytest.raises(FFmpegError):
         ffmpeg.probe(tmp_path / "missing.mp4")

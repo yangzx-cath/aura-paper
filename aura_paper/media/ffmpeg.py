@@ -216,6 +216,8 @@ def join(
 
     overlaps[i] is the length shared by clip i and clip i+1; zero means a
     hard cut, and a list of zeros takes the copy-only path of concat().
+    Clips that hard cut into each other are joined with concat first, because
+    a cross fade of zero length is not a hard cut.
     The sound of a dissolve is cut at the overlap, not cross faded, so the
     words of the next shot stay whole.
     """
@@ -232,29 +234,38 @@ def join(
     target.parent.mkdir(parents=True, exist_ok=True)
     lengths = [probe(source).duration_ms / 1000 for source in sources]
     size = probe(sources[0])
+    runs = _runs(spreads)
     edges = []
-    audio = []
-    for number, source in enumerate(sources):
-        spread = spreads[number] if number < len(spreads) else 0.0
-        keep = max(0.0, lengths[number] - spread)
+    for number in range(len(sources)):
+        tail = spreads[number] if number < len(spreads) else 0.0
+        if number not in [group[-1] for group in runs]:
+            tail = 0.0
+        keep = max(0.0, lengths[number] - tail)
         edges.append(f"[{number}:v]{_fit(size)}[v{number}]")
-        edges.append(f"[{number}:a]atrim=0:{keep:.3f}[a{number}]")
-        audio.append(f"[a{number}]")
-
-    label = "v0"
-    end = lengths[0]
-    for number in range(1, len(sources)):
-        spread = spreads[number - 1]
-        offset = end - spread
-        nxt = f"x{number}"
         edges.append(
-            f"[{label}][v{number}]xfade=transition=fade"
-            f":duration={spread:.3f}:offset={offset:.3f}[{nxt}]"
+            f"[{number}:a]atrim=0:{keep:.3f},asetpts=PTS-STARTPTS[a{number}]"
         )
-        label = nxt
-        end = offset + lengths[number]
 
-    edges.append("".join(audio) + f"concat=n={len(sources)}:v=0:a=1[a]")
+    for number, group in enumerate(runs):
+        edges.append(_pieced("v", group, f"gv{number}"))
+        edges.append(_pieced("a", group, f"ga{number}"))
+
+    label = "gv0"
+    end = _run_length(runs[0], lengths)
+    for number in range(1, len(runs)):
+        spread = spreads[runs[number - 1][-1]]
+        offset = end - spread
+        edges.append(
+            f"[{label}][gv{number}]xfade=transition=fade"
+            f":duration={spread:.3f}:offset={offset:.3f}[x{number}]"
+        )
+        label = f"x{number}"
+        end = offset + _run_length(runs[number], lengths)
+
+    edges.append(
+        "".join(f"[ga{number}]" for number in range(len(runs)))
+        + f"concat=n={len(runs)}:v=0:a=1[a]"
+    )
     args = [FFMPEG, *COMMON]
     for source in sources:
         args += ["-i", str(source)]
@@ -272,6 +283,37 @@ def join(
     ]
     run(args)
     return target
+
+
+# Split the takes into runs that hard cut into each other.
+def _runs(spreads: list[float]) -> list[list[int]]:
+    runs = [[0]]
+    for number in range(1, len(spreads) + 1):
+        if spreads[number - 1] > 0:
+            runs.append([number])
+        else:
+            runs[-1].append(number)
+    return runs
+
+
+# Return how long one run lasts once its takes are joined.
+def _run_length(group: list[int], lengths: list[float]) -> float:
+    return sum(lengths[number] for number in group)
+
+
+# Join the takes of one run into a single stream, or pass it through alone.
+def _pieced(kind: str, group: list[int], label: str) -> str:
+    if len(group) == 1:
+        filler = "null" if kind == "v" else "anull"
+        chain = f"[{kind}{group[0]}]{filler}"
+    else:
+        parts = "".join(f"[{kind}{number}]" for number in group)
+        flags = "v=1:a=0" if kind == "v" else "v=0:a=1"
+        chain = f"{parts}concat=n={len(group)}:{flags}"
+    if kind == "v":
+        # Cross fades only accept inputs that share a time base.
+        chain += ",settb=1/24"
+    return f"{chain}[{label}]"
 
 
 def frame(
