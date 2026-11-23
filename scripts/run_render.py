@@ -16,9 +16,9 @@ import time
 from pathlib import Path
 
 from aura_paper.cache import Cache
+from aura_paper.clients.providers import make_video_client
 from aura_paper.config import cache_root, load_env, out_root
 from aura_paper.schema.render import ShotRender
-from aura_paper.seedance import SeedanceClient
 from aura_paper.stages.render import render
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -56,7 +56,7 @@ def main() -> int:
         print("run scripts/run_jobs.py first", file=sys.stderr)
         return 2
 
-    client = SeedanceClient.from_env()
+    client = make_video_client()
     missing = client.missing_settings()
     if missing:
         print("missing config: " + ", ".join(missing), file=sys.stderr)

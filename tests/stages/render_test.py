@@ -1,10 +1,10 @@
 import json
 
 from aura_paper.cache import Cache
+from aura_paper.clients.video import VideoTask
 from aura_paper.output import write_json
 from aura_paper.schema.job import BookJobs
 from aura_paper.stages.render import render
-from aura_paper.video_types import VideoTask
 
 CLIP = b"\x00\x00\x00\x18ftypmp42"
 
