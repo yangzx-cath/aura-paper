@@ -18,6 +18,10 @@ TASK_DONE = ("succeeded", "failed", "cancelled", "expired")
 
 DEFAULT_DURATION = 6
 
+# The audio formats the service takes, and how many tracks it accepts.
+AUDIO_SUFFIXES = (".wav", ".mp3")
+MAX_AUDIOS = 3
+
 
 class VideoError(Exception):
     """Error for video generation calls."""
@@ -31,6 +35,7 @@ class VideoRequest:
     first_frame: Path | None = None
     last_frame: Path | None = None
     reference_images: list[Path] = field(default_factory=list)
+    reference_audios: list[Path] = field(default_factory=list)
     duration: int = DEFAULT_DURATION
     resolution: str | None = None
     ratio: str | None = None
@@ -45,6 +50,10 @@ class VideoRequest:
             raise ValueError("frames and reference images cannot be mixed")
         if self.last_frame is not None and self.first_frame is None:
             raise ValueError("last_frame needs first_frame")
+        self._check_images()
+        self._check_audios()
+
+    def _check_images(self) -> None:
         images = [self.first_frame, self.last_frame]
         images += self.reference_images
         for path in images:
@@ -52,6 +61,18 @@ class VideoRequest:
                 continue
             if path.suffix.lower() not in IMAGE_SUFFIXES:
                 raise ValueError(f"unsupported image type: {path.suffix}")
+
+    # The service takes audio only beside an image, and only a few tracks.
+    def _check_audios(self) -> None:
+        if not self.reference_audios:
+            return
+        if not (self.reference_images or self.first_frame):
+            raise ValueError("a reference audio needs an image beside it")
+        if len(self.reference_audios) > MAX_AUDIOS:
+            raise ValueError(f"at most {MAX_AUDIOS} reference audios")
+        for path in self.reference_audios:
+            if path.suffix.lower() not in AUDIO_SUFFIXES:
+                raise ValueError(f"unsupported audio type: {path.suffix}")
 
 
 @dataclass
