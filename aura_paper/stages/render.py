@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from ..cache import Cache, file_fingerprint, fingerprint
@@ -22,23 +23,32 @@ def render(
     *,
     client: VideoClient,
     only: str = "",
+    workers: int = 1,
     root: str | Path | None = None,
     cache: Cache | None = None,
 ) -> BookRender:
     """Read jobs.json, generate every clip, write render.json."""
+    assert workers >= 1
+
     directory = book_dir(book_id, root)
     job_book = _read_jobs(directory)
     out_dir = clips_dir(book_id, root)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    wanted = [job for job in job_book.shots if not only or job.shot == only]
+
+    def run(job: Job) -> ShotRender:
+        return _render_one(job, directory, out_dir, client, cache)
+
+    if workers == 1:
+        fresh = [run(job) for job in wanted]
+    else:
+        # pool.map() keeps the input order, so clips stay in shot order.
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            fresh = list(pool.map(run, wanted))
+
     result = BookRender(id=book_id, model=client.model)
-    for job in job_book.shots:
-        if only and job.shot != only:
-            continue
-        result.shots.append(
-            _render_one(job, directory, out_dir, client, cache)
-        )
-    result.shots = _merged(result.shots, job_book.shots, directory)
+    result.shots = _merged(fresh, job_book.shots, directory)
 
     result.error = "；".join(
         f"{shot.shot}：{shot.error}" for shot in result.shots if shot.error

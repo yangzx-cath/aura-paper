@@ -23,6 +23,10 @@ from aura_paper.stages.render import render
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# Seedance runs three tasks at once for this account; asking for more only
+# queues them. Each shot is one task, so this is also the number of calls.
+DEFAULT_WORKERS = 3
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -39,6 +43,12 @@ def main() -> int:
         default="",
         metavar="镜号",
         help="generate one shot only",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=DEFAULT_WORKERS,
+        help=f"clips to generate at once (default={DEFAULT_WORKERS})",
     )
     parser.add_argument(
         "--no-cache",
@@ -68,6 +78,7 @@ def main() -> int:
     print(f"model    {client.model}")
     print(f"root     {root}")
     print(f"cache    {cache.root}  enabled={cache.enabled}")
+    print(f"workers  {args.workers}")
     if args.shot:
         print(f"shot     {args.shot}")
     print()
@@ -78,6 +89,7 @@ def main() -> int:
         args.book,
         client=client,
         only=args.shot,
+        workers=args.workers,
         root=root,
         cache=cache,
     )
