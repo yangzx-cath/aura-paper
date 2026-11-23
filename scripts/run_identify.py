@@ -29,6 +29,9 @@ ROOT = Path(__file__).resolve().parent.parent
 # Reading a panel and matching clothes needs no deep thinking.
 DEFAULT_EFFORT = "low"
 
+# Pages read at once: each page is a separate call with no shared state.
+DEFAULT_WORKERS = 4
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -49,8 +52,8 @@ def main() -> int:
     parser.add_argument(
         "--workers",
         type=int,
-        default=4,
-        help="pages to read at once (default=4)",
+        default=DEFAULT_WORKERS,
+        help=f"pages to read at once (default={DEFAULT_WORKERS})",
     )
     parser.add_argument(
         "--effort",

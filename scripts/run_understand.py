@@ -28,6 +28,9 @@ ROOT = Path(__file__).resolve().parent.parent
 # of reasoning per page. Pass an empty effort to use LLM_REASONING_EFFORT.
 DEFAULT_EFFORT = "low"
 
+# Pages read at once: each page is a separate call with no shared state.
+DEFAULT_WORKERS = 4
+
 # Pages below this share of ink inside the boxes are reported.
 COVERAGE_LIMIT = 0.75
 
@@ -43,8 +46,8 @@ def main() -> int:
     parser.add_argument(
         "--workers",
         type=int,
-        default=4,
-        help="pages to read at once (default=4)",
+        default=DEFAULT_WORKERS,
+        help=f"pages to read at once (default={DEFAULT_WORKERS})",
     )
     parser.add_argument(
         "--effort",
