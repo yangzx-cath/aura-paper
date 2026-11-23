@@ -243,3 +243,17 @@ def _samples(frames):
     import array
 
     return array.array("h", frames)
+
+
+def test_reports_sound_where_the_narration_should_be_quiet(tmp_path):
+    make_book(tmp_path, tone=True)
+    path = tmp_path / "demo" / "jobs.json"
+    data = json.loads(path.read_text("utf-8"))
+    data["shots"][0]["reference"] = "jobs/j1-ref.wav"
+    data["shots"][0]["lines"][0]["duration_ms"] = 1500
+    path.write_text(json.dumps(data), "utf-8")
+
+    result = compose("demo", root=tmp_path)
+
+    # The clip talked over the stretch that held no words.
+    assert "旁白时段画面有声音" in result.shots[0].error

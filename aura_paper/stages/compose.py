@@ -30,6 +30,10 @@ BACKGROUND_VOLUME = ffmpeg.BACKGROUND_VOLUME
 # Every take is encoded the same way, so the takes can be joined later.
 SUFFIX = ".mp4"
 TRACK_SUFFIX = ".wav"
+HEARD_SUFFIX = "-heard.wav"
+
+# A clip that speaks this long inside the silence it was sent is reported.
+UNASKED_SECONDS = 0.3
 
 # How long two shots share the screen when they dissolve into each other.
 OVERLAP = 0.5
@@ -265,7 +269,31 @@ def _one(
 
     record.file = f"shots/{target.name}"
     record.seconds = round(seconds, 3)
+    if job.reference and info.has_audio:
+        found = _narration_sound(job, clip, out_dir)
+        if found >= UNASKED_SECONDS:
+            record.error = f"旁白时段画面有声音 {found:.1f}s"
     return record
+
+
+# Say how much the clip speaks inside the stretches that hold no words.
+def _narration_sound(job: Job, clip: Path, out_dir: Path) -> float:
+    windows = [
+        (line.start_ms, line.start_ms + line.duration_ms)
+        for line in job.lines
+        if line.kind == "旁白" and line.duration_ms
+    ]
+    if not windows:
+        return 0.0
+    heard = out_dir / f"{job.shot}{HEARD_SUFFIX}"
+    try:
+        audio.extract(clip, heard)
+    except ffmpeg.FFmpegError:
+        return 0.0
+    try:
+        return audio.sound_in_windows(heard, windows)
+    finally:
+        heard.unlink(missing_ok=True)
 
 
 # Take the shot as long as its lines run plus a tail, so the picture holds a
