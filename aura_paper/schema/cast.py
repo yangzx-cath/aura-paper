@@ -108,6 +108,7 @@ class BookCast:
     """The characters of one book, and what was settled about them."""
 
     id: str = ""
+    language: str = ""
     cast: list[Cast] = field(default_factory=list)
     figure_cast: list[FigureCast] = field(default_factory=list)
     resolved: list[Resolution] = field(default_factory=list)
@@ -119,6 +120,7 @@ class BookCast:
         """Return the external JSON shape of this cast."""
         return {
             "id": self.id,
+            "language": self.language,
             "generated_at": now_iso(),
             "model": self.model,
             "cast": [member.to_dict() for member in self.cast],
@@ -133,6 +135,7 @@ class BookCast:
         """Build a cast from its external JSON shape."""
         return cls(
             id=_text(data.get("id")),
+            language=_text(data.get("language")),
             cast=_cast_list(data.get("cast")),
             figure_cast=_figure_cast_list(data.get("figure_cast")),
             resolved=_resolution_list(data.get("resolved")),

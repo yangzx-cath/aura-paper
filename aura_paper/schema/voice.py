@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 
 from .time import now_iso
 
-# Ids and what each one sounds like, from the 豆包语音合成模型2.0 list.
-CHOICES = (
+# Chinese ids and what each one sounds like, from the Seed TTS 2.0 list.
+CHINESE_CHOICES = (
     ("zh_female_shaoergushi_uranus_bigtts", "成年女声，讲绘本故事，语速稳"),
     ("zh_female_wenroumama_uranus_bigtts", "成年女声，温柔，像妈妈"),
     ("zh_female_wenroushunv_uranus_bigtts", "成年女声，平缓，像有声书"),
@@ -19,11 +19,66 @@ CHOICES = (
     ("zh_male_liangsangmengzai_uranus_bigtts", "男童，清亮"),
 )
 
+# English ids from the same list. A book is spoken in one language, so its
+# dialogue and narration stay inside that language's table. Voices marked
+# Context only work on the unidirectional call this project makes.
+ENGLISH_CHOICES = (
+    ("en_female_joanne_uranus_bigtts", "美式英语，成年女声，有声阅读"),
+    ("en_female_dacey_uranus_bigtts", "美式英语，成年女声，通用"),
+    ("en_female_stokie_uranus_bigtts", "美式英语，成年女声，通用"),
+    ("en_female_hayley_uranus_bigtts", "美式英语，成年女声，教学与配音"),
+    ("en_female_myra_uranus_bigtts", "美式英语，成年女声，教学"),
+    ("en_female_jane_uranus_bigtts", "美式英语，成年女声，视频配音"),
+    ("en_female_jenny_uranus_bigtts", "美式英语，成年女声，通用"),
+    ("en_female_allison_uranus_bigtts", "美式英语，成年女声，视频配音"),
+    ("en_female_skye_uranus_bigtts", "美式英语，成年女声，通用"),
+    ("en_female_rachel_p1_uranus_bigtts", "美式英语，成年女声，口音"),
+    ("en_female_pleasant-female_uranus_bigtts", "美式英语，成年女声，温和"),
+    (
+        "en_female_authoritative-british_uranus_bigtts",
+        "英式英语，成年女声，教学与配音",
+    ),
+    ("en_male_tim_uranus_bigtts", "美式英语，成年男声，通用"),
+    ("en_male_josh_uranus_bigtts", "美式英语，成年男声，视频配音"),
+    ("en_male_jamie_uranus_bigtts", "美式英语，成年男声，教学与配音"),
+    ("en_male_kevin_uranus_bigtts", "美式英语，成年男声，教学与配音"),
+    ("en_male_alex_uranus_bigtts", "美式英语，成年男声，视频配音"),
+    ("en_male_alberto_uranus_bigtts", "美式英语，成年男声，教学"),
+    ("en_male_marcus_uranus_bigtts", "美式英语，成年男声，有声阅读"),
+    ("en_male_david_uranus_bigtts", "美式英语，成年男声，有声阅读"),
+    ("en_male_ryan_uranus_bigtts", "美式英语，成年男声，有声阅读"),
+    ("en_male_deep-voice_uranus_bigtts", "美式英语，成年男声，低沉"),
+    ("en_male_russell_uranus_bigtts", "英式英语，成年男声，通用"),
+    ("en_male_knightley_uranus_bigtts", "英式英语，成年男声，有声阅读"),
+)
+
 # Every line that is not a character's is spoken with this voice.
 NARRATOR = "zh_female_shaoergushi_uranus_bigtts"
 
-# Every id a character may be given.
-ALL = frozenset(voice for voice, _ in CHOICES)
+# The narrator of an English book.
+ENGLISH_NARRATOR = "en_female_joanne_uranus_bigtts"
+
+# The voices each book language may use, and how each language narrates.
+# A question is answered in the language it was asked in, with the narrator
+# voice, so the answer never changes character mid-sentence.
+CHOICES_BY_LANGUAGE = {
+    "zh": CHINESE_CHOICES,
+    "en": ENGLISH_CHOICES,
+}
+NARRATOR_BY_LANGUAGE = {
+    "zh": NARRATOR,
+    "en": ENGLISH_NARRATOR,
+}
+
+
+# Return the narrator voice of a language, defaulting to Chinese.
+def narrator_for(language: str) -> str:
+    """Return the narrator voice of a language."""
+    return NARRATOR_BY_LANGUAGE.get(language, NARRATOR)
+
+
+# Every id a character may be given, in either language.
+ALL = frozenset(voice for voice, _ in CHINESE_CHOICES + ENGLISH_CHOICES)
 
 
 @dataclass

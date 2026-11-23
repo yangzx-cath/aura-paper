@@ -250,6 +250,14 @@ def _text_list(value: object) -> list[str]:
     return texts
 
 
+# Tell whether a text is written in Chinese or English.
+def language_of(text: str) -> str:
+    """Return "zh" or "en" from the letters in text."""
+    han = sum(1 for char in text if "\u4e00" <= char <= "\u9fff")
+    latin = sum(1 for char in text if char.isascii() and char.isalpha())
+    return "en" if latin > han else "zh"
+
+
 @dataclass
 class BookContent:
     """Structured content of a whole book."""
@@ -286,11 +294,10 @@ class BookContent:
 
     @property
     def language(self) -> str:
-        """Return the language printed on the pages, so narration uses it."""
-        text = "".join(page.page_text for page in self.pages)
-        letters = [char for char in text if char.isalpha()]
-        english = sum(1 for char in letters if char.isascii())
-        return "英文" if english * 2 > len(letters) else "中文"
+        """Return "zh" or "en" from the words the book carries."""
+        text = self.cover.title
+        text += "".join(page.page_text for page in self.pages)
+        return language_of(text)
 
     def to_dict(self) -> dict:
         """Return the external JSON shape of this book."""

@@ -46,6 +46,12 @@ def main() -> int:
         help="speaking speed of one speaker, 1.0 is normal",
     )
     parser.add_argument(
+        "--language",
+        choices=("zh", "en"),
+        default="",
+        help="speech language, detected from the book when left out",
+    )
+    parser.add_argument(
         "--gap-ms",
         type=int,
         default=DEFAULT_GAP_MS,
@@ -75,13 +81,19 @@ def main() -> int:
         return 2
 
     overrides = _voices(args.voice)
-    voices = voices_for(args.book, overrides=overrides, root=root)
+    voices = voices_for(
+        args.book,
+        overrides=overrides,
+        language=args.language,
+        root=root,
+    )
     speeds = _speeds(args.speed)
 
     cache = Cache(cache_root(), enabled=not args.no_cache)
 
     print(f"book     {args.book}")
     print(f"resource {tts.resource_id}")
+    print(f"language {args.language or 'auto'}")
     print(f"root     {root}")
     print(f"cache    {cache.root}  enabled={cache.enabled}")
     print(f"gap      {args.gap_ms}ms")
@@ -97,6 +109,7 @@ def main() -> int:
         tts=tts,
         overrides=overrides,
         speeds=speeds,
+        language=args.language,
         gap_ms=args.gap_ms,
         root=root,
         cache=cache,

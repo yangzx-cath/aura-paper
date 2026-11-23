@@ -74,12 +74,26 @@ def assets(
 ) -> tuple[BookCast, BookLocations]:
     """Read understand.json, build the reference images, write two files."""
     directory = book_dir(book_id, root)
-    pages = _read_content(directory).pages
+    content = _read_content(directory)
+    pages = content.pages
     picks = pick_figures(book_id, root=root)
-    cast_book = BookCast(id=book_id, model=llm.model)
+    cast_book = BookCast(
+        id=book_id,
+        language=content.language,
+        model=llm.model,
+    )
     places = BookLocations(id=book_id, model=llm.model)
     if picks:
-        _fill(cast_book, llm, pages, picks, cache, book_id, root)
+        _fill(
+            cast_book,
+            llm,
+            pages,
+            picks,
+            content.language,
+            cache,
+            book_id,
+            root,
+        )
     full = _full_panels(pages)
     if full:
         _fill_locations(places, llm, pages, full, cache, book_id, root)
@@ -94,11 +108,12 @@ def _fill(
     llm: LLMClient,
     pages: list[PageContent],
     picks: list[FigurePick],
+    language: str,
     cache: Cache | None,
     book_id: str,
     root: str | Path | None,
 ) -> None:
-    prompt = cast_prompt(pages, picks)
+    prompt = cast_prompt(pages, picks, language=language)
     images = [figures_dir(book_id, root) / pick.file for pick in picks]
     try:
         fields = _ask(llm, prompt, images, cache, book_id, "cast")

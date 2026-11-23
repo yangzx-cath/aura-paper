@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from ..schema.cast import FigurePick
 from ..schema.content import PageContent
-from ..schema.voice import CHOICES
+from ..schema.voice import CHINESE_CHOICES, CHOICES_BY_LANGUAGE
 
 # Words that mark an uncertainty as being about who someone is.
 IDENTITY_WORDS = ("同一人", "身份", "是谁", "指谁", "名字", "对应")
@@ -86,24 +86,30 @@ __CROPS__
 10. voice 只给会说话的角色：人，以及书里真的开口说过话的动物。不出声的动物
    （只叫、只被人叫名字、只跟着走）留空字符串。
 11. voice 从【可选音色】里原样抄一个 id，不要写 id 以外的任何字。按角色的性别和
-   年龄挑：成年男人挑成年男声，小孩挑童声，不要把成年人的声音给小孩。
+   年龄挑：成年男人挑成年男声，小孩挑更轻更亮的音色，不要把低沉音色给小孩。
 12. 同一本书里性别和年龄都一样的角色，不能共用同一个 id；不够分时先给主角挑最
    贴的，其余角色挑剩下的。
 """
 
 
-def cast_prompt(pages: list[PageContent], picks: list[FigurePick]) -> str:
+def cast_prompt(
+    pages: list[PageContent],
+    picks: list[FigurePick],
+    *,
+    language: str = "zh",
+) -> str:
     """Build the prompt that groups the figure crops into characters."""
+    choices = CHOICES_BY_LANGUAGE.get(language, CHINESE_CHOICES)
     text = TEMPLATE.replace("__COUNT__", str(len(picks)))
     text = text.replace("__PAGES__", _pages_text(pages))
     text = text.replace("__ISSUES__", _issues_text(pages))
-    text = text.replace("__VOICES__", _voices_text())
+    text = text.replace("__VOICES__", _voices_text(choices))
     return text.replace("__CROPS__", _crops_text(pages, picks))
 
 
 # List the voices a character may be given, with what each one sounds like.
-def _voices_text() -> str:
-    return "\n".join(f"{voice}：{sound}" for voice, sound in CHOICES)
+def _voices_text(choices: tuple[tuple[str, str], ...]) -> str:
+    return "\n".join(f"{voice}：{sound}" for voice, sound in choices)
 
 
 # List the story text of every page, so names can be matched to crops.

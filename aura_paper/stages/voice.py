@@ -9,7 +9,12 @@ from pathlib import Path
 from ..clients.tts import DEFAULT_RATE, TTSClient, TTSError
 from ..schema.cast import BookCast
 from ..schema.shot import BookShots, Shot
-from ..schema.voice import NARRATOR, BookVoice, VoiceLine, VoiceShot
+from ..schema.voice import (
+    BookVoice,
+    VoiceLine,
+    VoiceShot,
+    narrator_for,
+)
 from ..store.cache import Cache, fingerprint
 from ..store.output import write_json
 from .paths import book_dir, voice_dir
@@ -34,6 +39,7 @@ def voice(
     tts: TTSClient,
     overrides: dict[str, str] | None = None,
     speeds: dict[str, float] | None = None,
+    language: str = "",
     gap_ms: int = DEFAULT_GAP_MS,
     root: str | Path | None = None,
     cache: Cache | None = None,
@@ -41,7 +47,12 @@ def voice(
     """Read shots.json, speak every line, write voice.json and the audio."""
     directory = book_dir(book_id, root)
     shots = _read_shots(directory).shots
-    voices = voices_for(book_id, overrides=overrides, root=root)
+    voices = voices_for(
+        book_id,
+        overrides=overrides,
+        language=language,
+        root=root,
+    )
     rates = dict(speeds or {})
 
     result = BookVoice(
@@ -80,11 +91,14 @@ def voices_for(
     book_id: str,
     *,
     overrides: dict[str, str] | None = None,
+    language: str = "",
     root: str | Path | None = None,
 ) -> dict[str, str]:
     """Return the voice of every speaker the cast stage named."""
     cast_book = _read_cast(book_dir(book_id, root))
-    voices = {"旁白": NARRATOR}
+    tongue = language or cast_book.language or "zh"
+    narrator = narrator_for(tongue)
+    voices = {"旁白": narrator}
     for member in cast_book.cast:
         if member.voice:
             voices[member.id] = member.voice

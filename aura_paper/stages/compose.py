@@ -13,7 +13,7 @@ from ..media.image import extend_sides, load_image, save_jpeg
 from ..schema.compose import BookCompose, ComposedJoin, ComposedShot
 from ..schema.content import BookContent
 from ..schema.job import BookJobs, Job
-from ..schema.voice import NARRATOR, BookVoice
+from ..schema.voice import BookVoice, narrator_for
 from ..store.cache import Cache, fingerprint
 from ..store.output import write_json
 from .paths import book_dir, shots_dir
@@ -140,7 +140,11 @@ def title_card(
     if cover is None:
         raise ValueError("还没有封面图")
 
-    voice_id = _voice_for(directory, "旁白", NARRATOR)
+    voice_id = _voice_for(
+        directory,
+        "旁白",
+        narrator_for(content.language),
+    )
     out_dir = shots_dir(book_id, root)
     out_dir.mkdir(parents=True, exist_ok=True)
 

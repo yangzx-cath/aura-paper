@@ -3,7 +3,7 @@ import json
 from aura_paper.clients.tts import TTSClient, TTSError
 from aura_paper.schema.cast import BookCast
 from aura_paper.schema.shot import BookShots
-from aura_paper.schema.voice import NARRATOR
+from aura_paper.schema.voice import ENGLISH_NARRATOR, NARRATOR
 from aura_paper.stages.voice import voice
 from aura_paper.store.cache import Cache
 from aura_paper.store.output import write_json
@@ -61,11 +61,13 @@ def make_shots(root, shots):
 
 
 # Write the cast artifact the stage reads.
-def make_cast(root, voices):
+def make_cast(root, voices, language=""):
     make_book = root / "demo"
     make_book.mkdir(parents=True, exist_ok=True)
     members = [{"id": key, "voice": value} for key, value in voices.items()]
-    book = BookCast.from_dict({"id": "demo", "cast": members})
+    book = BookCast.from_dict(
+        {"id": "demo", "language": language, "cast": members}
+    )
     write_json("demo", "cast", book.to_dict(), root)
 
 
@@ -84,6 +86,24 @@ def shot(shot_id, audio):
         "panels": [{"page": "p000.jpg", "panel": 0}],
         "audio": audio,
     }
+
+
+def test_an_english_cast_uses_the_english_narrator(tmp_path):
+    make_shots(tmp_path, [shot("j1", [line("旁白", "Hello")])])
+    make_cast(tmp_path, {}, language="en")
+
+    result = voice("demo", tts=FakeTTS(), root=tmp_path)
+
+    assert result.shots[0].lines[0].voice == ENGLISH_NARRATOR
+
+
+def test_the_language_argument_wins_over_the_cast(tmp_path):
+    make_shots(tmp_path, [shot("j1", [line("旁白", "Hello")])])
+    make_cast(tmp_path, {}, language="zh")
+
+    result = voice("demo", tts=FakeTTS(), language="en", root=tmp_path)
+
+    assert result.shots[0].lines[0].voice == ENGLISH_NARRATOR
 
 
 def test_speaks_every_line_and_measures_the_shot(tmp_path):
