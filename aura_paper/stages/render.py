@@ -6,6 +6,7 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Callable
 
 from ..cache import Cache, file_fingerprint, fingerprint
 from ..clients.video import VideoClient, VideoError, VideoRequest
@@ -26,6 +27,7 @@ def render(
     workers: int = 1,
     root: str | Path | None = None,
     cache: Cache | None = None,
+    on_shot: Callable[[ShotRender], None] | None = None,
 ) -> BookRender:
     """Read jobs.json, generate every clip, write render.json."""
     assert workers >= 1
@@ -38,7 +40,10 @@ def render(
     wanted = [job for job in job_book.shots if not only or job.shot == only]
 
     def run(job: Job) -> ShotRender:
-        return _render_one(job, directory, out_dir, client, cache)
+        record = _render_one(job, directory, out_dir, client, cache)
+        if on_shot is not None:
+            on_shot(record)
+        return record
 
     if workers == 1:
         fresh = [run(job) for job in wanted]

@@ -128,6 +128,17 @@ def test_keeps_the_records_of_shots_it_did_not_touch(tmp_path):
     assert [shot["shot"] for shot in saved["shots"]] == ["j1", "j2"]
 
 
+def test_reports_each_shot_as_it_finishes(tmp_path):
+    make_jobs(tmp_path, ["j1", "j2"])
+    client = FakeVideo()
+    seen = []
+
+    render("demo", client=client, root=tmp_path, on_shot=seen.append)
+
+    assert [shot.shot for shot in seen] == ["j1", "j2"]
+    assert seen[0].task_id == "t1"
+
+
 def test_renders_one_shot_only(tmp_path):
     make_jobs(tmp_path, ["j1", "j2"])
     client = FakeVideo()

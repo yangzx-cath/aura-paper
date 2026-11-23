@@ -92,12 +92,10 @@ def main() -> int:
         workers=args.workers,
         root=root,
         cache=cache,
+        on_shot=_print_shot,
     )
     elapsed = time.perf_counter() - started
 
-    print()
-    for shot in result.shots:
-        print(_shot_line(shot))
     generated = [shot for shot in result.shots if not shot.cached]
     failed = [shot for shot in result.shots if shot.error]
     print()
@@ -113,6 +111,11 @@ def main() -> int:
         print(f"error    {result.error}", file=sys.stderr)
         return 1
     return 0
+
+
+# Print one clip as soon as the service hands it back.
+def _print_shot(shot: ShotRender) -> None:
+    print(_shot_line(shot), flush=True)
 
 
 # Print one clip with its task id and how long the call took.
