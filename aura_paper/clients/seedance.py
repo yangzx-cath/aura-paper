@@ -6,6 +6,7 @@ downloads the resulting clip.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import shutil
@@ -179,6 +180,14 @@ class SeedanceClient:
                     "role": role,
                 }
             )
+        for path in request.reference_audios:
+            content.append(
+                {
+                    "type": "audio_url",
+                    "audio_url": {"url": _audio_url(path)},
+                    "role": "reference_audio",
+                }
+            )
 
         payload = {
             "model": self.model,
@@ -305,3 +314,16 @@ def _resolution(value: str) -> str:
     if result not in _RESOLUTIONS:
         raise ValueError(f"unsupported resolution: {value}")
     return result
+
+
+# Audio suffixes the endpoint takes, and the MIME type each one needs.
+_AUDIO_MIME = {".wav": "audio/wav", ".mp3": "audio/mpeg"}
+
+
+# Turn a local audio file into the data URL the endpoint reads.
+def _audio_url(path: Path) -> str:
+    mime = _AUDIO_MIME.get(path.suffix.lower())
+    if mime is None:
+        raise ValueError(f"unsupported audio type: {path.suffix}")
+    payload = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{payload}"
