@@ -129,7 +129,21 @@ def test_leaves_the_dialogue_to_the_clip_that_was_sent_a_reference(tmp_path):
     assert set(track) == {0}
     info = ffmpeg.probe(tmp_path / "demo" / "shots" / "j1.mp4")
     assert info.has_audio is True
-    assert result.shots[0].error == ""
+    assert "旁白时段画面有声音" not in result.shots[0].error
+
+
+def test_reports_a_line_that_runs_into_the_end_of_the_clip(tmp_path):
+    make_book(tmp_path, tone=True)
+    path = tmp_path / "demo" / "jobs.json"
+    data = json.loads(path.read_text("utf-8"))
+    data["shots"][0]["reference"] = "jobs/j1-ref.wav"
+    data["shots"][0]["lines"][0]["kind"] = "对白"
+    path.write_text(json.dumps(data), "utf-8")
+
+    result = compose("demo", root=tmp_path)
+
+    # The tone runs to the last frame, so the words had no room left.
+    assert "台词贴到片尾" in result.shots[0].error
 
 
 def test_a_take_is_as_long_as_its_clip_and_its_hold(tmp_path):

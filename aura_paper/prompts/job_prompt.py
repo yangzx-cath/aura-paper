@@ -127,6 +127,7 @@ def _track_text(quiet: bool = False, voice_only: bool = False) -> str:
     said = "声音照音频1：谁说话、说什么、按什么顺序，都不改。"
     if voice_only:
         said += "音频1 没有人声的段落，画面里也不许有任何人说话。"
+        said += "每一句都要说完，不要说到一半就停。"
     else:
         said += "画外音时谁都不张口。"
     if quiet:

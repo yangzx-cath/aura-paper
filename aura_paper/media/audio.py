@@ -86,6 +86,22 @@ def extract(clip: Path, target: Path) -> None:
     )
 
 
+# Return how many seconds of silence a track ends with.
+def silence_at_end(path: Path) -> float:
+    """Count the seconds of silence at the end of a track.
+
+    A shot that closes on its last word left the model no room, and a model
+    that reads slower than its reference loses the end of the line.
+    """
+    marks = _marks(path)
+    quiet = 0
+    for mark in reversed(marks):
+        if mark:
+            break
+        quiet += 1
+    return round(quiet * STEP, 2)
+
+
 # Return one mark per step, True where the track carries sound.
 def _marks(path: Path) -> list[bool]:
     with wave.open(str(path), "rb") as handle:

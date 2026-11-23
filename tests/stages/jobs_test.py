@@ -149,6 +149,23 @@ def test_sends_the_dialogue_as_a_reference_track(tmp_path):
     assert "小满说" in job.prompt
 
 
+def test_gives_a_shot_the_model_speaks_a_longer_tail(tmp_path):
+    make_book(
+        tmp_path,
+        [shot([{"kind": "对白", "text": "走吧", "cast": "c1"}])],
+        [spoken(0, 4000)],
+    )
+
+    job = jobs(
+        "demo", ratio="4:3", resolution="480p", audio=False, root=tmp_path
+    ).shots[0]
+
+    # Four seconds of words plus the longer tail still fits five seconds,
+    # and the model gets a sixth to finish the last sentence in.
+    assert job.audio_ms == 4000
+    assert job.duration == 6
+
+
 def test_sends_no_reference_for_a_shot_with_a_sound_effect(tmp_path):
     make_book(
         tmp_path,

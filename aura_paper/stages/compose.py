@@ -35,6 +35,9 @@ HEARD_SUFFIX = "-heard.wav"
 # A clip that speaks this long inside the silence it was sent is reported.
 UNASKED_SECONDS = 0.3
 
+# A clip whose sound reaches this close to its end ended mid word.
+CUT_SECONDS = 0.5
+
 # How long two shots share the screen when they dissolve into each other.
 OVERLAP = 0.5
 
@@ -280,14 +283,33 @@ def _one(
     record.file = f"shots/{target.name}"
     record.seconds = round(seconds, 3)
     if job.reference and info.has_audio:
-        found = _narration_sound(job, clip, out_dir)
-        if found >= UNASKED_SECONDS:
-            record.error = f"旁白时段画面有声音 {found:.1f}s"
+        record.error = _spoken_check(job, clip, out_dir)
     return record
 
 
+# Read what the clip says where the shot has no words, and how close its
+# last words come to the end.
+def _spoken_check(job: Job, clip: Path, out_dir: Path) -> str:
+    heard = out_dir / f"{job.shot}{HEARD_SUFFIX}"
+    try:
+        audio.extract(clip, heard)
+    except ffmpeg.FFmpegError:
+        return ""
+    try:
+        unasked = _narration_sound(job, heard)
+        quiet = audio.silence_at_end(heard)
+    finally:
+        heard.unlink(missing_ok=True)
+    notes = []
+    if unasked >= UNASKED_SECONDS:
+        notes.append(f"旁白时段画面有声音 {unasked:.1f}s")
+    if quiet < CUT_SECONDS:
+        notes.append(f"台词贴到片尾，尾部只有 {quiet:.1f}s 静音")
+    return "；".join(notes)
+
+
 # Say how much the clip speaks inside the stretches that hold no words.
-def _narration_sound(job: Job, clip: Path, out_dir: Path) -> float:
+def _narration_sound(job: Job, heard: Path) -> float:
     windows = [
         (line.start_ms, line.start_ms + line.duration_ms)
         for line in job.lines
@@ -295,15 +317,7 @@ def _narration_sound(job: Job, clip: Path, out_dir: Path) -> float:
     ]
     if not windows:
         return 0.0
-    heard = out_dir / f"{job.shot}{HEARD_SUFFIX}"
-    try:
-        audio.extract(clip, heard)
-    except ffmpeg.FFmpegError:
-        return 0.0
-    try:
-        return audio.sound_in_windows(heard, windows)
-    finally:
-        heard.unlink(missing_ok=True)
+    return audio.sound_in_windows(heard, windows)
 
 
 # Take the shot at the whole length of its clip, cut to a whole number of

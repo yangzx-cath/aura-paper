@@ -29,6 +29,11 @@ MAX_SECONDS = 15
 # Room after the last sound, so the picture does not stop with the voice.
 TAIL_MS = 300
 
+# The model re-performs a reference track instead of replaying it, and its
+# last words land 3-18% later than the track says, so a shot it speaks needs
+# its own tail or the end of the line falls outside the clip.
+REFERENCE_TAIL_MS = 1500
+
 # A sound effect needs a moment on the timeline, though nothing is spoken.
 SFX_MS = 600
 
@@ -189,6 +194,8 @@ def _build(
     )
     job.reference = _reference(job, shot, directory, out_dir)
     job.audio = job.audio or bool(job.reference)
+    if job.reference:
+        job.duration = _seconds(job.audio_ms, REFERENCE_TAIL_MS)
     job.prompt = _prompt(shot, style, place, places, cast, job)
     if len(job.images) > MAX_IMAGES:
         job.images = job.images[:MAX_IMAGES]
@@ -202,6 +209,9 @@ def _build(
             job.error,
             f"配音少了 {wanted - found} 句，先重跑 run_voice.py",
         )
+    # The script itself has to fit the service's ceiling; the tail is only
+    # what is left over, so a long shot gets a shorter one rather than an
+    # error it can do nothing about.
     if job.audio_ms + TAIL_MS > MAX_SECONDS * 1000:
         job.error = _joined(
             job.error,
@@ -258,8 +268,8 @@ def _length(lines: list[JobLine]) -> int:
 
 
 # Round the sound up to whole seconds the service accepts.
-def _seconds(audio_ms: int) -> int:
-    seconds = math.ceil((audio_ms + TAIL_MS) / 1000)
+def _seconds(audio_ms: int, tail_ms: int = TAIL_MS) -> int:
+    seconds = math.ceil((audio_ms + tail_ms) / 1000)
     return min(MAX_SECONDS, max(MIN_SECONDS, seconds))
 
 
