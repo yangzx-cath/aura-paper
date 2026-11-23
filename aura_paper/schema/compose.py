@@ -15,6 +15,7 @@ class ComposedShot:
     file: str = ""
     audio: str = ""
     source: str = ""
+    start: float = 0.0
     seconds: float = 0.0
     sound: bool = False
     error: str = ""
@@ -26,6 +27,7 @@ class ComposedShot:
             "file": self.file,
             "audio": self.audio,
             "source": self.source,
+            "start": self.start,
             "seconds": self.seconds,
             "sound": self.sound,
             "error": self.error,
@@ -39,6 +41,7 @@ class ComposedShot:
             file=_text(data.get("file")),
             audio=_text(data.get("audio")),
             source=_text(data.get("source")),
+            start=_float_value(data.get("start")),
             seconds=_float_value(data.get("seconds")),
             sound=bool(data.get("sound", False)),
             error=_text(data.get("error")),

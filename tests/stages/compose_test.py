@@ -167,6 +167,7 @@ def test_joins_the_takes_into_a_film(tmp_path):
     assert (tmp_path / "demo" / "shots" / "film.mp4").is_file()
     # Two whole clips and their holds, cut together without losing anything.
     assert result.seconds == pytest.approx(5.0, abs=0.1)
+    assert [shot.start for shot in result.shots] == [0.0, 2.5]
     assert [join.after for join in result.joins] == ["j2"]
     assert result.joins[0].kind == "硬切"
 

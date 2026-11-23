@@ -103,6 +103,7 @@ def compose(
             tts,
             cache,
         )
+    _place(result, directory)
     result.error = "；".join(
         [
             f"{shot.shot}：{shot.error}"
@@ -369,6 +370,20 @@ def _jump(before: Path, after: Path, folder: Path) -> float:
     right = Image.open(second).convert("L").resize(JUMP_BOX)
     data = ImageChops.difference(left, right).tobytes()
     return sum(data) / len(data)
+
+
+# Record where every take sits in the film, so a later stage can time
+# subtitles against the finished picture.
+def _place(result: BookCompose, directory: Path) -> None:
+    at = 0.0
+    if result.title_card:
+        card = ffmpeg.probe(directory / result.title_card)
+        at = max(0.0, card.video_ms / 1000 - OVERLAP)
+    kinds = {join.after: join.kind for join in result.joins}
+    for shot in result.shots:
+        shot.start = round(at, 3)
+        spread = OVERLAP if kinds.get(shot.shot) == "叠化" else 0.0
+        at += shot.seconds - spread
 
 
 # Join every take into one film, once all of them are on disk.
