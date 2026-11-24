@@ -42,6 +42,7 @@ let quiet = 0;
 let spoken = 0;
 let timer = 0;
 let socket = null;
+let busy = false;
 let queued = [];
 let slice = [];
 let sliceLen = 0;
@@ -125,7 +126,7 @@ function hear(event) {
 
   if (!voiced) {
     keep(pcm);
-    if (level < LEVEL) {
+    if (level < LEVEL || busy) {
       return;
     }
     voiced = true;
@@ -210,6 +211,7 @@ function openStream() {
   const query = encodeURIComponent(BOOK);
   const ws = new WebSocket(`${scheme}://${location.host}/ws/qa?book=${query}`);
   socket = ws;
+  busy = true;
   ws.addEventListener("open", () => {
     for (const bytes of queued) {
       ws.send(bytes);
@@ -225,6 +227,7 @@ function openStream() {
   ws.addEventListener("close", () => {
     if (socket === ws) {
       socket = null;
+      busy = false;
     }
   });
 }
@@ -234,6 +237,7 @@ function closeStream() {
     socket.close();
     socket = null;
   }
+  busy = false;
   queued = [];
 }
 
@@ -249,9 +253,11 @@ function receive(event) {
     return;
   }
   if (data.type === "done") {
+    busy = false;
     obey(data.text);
     return;
   }
+  busy = false;
   toast("语音识别失败");
 }
 
@@ -297,24 +303,74 @@ function clean(text) {
   return String(text || "").replace(/[\s，。！？、,.!?]/g, "");
 }
 
-// 找画面的请求：命中就跳到那一页，返回是否算作检索。
+// 找画面或台词：先看问的是哪一种，命中就跳过去。
 function find(said) {
-  const at = said.search(/找到|查找|高亮|帮我找|找找/);
+  const at = said.search(/找到|查找|搜索|高亮|帮我找|找找/);
   if (at < 0) {
     return false;
   }
   const head = said.slice(at);
-  const slot = trimSlot(head.replace(/^(找到|查找|帮我找|找找|高亮)/, ""));
-  const page = slot && pages.length ? best(slot) : null;
-  if (!page) {
+  const slot = trimSlot(head.replace(/^(找到|查找|搜索|帮我找|找找|高亮)/, ""));
+  if (!slot) {
     toast(`没找到，再说一次 · ${stats()}`);
     return true;
   }
+  const lineFirst = /高亮|查找|搜索|这句/.test(said);
+  const line = bestLine(slot);
+  const page = best(slot);
+  if (lineFirst && line) {
+    showLine(line);
+    return true;
+  }
+  if (page) {
+    showPage(page);
+    return true;
+  }
+  if (line) {
+    showLine(line);
+    return true;
+  }
+  toast(`没找到，再说一次 · ${stats()}`);
+  return true;
+}
+
+// 台词短，命中比例够高才算找到。
+function bestLine(slot) {
+  const pairs = [...bigrams(slot)];
+  const needed = pairs.length === 1
+    ? 1
+    : Math.max(2, Math.ceil(pairs.length * 0.5));
+  let top = null;
+  let topScore = 0;
+  for (const cue of cues) {
+    const hay = normalize(cue.text);
+    let hit = 0;
+    for (const pair of pairs) {
+      if (hay.includes(pair)) {
+        hit += 1;
+      }
+    }
+    if (hit >= needed && hit > topScore) {
+      topScore = hit;
+      top = cue;
+    }
+  }
+  return top;
+}
+
+// 跳到那一句，并把台词放到字幕行。
+function showLine(line) {
+  FILM.pause();
+  FILM.currentTime = line.start;
+  draw();
+  toast(`找到台词：${line.text} · ${stats()}`);
+}
+
+function showPage(page) {
   FILM.pause();
   FILM.currentTime = page.start;
   draw();
   toast(`找到第 ${page.page + 1} 页 · ${stats()}`);
-  return true;
 }
 
 // 把“...的画面”“...的那一页”这类尾巴去掉，只留要找的东西。
@@ -517,6 +573,7 @@ async function load() {
     if (show.cover) {
       FILM.poster = pub(show.cover);
     }
+    pages = show.pages || [];
     cues = await subtitles(pub(show.vtt || "subtitles.vtt"));
     shown = -1;
   } catch (error) {
@@ -692,21 +749,6 @@ TRACK.addEventListener("pointercancel", () => {
   dragging = false;
 });
 
-// 读发布清单：成片地址和页索引都从这里来。
-async function load() {
-  if (!BOOK) {
-    return;
-  }
-  const reply = await fetch(`/api/books/${BOOK}/publish`);
-  if (!reply.ok) {
-    toast("这本书还没发布");
-    return;
-  }
-  const data = await reply.json();
-  pages = data.pages || [];
-  FILM.src = `/api/books/${BOOK}/pub/${data.film}`;
-}
-
 PLAY.addEventListener("click", toggle);
 FILM.addEventListener("click", toggle);
 FILM.addEventListener("play", sync);
@@ -741,7 +783,5 @@ MIC.addEventListener("click", () => {
   }
   start();
 });
-
-load();
 
 load();
