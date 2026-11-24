@@ -8,20 +8,24 @@ from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from aura_paper.config import load_env
+
 from .books import router
 from .qa import router as qa_router
 from .stages import prepare_state
 from .stages import router as stages_router
 
-WEB = Path(__file__).resolve().parent.parent / "web"
-FONTS = Path(__file__).resolve().parent.parent / "resources" / "fonts"
-OUT = Path(__file__).resolve().parent.parent / "out"
+ROOT = Path(__file__).resolve().parent.parent
+WEB = ROOT / "web"
+FONTS = ROOT / "resources" / "fonts"
+OUT = ROOT / "out"
 
 
 def create_app() -> FastAPI:
     """Return the app with both pages and the API mounted."""
     app = FastAPI(title="灵动绘卷")
     app.middleware("http")(_revalidate)
+    load_env(ROOT / ".env")
     prepare_state()
 
     @app.get("/", include_in_schema=False)
