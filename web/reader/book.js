@@ -54,6 +54,7 @@ let pages = [];
 // 发布清单里的字幕，和现在已经显示的那一条。
 let cues = [];
 let shown = -1;
+let marked = null;
 
 async function start() {
   if (starting || listening) {
@@ -319,7 +320,7 @@ function find(said) {
   const line = bestLine(slot);
   const page = best(slot);
   if (lineFirst && line) {
-    showLine(line);
+    showLine(line, slot);
     return true;
   }
   if (page) {
@@ -327,7 +328,7 @@ function find(said) {
     return true;
   }
   if (line) {
-    showLine(line);
+    showLine(line, slot);
     return true;
   }
   toast(`没找到，再说一次 · ${stats()}`);
@@ -358,17 +359,42 @@ function bestLine(slot) {
   return top;
 }
 
-// 跳到那一句，并把台词放到字幕行。
-function showLine(line) {
+// 跳到那一句，并把命中的片段标出来。
+function showLine(line, slot) {
   FILM.pause();
   FILM.currentTime = line.start;
   draw();
+  const index = cues.indexOf(line);
+  const spot = locate(line.text, slot);
+  marked = spot ? { index, from: spot.from, to: spot.to } : null;
+  shown = -1;
+  speak();
   toast(`找到台词：${line.text} · ${stats()}`);
+}
+
+// 在原文里找到要标的位置，标点不参与比对。
+function locate(text, slot) {
+  let flat = "";
+  const map = [];
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (MARKS.includes(ch)) {
+      continue;
+    }
+    flat += ch;
+    map.push(i);
+  }
+  const at = flat.indexOf(slot);
+  if (at < 0) {
+    return null;
+  }
+  return { from: map[at], to: map[at + slot.length - 1] + 1 };
 }
 
 function showPage(page) {
   FILM.pause();
   FILM.currentTime = page.start;
+  marked = null;
   draw();
   toast(`找到第 ${page.page + 1} 页 · ${stats()}`);
 }
@@ -452,15 +478,27 @@ const DIGITS = {
   五: 5, 六: 6, 七: 7, 八: 8, 九: 9,
 };
 
+// 检索时去掉的字符：空白、标点和引号。
+const MARKS = " \t\n\r，。！？、,.!?：“”\"'…—";
+
 // 检索用的统一写法：去标点空白，中文数字换成阿拉伯数字。
 function normalize(text) {
-  const flat = String(text || "")
-    .toLowerCase()
-    .replace(/[\s，。！？、,.!?：“”"'…—]/g, "");
+  const flat = flatten(text).toLowerCase();
   return flat.replace(
     /[零一二两三四五六七八九十]+(?=[块个只张页])/g,
     (run) => String(number(run))
   );
+}
+
+// 去掉标点与空白，保留字序。
+function flatten(text) {
+  let out = "";
+  for (const ch of String(text || "")) {
+    if (!MARKS.includes(ch)) {
+      out += ch;
+    }
+  }
+  return out;
 }
 
 // 一到九十九的中文数字，超出范围的当作没写。
@@ -665,12 +703,31 @@ function speak() {
   if (index < 0) {
     SUBTITLE.textContent = "";
     SUBTITLE.className = "subtitle";
+    marked = null;
     return;
   }
-  const cue = cues[index];
-  SUBTITLE.textContent = cue.text;
+  paint(cues[index], index);
+}
+
+// 命中片段单独包一层 mark，其余文字原样写入。
+function paint(cue, index) {
   const kind = cue.who === "旁白" ? "narrator" : "cast";
   SUBTITLE.className = `subtitle subtitle--${kind}`;
+  if (!marked || marked.index !== index) {
+    marked = null;
+    SUBTITLE.textContent = cue.text;
+    return;
+  }
+  const before = cue.text.slice(0, marked.from);
+  const hit = cue.text.slice(marked.from, marked.to);
+  const after = cue.text.slice(marked.to);
+  const mark = document.createElement("mark");
+  mark.className = "subtitle-hit";
+  mark.textContent = hit;
+  // 字幕行是 grid 容器，多出来的节点会各占一行，所以整句包进一个 span。
+  const line = document.createElement("span");
+  line.replaceChildren(before, mark, after);
+  SUBTITLE.replaceChildren(line);
 }
 
 // 字幕按时间排好且不重叠，用二分找当前这条。

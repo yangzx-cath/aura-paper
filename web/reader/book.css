@@ -274,3 +274,11 @@
   opacity: 1;
   transform: translate(-50%, 0);
 }
+
+/* 命中台词时，把要找的那几个字用暖色标出来。 */
+.subtitle-hit {
+  padding: 0 4px;
+  border-radius: 6px;
+  background: var(--warm);
+  color: var(--ink);
+}
