@@ -14,8 +14,10 @@ from ..schema.voice import BookVoice
 from ..store.output import write_json
 from .paths import book_dir, shots_dir
 
-# The subtitle file the film is burnt with, and the burnt copy's suffix.
+# The subtitle file the film is burnt with, the reader's copy, and the
+# burnt copy's suffix.
 ASS_SUFFIX = ".ass"
+VTT_SUFFIX = ".vtt"
 BURN_SUFFIX = "-subs.mp4"
 
 # Font families, as the files in resources/fonts name themselves.
@@ -70,9 +72,9 @@ def subtitles(
     *,
     root: str | Path | None = None,
     fonts: str | Path | None = None,
-    burn: bool = True,
+    burn: bool = False,
 ) -> BookSubtitles:
-    """Read jobs.json and compose.json, write subtitles.ass, burn the film."""
+    """Read jobs.json and compose.json, write subtitles.ass and .vtt."""
     directory = book_dir(book_id, root)
     result = BookSubtitles(id=book_id)
     book = _read_compose(directory)
@@ -95,6 +97,8 @@ def subtitles(
     path = directory / f"subtitles{ASS_SUFFIX}"
     path.write_text(_ass(cues, styles, ffmpeg.probe(film)), encoding="utf-8")
     result.file = path.name
+    result.vtt = f"subtitles{VTT_SUFFIX}"
+    (directory / result.vtt).write_text(_vtt(cues), encoding="utf-8")
     result.cues = len(cues)
 
     if burn:
@@ -246,6 +250,31 @@ def _clock(seconds: float) -> str:
     minutes, rest = divmod(rest, 6000)
     secs, cents = divmod(rest, 100)
     return f"{hours}:{minutes:02d}:{secs:02d}.{cents:02d}"
+
+
+# Write the WebVTT file the reader loads: one cue per line, the speaker as
+# a voice span so the page can style it.
+def _vtt(cues: list[Cue]) -> str:
+    parts = ["WEBVTT", ""]
+    for cue in cues:
+        parts.append(f"{_vtt_clock(cue.start)} --> {_vtt_clock(cue.end)}")
+        parts.append(f"<v {cue.style}>{_markup(cue.text)}</v>")
+        parts.append("")
+    return "\n".join(parts)
+
+
+# Turn the characters WebVTT reads as markup into plain text.
+def _markup(text: str) -> str:
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+# Write a time the way WebVTT reads it, to the thousandth of a second.
+def _vtt_clock(seconds: float) -> str:
+    total = max(0, round(seconds * 1000))
+    hours, rest = divmod(total, 3600000)
+    minutes, rest = divmod(rest, 60000)
+    secs, millis = divmod(rest, 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}.{millis:03d}"
 
 
 # Burn the subtitle file into a copy of the film, leaving the master alone.

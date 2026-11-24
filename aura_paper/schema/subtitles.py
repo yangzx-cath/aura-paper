@@ -13,6 +13,7 @@ class BookSubtitles:
 
     id: str = ""
     file: str = ""
+    vtt: str = ""
     burned: str = ""
     cues: int = 0
     error: str = ""
@@ -23,6 +24,7 @@ class BookSubtitles:
             "id": self.id,
             "generated_at": now_iso(),
             "file": self.file,
+            "vtt": self.vtt,
             "burned": self.burned,
             "cues": self.cues,
             "error": self.error,
@@ -34,6 +36,7 @@ class BookSubtitles:
         return cls(
             id=str(data.get("id") or "").strip(),
             file=str(data.get("file") or "").strip(),
+            vtt=str(data.get("vtt") or "").strip(),
             burned=str(data.get("burned") or "").strip(),
             cues=int(data.get("cues") or 0),
             error=str(data.get("error") or "").strip(),

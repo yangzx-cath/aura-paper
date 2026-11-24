@@ -1,14 +1,13 @@
-"""Lay every spoken line over the finished film as burnt-in subtitles.
+"""Place every spoken line on the finished film as a subtitle file.
 
 Reads out/<book>/compose.json for where each take sits in the film and
 out/<book>/jobs.json for the lines and their offsets, then writes
-out/<book>/subtitles.ass and, by default, out/<book>/shots/film-subs.mp4.
-The master film is left without words, so a second copy can be made any
-time.
+out/<book>/subtitles.ass and out/<book>/subtitles.vtt. Only --burn makes
+out/<book>/shots/film-subs.mp4, so the copy the reader plays stays clean.
 
 Usage:
     python scripts/run_subtitles.py C01
-    python scripts/run_subtitles.py C01 --no-burn
+    python scripts/run_subtitles.py C01 --burn
 """
 
 import argparse
@@ -24,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Write the subtitle file and burn it into the film."
+        description="Write the subtitle files, and burn them on request."
     )
     parser.add_argument("book", help="book id produced by run_compose.py")
     parser.add_argument(
@@ -38,9 +37,9 @@ def main() -> int:
         help="font folder, default is resources/fonts",
     )
     parser.add_argument(
-        "--no-burn",
+        "--burn",
         action="store_true",
-        help="write the subtitle file only",
+        help="also burn the subtitles into a copy of the film",
     )
     args = parser.parse_args()
 
@@ -53,7 +52,7 @@ def main() -> int:
         print("run scripts/run_compose.py first", file=sys.stderr)
         return 2
 
-    burn = not args.no_burn
+    burn = args.burn
     print(f"book     {args.book}")
     print(f"root     {root}")
     print(f"burn     {burn}")
@@ -73,6 +72,8 @@ def main() -> int:
     print(f"cues     {result.cues}")
     if result.file:
         print(f"file     {result.file}")
+    if result.vtt:
+        print(f"vtt      {result.vtt}")
     if result.burned:
         print(f"burned   {result.burned}")
     print(f"total    {elapsed:.1f}s")

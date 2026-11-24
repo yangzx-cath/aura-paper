@@ -21,11 +21,11 @@ from aura_paper.stages.jobs import jobs
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Debug size: small and cheap to generate.
-DEFAULT_RESOLUTION = "480p"
+# The size the film is delivered in; 480p is for cheap test runs.
+DEFAULT_RESOLUTION = "720p"
 
-# A square book fits a 4:3 frame better than a wide one.
-DEFAULT_RATIO = "4:3"
+# The frame the film is delivered in; 4:3 fits a square book better.
+DEFAULT_RATIO = "16:9"
 
 
 def main() -> int:
