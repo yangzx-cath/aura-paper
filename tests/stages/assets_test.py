@@ -4,7 +4,8 @@ from PIL import Image
 
 from aura_paper.clients.llm import LLMClient, LLMError
 from aura_paper.schema.content import BookContent
-from aura_paper.stages.assets import assets, pick_figures
+from aura_paper.stages.assets import assets
+from aura_paper.stages.crop import crop
 from aura_paper.store.cache import Cache
 from aura_paper.store.output import write_json
 
@@ -132,6 +133,7 @@ def make_book(root, pages):
         )
     book = BookContent.from_dict({"id": "demo", "pages": records})
     write_json("demo", "understand", book.to_dict(), root)
+    crop("demo", root=root)
 
 
 def test_groups_crops_into_cast_and_locations(tmp_path):
@@ -173,45 +175,6 @@ def test_groups_crops_into_cast_and_locations(tmp_path):
     assert (tmp_path / "demo" / "cast.json").is_file()
     assert (tmp_path / "demo" / "locations.json").is_file()
     assert llm.calls == 2
-
-
-def test_keeps_only_figures_that_can_stand_alone(tmp_path):
-    pages = [
-        {
-            "figures": [
-                figure([0, 0, 200, 250]),
-                figure([500, 0, 699, 251]),
-                figure([0, 400, 300, 700], view="半身"),
-                figure([400, 400, 700, 700], facing="背面"),
-                figure([700, 400, 1000, 700], occlusion="遮挡"),
-                # A sibling without a box cannot overlap anything.
-                figure([0, 0, 0, 0]),
-            ]
-        },
-        {
-            "figures": [
-                figure([0, 0, 100, 1000]),
-                figure([69, 0, 169, 1000]),
-                figure([400, 0, 600, 1000]),
-            ]
-        },
-        {
-            "figures": [
-                figure([0, 0, 100, 1000]),
-                figure([70, 0, 170, 1000]),
-            ]
-        },
-    ]
-    make_book(tmp_path, pages)
-
-    picks = pick_figures("demo", root=tmp_path)
-
-    assert sorted(pick.file for pick in picks) == [
-        "p000_f0.jpg",
-        "p001_f2.jpg",
-        "p002_f0.jpg",
-        "p002_f1.jpg",
-    ]
 
 
 def test_keeps_two_pictures_and_ignores_a_pick_it_does_not_own(tmp_path):

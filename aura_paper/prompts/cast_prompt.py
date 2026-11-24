@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ..schema.cast import FigurePick
 from ..schema.content import PageContent
+from ..schema.crop import FigureCrop
 from ..schema.voice import CHINESE_CHOICES, CHOICES_BY_LANGUAGE
 
 # Words that mark an uncertainty as being about who someone is.
@@ -94,7 +94,7 @@ __CROPS__
 
 def cast_prompt(
     pages: list[PageContent],
-    picks: list[FigurePick],
+    picks: list[FigureCrop],
     *,
     language: str = "zh",
 ) -> str:
@@ -134,7 +134,7 @@ def _issues_text(pages: list[PageContent]) -> str:
 
 
 # List the crops in the order their images are given.
-def _crops_text(pages: list[PageContent], picks: list[FigurePick]) -> str:
+def _crops_text(pages: list[PageContent], picks: list[FigureCrop]) -> str:
     lines = []
     for number, pick in enumerate(picks, start=1):
         look = _figure_look(pages, pick)
@@ -146,7 +146,7 @@ def _crops_text(pages: list[PageContent], picks: list[FigurePick]) -> str:
 
 
 # Return the appearance words understand wrote for one crop.
-def _figure_look(pages: list[PageContent], pick: FigurePick) -> str:
+def _figure_look(pages: list[PageContent], pick: FigureCrop) -> str:
     for page in pages:
         if page.filename != pick.page:
             continue

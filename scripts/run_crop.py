@@ -45,6 +45,7 @@ def main() -> int:
     elapsed = time.perf_counter() - started
 
     print(f"panels  {len(result.panels)}")
+    print(f"figures {len(result.figures)}")
     erased = len([page for page in result.pages if page.erased])
     lines = sum(page.lines for page in result.pages)
     print(f"language {result.language}")

@@ -1,7 +1,7 @@
 """Build the reference images for one book's cast and places.
 
-Reads out/<book>/understand.json, crops the figures that can stand alone,
-asks the model which crops show the same character, then asks which panels
+Reads out/<book>/understand.json and the figures cut by run_crop.py, asks
+the model which crops show the same character, then asks which panels
 share a place. Writes cast.json and locations.json.
 
 Usage:
@@ -56,6 +56,11 @@ def main() -> int:
     if not understand_path.is_file():
         print(f"missing {understand_path}", file=sys.stderr)
         print("start with scripts/run_understand.py", file=sys.stderr)
+        return 2
+    crop_path = root / args.book / "crop.json"
+    if not crop_path.is_file():
+        print(f"missing {crop_path}", file=sys.stderr)
+        print("start with scripts/run_crop.py", file=sys.stderr)
         return 2
 
     llm = LLMClient.from_env(args.effort)

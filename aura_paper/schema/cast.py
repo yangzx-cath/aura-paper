@@ -9,17 +9,6 @@ from .voice import ALL as VOICES
 
 
 @dataclass
-class FigurePick:
-    """One crop that may stand for a character."""
-
-    page: str = ""
-    figure: int = 0
-    file: str = ""
-    facing: str = ""
-    area: float = 0.0
-
-
-@dataclass
 class Cast:
     """One character and the crops that show it best."""
 

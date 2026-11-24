@@ -63,6 +63,38 @@ class PageCrop:
 
 
 @dataclass
+class FigureCrop:
+    """One figure crop that may stand for a character."""
+
+    page: str = ""
+    figure: int = 0
+    file: str = ""
+    facing: str = ""
+    area: float = 0.0
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this figure."""
+        return {
+            "page": self.page,
+            "figure": self.figure,
+            "file": self.file,
+            "facing": self.facing,
+            "area": self.area,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> FigureCrop:
+        """Build a figure from its external JSON shape."""
+        return cls(
+            page=_text(data.get("page")),
+            figure=_int_value(data.get("figure")),
+            file=_text(data.get("file")),
+            facing=_text(data.get("facing")),
+            area=_float_value(data.get("area")),
+        )
+
+
+@dataclass
 class BookCrop:
     """Every panel of one book, in reading order."""
 
@@ -70,6 +102,7 @@ class BookCrop:
     language: str = ""
     pages: list[PageCrop] = field(default_factory=list)
     panels: list[PanelCrop] = field(default_factory=list)
+    figures: list[FigureCrop] = field(default_factory=list)
     error: str = ""
 
     def to_dict(self) -> dict:
@@ -80,6 +113,7 @@ class BookCrop:
             "language": self.language,
             "pages": [page.to_dict() for page in self.pages],
             "panels": [panel.to_dict() for panel in self.panels],
+            "figures": [figure.to_dict() for figure in self.figures],
             "error": self.error,
         }
 
@@ -91,6 +125,7 @@ class BookCrop:
             language=_text(data.get("language")),
             pages=_page_list(data.get("pages")),
             panels=_panel_list(data.get("panels")),
+            figures=_figure_list(data.get("figures")),
             error=_text(data.get("error")),
         )
 
@@ -132,6 +167,14 @@ def _panel_list(value: object) -> list[PanelCrop]:
     return [panel for panel in panels if panel.file]
 
 
+# Read a duration in seconds, falling back to zero.
+def _float_value(value: object) -> float:
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0.0
+
+
 # Read the page list, keeping the entries that name a file.
 def _page_list(value: object) -> list[PageCrop]:
     if not isinstance(value, list):
@@ -140,3 +183,13 @@ def _page_list(value: object) -> list[PageCrop]:
         PageCrop.from_dict(item) for item in value if isinstance(item, dict)
     ]
     return [page for page in pages if page.filename]
+
+
+# Read the figure list, keeping the entries that name a file.
+def _figure_list(value: object) -> list[FigureCrop]:
+    if not isinstance(value, list):
+        return []
+    figures = [
+        FigureCrop.from_dict(item) for item in value if isinstance(item, dict)
+    ]
+    return [figure for figure in figures if figure.file]
