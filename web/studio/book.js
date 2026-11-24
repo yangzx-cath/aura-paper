@@ -299,7 +299,8 @@ function follow(stage, ui) {
     const ok = line === "退出码 0";
     ui.badge.className = ok ? "badge badge--done" : "badge badge--failed";
     ui.badge.textContent = ok ? "完成" : "失败";
-    // 跑完重拉一次，下一个阶段的按钮就能用了。
+    // 跑完重拉一次：书名可能刚被理解阶段写回，下一个阶段也可能解锁了。
+    title(BOOK);
     refresh();
   };
 

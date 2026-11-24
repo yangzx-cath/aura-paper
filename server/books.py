@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
-from aura_paper.store.books import import_pdf, list_books, status_of
+from aura_paper.store.books import BookMeta, import_pdf, list_books, status_of
+
+OUT = Path(__file__).resolve().parent.parent / "out"
 
 router = APIRouter(prefix="/api", tags=["books"])
 
@@ -15,9 +19,7 @@ def books() -> dict:
     """Return every book with the status the shelf should show."""
     rows = []
     for meta in list_books():
-        row = meta.to_dict()
-        row["status"] = status_of(meta.id)
-        rows.append(row)
+        rows.append(_row(meta))
     return {"books": rows}
 
 
@@ -33,6 +35,13 @@ async def upload(file: UploadFile = File(...)) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    return _row(meta)
+
+
+# One book as the shelf needs it, cover path included.
+def _row(meta: BookMeta) -> dict:
     row = meta.to_dict()
     row["status"] = status_of(meta.id)
+    cover = OUT / meta.id / "cover.jpg"
+    row["cover"] = f"/media/{meta.id}/cover.jpg" if cover.is_file() else ""
     return row

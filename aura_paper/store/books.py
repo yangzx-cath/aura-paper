@@ -134,6 +134,24 @@ def read_meta(book_id: str, root: str | Path | None = None) -> BookMeta | None:
         return None
 
 
+def set_title(
+    book_id: str,
+    title: str,
+    source: str = "understand",
+    root: str | Path | None = None,
+) -> bool:
+    """Store a detected title unless someone typed one in by hand."""
+    meta = read_meta(book_id, root)
+    if meta is None or not title:
+        return False
+    if meta.title_source == "user":
+        return False
+    meta.title = title
+    meta.title_source = source
+    write_json(book_id, "book", meta.to_dict(), root or books_dir())
+    return True
+
+
 def status_of(book_id: str, root: str | Path | None = None) -> str:
     """Return the one word the shelf shows under a book."""
     folder = book_folder(book_id, root)

@@ -74,10 +74,19 @@ function card(book) {
 
   const cover = document.createElement("div");
   cover.className = "cover cover--empty";
-  const name = document.createElement("span");
-  name.className = "cover-name";
-  name.textContent = shown;
-  cover.append(name);
+  if (book.cover) {
+    cover.className = "cover";
+    const image = document.createElement("img");
+    image.className = "cover-img";
+    image.src = book.cover;
+    image.alt = "";
+    cover.append(image);
+  } else {
+    const name = document.createElement("span");
+    name.className = "cover-name";
+    name.textContent = shown;
+    cover.append(name);
+  }
 
   const title = document.createElement("h3");
   title.className = "book-title";

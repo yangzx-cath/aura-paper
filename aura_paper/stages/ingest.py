@@ -51,6 +51,11 @@ SEAM_SHARE = 0.08
 # Page files are numbered by their order in the book.
 PAGE_TEMPLATE = "p{index:03d}.jpg"
 
+# The shelf shows covers at about 130px, so 360 is already two times that.
+COVER_NAME = "cover.jpg"
+COVER_BOX = (360, 540)
+COVER_QUALITY = 85
+
 
 def ingest(
     pdf_path: str | Path,
@@ -104,7 +109,18 @@ def ingest(
                 on_page(page)
 
     write_json(book_id, "ingest", book.to_dict(), root)
+    _write_cover(pages_dir, directory)
     return book
+
+
+# The shelf needs a small cover, not the full page image.
+def _write_cover(pages_dir: Path, directory: Path) -> None:
+    pages = sorted(pages_dir.glob("p*.jpg"))
+    if not pages:
+        return
+    image = load_image(pages[0])
+    copy = thumbnail(image, COVER_BOX)
+    save_jpeg(copy, directory / COVER_NAME, COVER_QUALITY)
 
 
 # Remove files left by an earlier run, so the folders match this one.

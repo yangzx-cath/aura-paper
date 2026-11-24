@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from aura_paper.schema.time import now_iso
+from aura_paper.store.books import set_title
 
 ROOT = Path(__file__).resolve().parent.parent
 BOOKS = ROOT / "data" / "books"
@@ -188,7 +189,22 @@ async def _watch(
         with log.open("a", encoding="utf-8") as sink:
             sink.write(f"退出码 {code}\n")
         _record_run(folder, stage, code, started, began)
+        if stage == "understand" and code == 0:
+            _adopt_title(folder, book_id)
         RUNNING.pop(book_id, None)
+
+
+# Understand reads the real title, so the library takes it over.
+def _adopt_title(folder: Path, book_id: str) -> None:
+    path = folder / "understand.json"
+    if not path.is_file():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    title = str(data.get("title") or "").strip()
+    set_title(book_id, title)
 
 
 # Send each complete line once, and stop after the exit line.

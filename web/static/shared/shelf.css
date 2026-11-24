@@ -67,6 +67,13 @@
   aspect-ratio: 2 / 3;
   border-radius: var(--radius-lg);
   background: var(--surface);
+  overflow: hidden;
+}
+
+.cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* 书已存在但还没有成品封面：用书名占住方形区域。 */
@@ -90,6 +97,7 @@
   font-size: var(--text-md);
   font-weight: 600;
   line-height: 1.35;
+  text-align: center;
   /* 书名只排一行，网格行高才不会因长文件名跳动。 */
   white-space: nowrap;
   overflow: hidden;
@@ -99,6 +107,7 @@
 .status {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--gap-sm);
   font-size: var(--text-sm);
   color: var(--ink2);

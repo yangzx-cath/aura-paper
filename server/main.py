@@ -14,6 +14,7 @@ from .stages import router as stages_router
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 FONTS = Path(__file__).resolve().parent.parent / "resources" / "fonts"
+OUT = Path(__file__).resolve().parent.parent / "out"
 
 
 def create_app() -> FastAPI:
@@ -48,6 +49,11 @@ def create_app() -> FastAPI:
         "/reader",
         StaticFiles(directory=WEB / "reader", html=True),
         name="reader",
+    )
+    app.mount(
+        "/media",
+        StaticFiles(directory=OUT, check_dir=False),
+        name="media",
     )
     return app
 
