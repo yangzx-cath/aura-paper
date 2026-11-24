@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>灵动绘卷 · 绘本处理</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../static/shared/tokens.css">
+  <link rel="stylesheet" href="../static/shared/base.css">
+  <link rel="stylesheet" href="../static/shared/page.css">
+  <link rel="stylesheet" href="../static/shared/shelf.css">
+  <link rel="stylesheet" href="studio.css">
+  <link rel="stylesheet" href="book.css">
+</head>
+<body>
+  <div class="app">
+    <header class="bar bar--detail">
+      <a class="back" href="index.html">← 书库</a>
+      <h1 class="book-name" id="name">未选择绘本</h1>
+    </header>
+
+    <main class="detail">
+      <aside class="pages">
+        <div class="thumbs" id="thumbs"></div>
+      </aside>
+
+      <section class="stages">
+        <p class="hint">阶段接口尚未接入，运行按钮暂不触发。</p>
+        <ol class="stage-list" id="stages"></ol>
+      </section>
+    </main>
+  </div>
+
+  <script src="book.js"></script>
+</body>
+</html>

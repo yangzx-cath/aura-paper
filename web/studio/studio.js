@@ -68,8 +68,9 @@ function updatePager() {
 
 function card(book) {
   const shown = labelOf(book);
-  const article = document.createElement("article");
+  const article = document.createElement("a");
   article.className = "book";
+  article.href = `book.html?id=${encodeURIComponent(book.id)}`;
 
   const cover = document.createElement("div");
   cover.className = "cover cover--empty";

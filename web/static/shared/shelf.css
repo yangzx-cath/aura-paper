@@ -24,6 +24,15 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 焦点与悬停只用边框提示，不改封面尺寸。 */
+.book:focus-visible {
+  outline: 2px solid var(--accent-deep);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .cover {
