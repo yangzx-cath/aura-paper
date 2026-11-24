@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -17,6 +17,7 @@ FONTS = Path(__file__).resolve().parent.parent / "resources" / "fonts"
 def create_app() -> FastAPI:
     """Return the app with both pages and the API mounted."""
     app = FastAPI(title="灵动绘卷")
+    app.middleware("http")(_revalidate)
 
     @app.get("/", include_in_schema=False)
     def root() -> RedirectResponse:
@@ -45,6 +46,16 @@ def create_app() -> FastAPI:
         name="reader",
     )
     return app
+
+
+# Pages and their CSS/JS change while the server runs, so the browser must
+# revalidate them instead of reusing a stale copy from its cache.
+async def _revalidate(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path.endswith((".css", ".js", ".html", "/")):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 app = create_app()

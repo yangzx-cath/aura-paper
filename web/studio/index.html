@@ -18,21 +18,29 @@
       <h1 class="brand"><span class="brand-text">灵动绘卷</span></h1>
     </header>
 
-    <main class="shelf shelf--framed" id="shelf">
-      <p class="shelf-empty">还没有绘本，先上传一本</p>
-    </main>
+    <div class="board">
+      <main class="shelf shelf--framed" id="shelf">
+        <p class="shelf-empty">还没有绘本，先上传一本</p>
+      </main>
 
-    <section class="upload">
-      <div class="drop" id="drop">
-        <p class="drop-text">把 PDF 拖到这里，或</p>
-        <button class="pick" id="pick" type="button">选择文件</button>
-        <p class="drop-note" id="note"></p>
-        <div class="progress" id="progress" hidden>
-          <div class="progress-fill" id="fill"></div>
+      <nav class="pager" id="pager" hidden>
+        <button class="page-btn" id="prev" type="button">上一页</button>
+        <span class="page-count" id="count"></span>
+        <button class="page-btn" id="next" type="button">下一页</button>
+      </nav>
+
+      <section class="upload">
+        <div class="drop" id="drop">
+          <p class="drop-text">把 PDF 拖到这里，或</p>
+          <button class="pick" id="pick" type="button">选择文件</button>
+          <p class="drop-note" id="note"></p>
+          <div class="progress" id="progress" hidden>
+            <div class="progress-fill" id="fill"></div>
+          </div>
         </div>
-      </div>
-      <input id="file" type="file" accept="application/pdf" hidden>
-    </section>
+        <input id="file" type="file" accept="application/pdf" hidden>
+      </section>
+    </div>
   </div>
 
   <script src="studio.js"></script>

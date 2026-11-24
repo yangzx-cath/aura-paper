@@ -28,7 +28,8 @@
 
 .cover {
   width: var(--cover);
-  aspect-ratio: 1;
+  /* 现有绘本页为 0.676，竖版按 2:3 取整。 */
+  aspect-ratio: 2 / 3;
   border-radius: var(--radius-lg);
   background: var(--surface);
 }
@@ -54,6 +55,10 @@
   font-size: var(--text-md);
   font-weight: 600;
   line-height: 1.35;
+  /* 书名只排一行，网格行高才不会因长文件名跳动。 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status {

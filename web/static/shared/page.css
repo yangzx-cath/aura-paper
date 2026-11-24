@@ -1,7 +1,7 @@
 /* 两页共用的页面外壳与标题。 */
 
 .app {
-  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
