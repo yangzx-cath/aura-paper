@@ -167,35 +167,57 @@ def mix(
     """
     target = Path(target)
     target.parent.mkdir(parents=True, exist_ok=True)
-    # The model's own sound can be shorter than the local track, so the
-    # mix runs to the longer of the two and the tail is padded with silence.
-    graph = (
-        f"[0:a]volume={background:g}[bg];"
-        "[bg][1:a]amix=inputs=2:duration=longest:normalize=0,"
-        f"apad,alimiter=limit={LIMIT:g}[a]"
-    )
-    picture = "0:v:0"
-    if hold > 0:
-        graph += f";[0:v]tpad=stop_mode=clone:stop_duration={hold:.3f}[v]"
-        picture = "[v]"
-    args = [
-        FFMPEG,
-        *COMMON,
-        "-i",
-        str(clip),
-        "-i",
-        str(audio),
-        "-filter_complex",
-        graph,
-        "-map",
-        picture,
-        "-map",
-        "[a]",
-    ]
-    if seconds > 0:
-        args += ["-t", f"{seconds:.3f}"]
-    args += [*VIDEO_CODEC, *AUDIO_CODEC, *FASTSTART, str(target)]
-    run(args)
+    # A clip's own sound loses its last half second when that sound runs
+    # through the filter graph beside the video, so the sound is decoded to
+    # wav first and the mix reads it from there.
+    with tempfile.TemporaryDirectory() as folder:
+        bed = Path(folder) / "bed.wav"
+        run(
+            [
+                FFMPEG,
+                *COMMON,
+                "-i",
+                str(clip),
+                "-map",
+                "0:a:0",
+                "-ar",
+                "48000",
+                "-ac",
+                "2",
+                str(bed),
+            ]
+        )
+        # The model's own sound can be shorter than the local track, so
+        # the mix runs to the longer of the two and the tail is padded.
+        graph = (
+            f"[1:a]volume={background:g}[bg];"
+            "[bg][2:a]amix=inputs=2:duration=longest:normalize=0,"
+            f"apad,alimiter=limit={LIMIT:g}[a]"
+        )
+        picture = "0:v:0"
+        if hold > 0:
+            graph += f";[0:v]tpad=stop_mode=clone:stop_duration={hold:.3f}[v]"
+            picture = "[v]"
+        args = [
+            FFMPEG,
+            *COMMON,
+            "-i",
+            str(clip),
+            "-i",
+            str(bed),
+            "-i",
+            str(audio),
+            "-filter_complex",
+            graph,
+            "-map",
+            picture,
+            "-map",
+            "[a]",
+        ]
+        if seconds > 0:
+            args += ["-t", f"{seconds:.3f}"]
+        args += [*VIDEO_CODEC, *AUDIO_CODEC, *FASTSTART, str(target)]
+        run(args)
     return target
 
 
