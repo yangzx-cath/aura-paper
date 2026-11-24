@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>灵动绘卷 · 阅读</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../static/shared/tokens.css">
+  <link rel="stylesheet" href="../static/shared/base.css">
+  <link rel="stylesheet" href="../static/shared/page.css">
+  <link rel="stylesheet" href="book.css">
+</head>
+<body>
+  <div class="app reader">
+    <header class="reader-bar">
+      <a class="reader-btn" href="./">← 书库</a>
+    </header>
+
+    <main class="stage" id="stage">
+      <!-- 播放器位置：成片接入后这里换成 object-fit: contain 的 <video>。 -->
+      <div class="stage-frame" id="player">播放器</div>
+      <p class="stage-note">AI 生成内容存在不确定性 · 语音图像已脱敏</p>
+    </main>
+
+    <p class="subtitle" id="subtitle">字幕</p>
+
+    <footer class="deck">
+      <button class="deck-play" type="button">播放</button>
+      <div class="track" id="track"></div>
+      <div class="deck-tools">
+        <button class="deck-mic" type="button">麦克风</button>
+        <button class="deck-tool" type="button">对话</button>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

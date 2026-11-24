@@ -1,4 +1,4 @@
-/* 阅读端书架：列出书库，点书暂时没有反应。 */
+/* 阅读端书库：列出绘本，点书进播放页。 */
 
 const SHELF = document.getElementById("shelf");
 const PAGER = document.getElementById("pager");
@@ -34,7 +34,7 @@ async function load() {
 function render() {
   SHELF.replaceChildren();
   if (!books.length) {
-    SHELF.append(message("绘本书架还空着"));
+    SHELF.append(message("书库还空着"));
     updatePager();
     return;
   }
@@ -55,11 +55,12 @@ function updatePager() {
   NEXT.disabled = page >= pages - 1;
 }
 
-// 只做展示，不用链接：阅读页还没有做出来。
+// 点书进播放页，书 id 走查询参数。
 function card(book) {
   const shown = labelOf(book);
-  const article = document.createElement("article");
+  const article = document.createElement("a");
   article.className = "book";
+  article.href = `book.html?id=${encodeURIComponent(book.id)}`;
 
   const cover = document.createElement("div");
   cover.className = "cover cover--empty";
