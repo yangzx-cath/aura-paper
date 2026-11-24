@@ -37,10 +37,38 @@ class PanelCrop:
 
 
 @dataclass
+class PageCrop:
+    """One page, and what the crop stage did to it."""
+
+    filename: str = ""
+    erased: bool = False
+    lines: int = 0
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this page."""
+        return {
+            "filename": self.filename,
+            "erased": self.erased,
+            "lines": self.lines,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> PageCrop:
+        """Build a page from its external JSON shape."""
+        return cls(
+            filename=_text(data.get("filename")),
+            erased=bool(data.get("erased", False)),
+            lines=_int_value(data.get("lines")),
+        )
+
+
+@dataclass
 class BookCrop:
     """Every panel of one book, in reading order."""
 
     id: str = ""
+    language: str = ""
+    pages: list[PageCrop] = field(default_factory=list)
     panels: list[PanelCrop] = field(default_factory=list)
     error: str = ""
 
@@ -49,6 +77,8 @@ class BookCrop:
         return {
             "id": self.id,
             "generated_at": now_iso(),
+            "language": self.language,
+            "pages": [page.to_dict() for page in self.pages],
             "panels": [panel.to_dict() for panel in self.panels],
             "error": self.error,
         }
@@ -58,6 +88,8 @@ class BookCrop:
         """Build the crops from their external JSON shape."""
         return cls(
             id=_text(data.get("id")),
+            language=_text(data.get("language")),
+            pages=_page_list(data.get("pages")),
             panels=_panel_list(data.get("panels")),
             error=_text(data.get("error")),
         )
@@ -98,3 +130,13 @@ def _panel_list(value: object) -> list[PanelCrop]:
         PanelCrop.from_dict(item) for item in value if isinstance(item, dict)
     ]
     return [panel for panel in panels if panel.file]
+
+
+# Read the page list, keeping the entries that name a file.
+def _page_list(value: object) -> list[PageCrop]:
+    if not isinstance(value, list):
+        return []
+    pages = [
+        PageCrop.from_dict(item) for item in value if isinstance(item, dict)
+    ]
+    return [page for page in pages if page.filename]

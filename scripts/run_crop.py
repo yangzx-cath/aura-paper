@@ -45,6 +45,10 @@ def main() -> int:
     elapsed = time.perf_counter() - started
 
     print(f"panels  {len(result.panels)}")
+    erased = len([page for page in result.pages if page.erased])
+    lines = sum(page.lines for page in result.pages)
+    print(f"language {result.language}")
+    print(f"erased  {erased} pages, {lines} text lines")
     print(f"total   {elapsed:.1f}s")
     if result.error:
         print(f"error   {result.error}", file=sys.stderr)
