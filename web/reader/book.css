@@ -45,21 +45,16 @@
 }
 
 /* 播放器位置随舞台收缩，宽度同时受舞台宽高约束。 */
-.stage-frame {
+.stage-film {
   width: min(
     100%,
     calc((100dvh - var(--bar-h) - var(--sub-h) - var(--deck-h)) * 16 / 9)
   );
   max-height: 100%;
   aspect-ratio: 16 / 9;
-  display: grid;
-  place-items: center;
-  border: 1px dashed rgba(249, 253, 251, 0.22);
-  border-radius: var(--radius-sm);
-  color: rgba(249, 253, 251, 0.5);
-  font-size: var(--text-md);
-  letter-spacing: 0.2em;
-  text-indent: 0.1em;
+  object-fit: contain;
+  background: var(--stage);
+  cursor: pointer;
 }
 
 /* 合规角标压在舞台右下角，不占底栏高度。 */
@@ -107,16 +102,40 @@
   gap: var(--gap-sm);
 }
 
-/* 播放是全页唯一的主按钮，白字压深青。 */
+/* 播放是全页唯一的主按钮，白图标压深青。 */
 .deck-play {
-  height: var(--tap);
-  padding: 0 26px;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--accent-deep);
   color: #fff;
-  font-size: var(--text-md);
-  white-space: nowrap;
+}
+
+.deck-play svg {
+  width: 26px;
+  height: 26px;
+  fill: currentColor;
+}
+
+/* 播放三角向右偏一点，圆形里才看着居中。 */
+.icon-play {
+  transform: translateX(2px);
+}
+
+.deck-play .icon-pause {
+  display: none;
+}
+
+.deck-play.is-playing .icon-play {
+  display: none;
+}
+
+.deck-play.is-playing .icon-pause {
+  display: block;
 }
 
 /* 进度占位：接入 show.json 后按页切成 N 段。 */

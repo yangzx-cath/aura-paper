@@ -18,15 +18,24 @@
     </header>
 
     <main class="stage" id="stage">
-      <!-- 播放器位置：成片接入后这里换成 object-fit: contain 的 <video>。 -->
-      <div class="stage-frame" id="player">播放器</div>
+      <!-- 成片先用 C01 的 film.mp4，接 show.json 后改成按书读取。 -->
+      <video class="stage-film" id="film" src="/media/C01/shots/film.mp4"
+             playsinline preload="metadata"></video>
       <p class="stage-note">AI 生成内容存在不确定性 · 语音图像已脱敏</p>
     </main>
 
     <p class="subtitle" id="subtitle">字幕</p>
 
     <footer class="deck">
-      <button class="deck-play" type="button">播放</button>
+      <button class="deck-play" id="play" type="button" aria-label="播放">
+        <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 5.5v13l11-6.5z"/>
+        </svg>
+        <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="7" y="5" width="4" height="14" rx="1"/>
+          <rect x="14" y="5" width="4" height="14" rx="1"/>
+        </svg>
+      </button>
       <div class="track" id="track"></div>
       <div class="deck-tools">
         <button class="deck-mic" type="button">麦克风</button>
@@ -34,5 +43,7 @@
       </div>
     </footer>
   </div>
+
+  <script src="book.js"></script>
 </body>
 </html>
