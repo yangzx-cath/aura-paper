@@ -5,7 +5,7 @@ understand.json for the next stage.
 
 Usage:
     python scripts/run_understand.py C01
-    python scripts/run_understand.py C01 --workers 4
+    python scripts/run_understand.py C01 --workers 6
     python scripts/run_understand.py C01 --effort high
 """
 
@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_EFFORT = "low"
 
 # Pages read at once: each page is a separate call with no shared state.
-DEFAULT_WORKERS = 4
+DEFAULT_WORKERS = 6
 
 # Pages below this share of ink inside the boxes are reported.
 COVERAGE_LIMIT = 0.75

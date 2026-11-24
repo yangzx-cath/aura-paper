@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_EFFORT = "low"
 
 # Pages read at once: each page is a separate call with no shared state.
-DEFAULT_WORKERS = 4
+DEFAULT_WORKERS = 6
 
 
 def main() -> int:
