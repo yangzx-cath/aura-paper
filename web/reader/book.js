@@ -17,11 +17,15 @@ const RATE = 16000;
 // 一句话的判定：能量高过门限开始收，静音够久收尾。
 const LEVEL = 0.015;
 const QUIET_MS = 350;
-const SHORTEST_MS = 300;
+// 快念的命令词只有两三百毫秒，门槛压到 150 ms 才不会整句丢掉。
+const SHORTEST_MS = 150;
 const LONGEST_MS = 8000;
 
 // 起说前多带几块，第一个字才不会被削掉。
-const PRE_ROLL = 3;
+const PRE_ROLL = 8;
+
+// 句尾补一段静音，ASR 对孤立的短词才容易切出来。
+const PAD_MS = 200;
 
 // 音频按 100 ms 一片送给端点，太碎的帧它不接受。
 const SLICE = 1600;
@@ -44,6 +48,7 @@ let sliceLen = 0;
 let recent = [];
 let firstAt = 0;
 let endAt = 0;
+let pages = [];
 
 // 发布清单里的字幕，和现在已经显示的那一条。
 let cues = [];
@@ -191,9 +196,12 @@ function finish() {
     closeStream();
     return;
   }
-  if (socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ type: "end" }));
+  write(new Int16Array((RATE * PAD_MS) / 1000));
+  if (socket.readyState !== WebSocket.OPEN) {
+    closeStream();
+    return;
   }
+  socket.send(JSON.stringify({ type: "end" }));
 }
 
 // 起说就建流，服务端从第一个字节就开始识别。
@@ -265,6 +273,9 @@ function obey(text) {
     return;
   }
   toast(`听到：${said} · ${stats()}`);
+  if (find(said)) {
+    return;
+  }
   command(said);
 }
 
@@ -284,6 +295,130 @@ function command(said) {
 
 function clean(text) {
   return String(text || "").replace(/[\s，。！？、,.!?]/g, "");
+}
+
+// 找画面的请求：命中就跳到那一页，返回是否算作检索。
+function find(said) {
+  const at = said.search(/找到|查找|高亮|帮我找|找找/);
+  if (at < 0) {
+    return false;
+  }
+  const head = said.slice(at);
+  const slot = trimSlot(head.replace(/^(找到|查找|帮我找|找找|高亮)/, ""));
+  const page = slot && pages.length ? best(slot) : null;
+  if (!page) {
+    toast(`没找到，再说一次 · ${stats()}`);
+    return true;
+  }
+  FILM.pause();
+  FILM.currentTime = page.start;
+  draw();
+  toast(`找到第 ${page.page + 1} 页 · ${stats()}`);
+  return true;
+}
+
+// 把“...的画面”“...的那一页”这类尾巴去掉，只留要找的东西。
+function trimSlot(text) {
+  const flat = normalize(text);
+  return flat.replace(/(的那一页|的画面|那一页|这幅画|画面|一页|的图)$/g, "");
+}
+
+// 二元组打分：命中要多，稀有的词组权重高，常见的词权重低。
+function best(slot) {
+  const pairs = [...bigrams(slot)];
+  const hays = pages.map((page) => haystack(page));
+  const now = currentPage();
+  // 短语越短越容易撞上常见词，要求命中的比例也越高。
+  const needed = pairs.length === 1
+    ? 1
+    : Math.max(2, Math.ceil(pairs.length * 0.5));
+  let top = null;
+  let topScore = 0;
+  for (let index = 0; index < pages.length; index += 1) {
+    const hay = hays[index];
+    let hit = 0;
+    let score = 0;
+    for (const pair of pairs) {
+      if (!hay.includes(pair)) {
+        continue;
+      }
+      hit += 1;
+      const seen = hays.filter((row) => row.includes(pair)).length;
+      score += 1 / seen;
+    }
+    if (hit < needed) {
+      continue;
+    }
+    // 故事往后走，当前页之后的优先级高一点。
+    if (pages[index].page >= now) {
+      score += 0.05;
+    }
+    if (score > topScore) {
+      topScore = score;
+      top = pages[index];
+    }
+  }
+  return top;
+}
+
+// 一页的可检索文本：台词、画面描述和角色名。
+function haystack(page) {
+  const names = (page.cast || []).join("");
+  return normalize(`${page.text}${page.desc}${names}`);
+}
+
+// 当前播到第几页，用作检索的起点。
+function currentPage() {
+  let page = 0;
+  for (const item of pages) {
+    if (item.start <= FILM.currentTime + 0.01) {
+      page = item.page;
+    }
+  }
+  return page;
+}
+
+function bigrams(text) {
+  const set = new Set();
+  if (text.length < 2) {
+    set.add(text);
+    return set;
+  }
+  for (let i = 0; i + 2 <= text.length; i += 1) {
+    set.add(text.slice(i, i + 2));
+  }
+  return set;
+}
+
+// 个位数字，两位数的拼法见 number()。
+const DIGITS = {
+  零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4,
+  五: 5, 六: 6, 七: 7, 八: 8, 九: 9,
+};
+
+// 检索用的统一写法：去标点空白，中文数字换成阿拉伯数字。
+function normalize(text) {
+  const flat = String(text || "")
+    .toLowerCase()
+    .replace(/[\s，。！？、,.!?：“”"'…—]/g, "");
+  return flat.replace(
+    /[零一二两三四五六七八九十]+(?=[块个只张页])/g,
+    (run) => String(number(run))
+  );
+}
+
+// 一到九十九的中文数字，超出范围的当作没写。
+function number(run) {
+  if (run === "十") {
+    return 10;
+  }
+  const at = run.indexOf("十");
+  if (at < 0) {
+    return DIGITS[run[0]] ?? 0;
+  }
+  const tens = at === 0 ? 1 : DIGITS[run[at - 1]] ?? 0;
+  const ones = at === run.length - 1 ? 0 : DIGITS[run[at + 1]] ?? 0;
+  return tens * 10 + ones;
 }
 
 function reset() {
@@ -557,6 +692,21 @@ TRACK.addEventListener("pointercancel", () => {
   dragging = false;
 });
 
+// 读发布清单：成片地址和页索引都从这里来。
+async function load() {
+  if (!BOOK) {
+    return;
+  }
+  const reply = await fetch(`/api/books/${BOOK}/publish`);
+  if (!reply.ok) {
+    toast("这本书还没发布");
+    return;
+  }
+  const data = await reply.json();
+  pages = data.pages || [];
+  FILM.src = `/api/books/${BOOK}/pub/${data.film}`;
+}
+
 PLAY.addEventListener("click", toggle);
 FILM.addEventListener("click", toggle);
 FILM.addEventListener("play", sync);
@@ -564,6 +714,19 @@ FILM.addEventListener("pause", sync);
 FILM.addEventListener("ended", sync);
 FILM.addEventListener("timeupdate", draw);
 FILM.addEventListener("loadedmetadata", draw);
+
+// 空格切播放与暂停；焦点在按钮或链接上时交给它们自己处理。
+document.addEventListener("keydown", (event) => {
+  if (event.code !== "Space" || event.repeat) {
+    return;
+  }
+  const target = event.target;
+  if (target instanceof Element && target.closest("button, a")) {
+    return;
+  }
+  event.preventDefault();
+  toggle();
+});
 
 // 字幕跟着同一个时钟走，跳转后也要立刻对一次。
 FILM.addEventListener("timeupdate", speak);
@@ -578,5 +741,7 @@ MIC.addEventListener("click", () => {
   }
   start();
 });
+
+load();
 
 load();

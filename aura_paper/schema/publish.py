@@ -28,6 +28,46 @@ class PublishCast:
 
 
 @dataclass
+class PublishPage:
+    """One page of the film: when it plays and what it holds."""
+
+    page: int = 0
+    start: float = 0.0
+    end: float = 0.0
+    text: str = ""
+    desc: str = ""
+    cast: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        """Return the external JSON shape of this page."""
+        return {
+            "page": self.page,
+            "start": round(self.start, 3),
+            "end": round(self.end, 3),
+            "text": self.text,
+            "desc": self.desc,
+            "cast": self.cast,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> PublishPage:
+        """Build a page from its external JSON shape."""
+        cast = data.get("cast")
+        return cls(
+            page=int(data.get("page") or 0),
+            start=_float_value(data.get("start")),
+            end=_float_value(data.get("end")),
+            text=str(data.get("text") or "").strip(),
+            desc=str(data.get("desc") or "").strip(),
+            cast=(
+                [str(name) for name in cast if name]
+                if isinstance(cast, list)
+                else []
+            ),
+        )
+
+
+@dataclass
 class BookPublish:
     """Everything the reader needs to play one book."""
 
@@ -40,6 +80,7 @@ class BookPublish:
     vtt: str = ""
     cover: str = ""
     cast: list[PublishCast] = field(default_factory=list)
+    pages: list[PublishPage] = field(default_factory=list)
     error: str = ""
 
     def to_dict(self) -> dict:
@@ -55,6 +96,7 @@ class BookPublish:
             "vtt": self.vtt,
             "cover": self.cover,
             "cast": [member.to_dict() for member in self.cast],
+            "pages": [page.to_dict() for page in self.pages],
             "error": self.error,
         }
 
@@ -62,6 +104,7 @@ class BookPublish:
     def from_dict(cls, data: dict) -> BookPublish:
         """Build a release from its external JSON shape."""
         cast = data.get("cast")
+        pages = data.get("pages")
         return cls(
             id=str(data.get("id") or "").strip(),
             title=str(data.get("title") or "").strip(),
@@ -78,6 +121,15 @@ class BookPublish:
                     if isinstance(item, dict)
                 ]
                 if isinstance(cast, list)
+                else []
+            ),
+            pages=(
+                [
+                    PublishPage.from_dict(item)
+                    for item in pages
+                    if isinstance(item, dict)
+                ]
+                if isinstance(pages, list)
                 else []
             ),
             error=str(data.get("error") or "").strip(),
