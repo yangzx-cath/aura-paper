@@ -265,12 +265,14 @@ function obey(text) {
 
 // 中间结果和最终文本都走这里，宁可不动也不误判。
 function command(said) {
-  if (said.includes("暂停") || said.includes("停")) {
+  const text = said.toLowerCase();
+  const pause = ["暂停", "停", "pause", "stop"];
+  if (pause.some((word) => text.includes(word))) {
     FILM.pause();
     return;
   }
-  const play = ["播放", "继续", "开始"].some((word) => said.includes(word));
-  if (play) {
+  const play = ["播放", "继续", "开始", "play", "resume", "continue"];
+  if (play.some((word) => text.includes(word))) {
     FILM.play();
   }
 }

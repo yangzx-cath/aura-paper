@@ -37,7 +37,7 @@ SUFFIXES = {
 PCM_SUFFIX = ".pcm"
 
 # Words a reader is likely to say, used to bias the endpoint.
-HOTWORDS = ("暂停", "播放", "继续", "开始")
+HOTWORDS = ("暂停", "播放", "继续")
 
 # Book ids are assigned by the library: B001, C01 and so on.
 BOOK_ID = r"[A-Z]\d{2,3}"
