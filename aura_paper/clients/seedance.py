@@ -24,6 +24,13 @@ DEFAULT_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
 DEFAULT_MODEL = "doubao-seedance-2-0-fast-260128"
 DEFAULT_RESOLUTION = "720p"
 
+# A clip is a few megabytes, so its download reads for much longer than a
+# JSON reply does.
+DEFAULT_DOWNLOAD_TIMEOUT = 300.0
+
+# Waits before each retry of a finished download.
+RETRY_DELAYS = (2.0, 5.0, 10.0)
+
 # Request limits from the video endpoint.
 _MAX_IMAGE_BYTES = 30 * 1024 * 1024
 _MAX_BODY_BYTES = 64 * 1024 * 1024
@@ -43,6 +50,7 @@ class SeedanceClient:
     api_key: str
     model: str
     timeout: float
+    download_timeout: float
     poll_interval: float
     max_wait: float
 
@@ -52,6 +60,7 @@ class SeedanceClient:
         api_key: str = "",
         model: str = DEFAULT_MODEL,
         timeout: float = 60.0,
+        download_timeout: float = DEFAULT_DOWNLOAD_TIMEOUT,
         poll_interval: float = 5.0,
         max_wait: float = 1200.0,
     ) -> None:
@@ -59,6 +68,7 @@ class SeedanceClient:
         self.api_key = api_key
         self.model = model
         self.timeout = timeout
+        self.download_timeout = download_timeout
         self.poll_interval = poll_interval
         self.max_wait = max_wait
 
@@ -79,6 +89,9 @@ class SeedanceClient:
             ),
             model=os.environ.get("SEEDANCE_MODEL", DEFAULT_MODEL),
             timeout=float(os.environ.get("SEEDANCE_TIMEOUT", "60")),
+            download_timeout=float(
+                os.environ.get("SEEDANCE_DOWNLOAD_TIMEOUT", "300")
+            ),
             poll_interval=float(os.environ.get("SEEDANCE_POLL_INTERVAL", "5")),
             max_wait=float(os.environ.get("SEEDANCE_MAX_WAIT", "1200")),
         )
@@ -120,15 +133,27 @@ class SeedanceClient:
             time.sleep(min(self.poll_interval, remaining))
 
     def download(self, url: str, path: str | Path) -> Path:
-        """Fetch a finished video to path and return the path."""
+        """Fetch a finished video to path and return the path.
+
+        A stalled transfer is retried, because the task has already been
+        paid for and its URL still points at the same clip.
+        """
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
+        for delay in RETRY_DELAYS:
+            try:
+                return self._fetch(url, target)
+            except SeedanceError:
+                time.sleep(delay)
+        return self._fetch(url, target)
 
+    def _fetch(self, url: str, target: Path) -> Path:
+        """Download once into a temporary file, then move it into place."""
         fd, temp_name = tempfile.mkstemp(dir=target.parent, suffix=".tmp")
         try:
             with os.fdopen(fd, "wb") as f:
                 with urllib.request.urlopen(
-                    url, timeout=self.timeout
+                    url, timeout=self.download_timeout
                 ) as response:
                     shutil.copyfileobj(response, f)
             os.replace(temp_name, target)

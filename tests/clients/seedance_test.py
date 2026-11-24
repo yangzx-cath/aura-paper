@@ -401,6 +401,7 @@ def test_task_from_rejects_a_malformed_reply():
 def test_download_wraps_an_http_error(monkeypatch, tmp_path):
     client = SeedanceClient(api_key="key")
     target = tmp_path / "clip.mp4"
+    monkeypatch.setattr("aura_paper.clients.seedance.RETRY_DELAYS", ())
 
     def fake_urlopen(*args, **kwargs):
         raise http_error(404, b"")
@@ -419,6 +420,7 @@ def test_download_wraps_an_http_error(monkeypatch, tmp_path):
 def test_download_wraps_a_connection_error(monkeypatch, tmp_path):
     client = SeedanceClient(api_key="key")
     target = tmp_path / "clip.mp4"
+    monkeypatch.setattr("aura_paper.clients.seedance.RETRY_DELAYS", ())
 
     def fake_urlopen(*args, **kwargs):
         raise urllib.error.URLError("down")
@@ -431,4 +433,29 @@ def test_download_wraps_a_connection_error(monkeypatch, tmp_path):
         client.download("http://x/clip.mp4", target)
 
     assert not target.exists()
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_download_retries_a_stalled_transfer(monkeypatch, tmp_path):
+    client = SeedanceClient(api_key="key")
+    target = tmp_path / "clip.mp4"
+    waits = []
+    attempts = []
+
+    def fake_urlopen(*args, **kwargs):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise TimeoutError("stalled")
+        return io.BytesIO(b"video")
+
+    monkeypatch.setattr(
+        "aura_paper.clients.seedance.urllib.request.urlopen", fake_urlopen
+    )
+    monkeypatch.setattr("aura_paper.clients.seedance.time.sleep", waits.append)
+
+    path = client.download("http://x/clip.mp4", target)
+
+    assert path.read_bytes() == b"video"
+    assert waits == [2.0]
+    assert len(attempts) == 2
     assert not list(tmp_path.glob("*.tmp"))
