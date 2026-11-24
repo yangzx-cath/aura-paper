@@ -1,4 +1,4 @@
-/* 书架：3×2 封面墙，一屏摆完六本。 */
+/* 两页共用的页面外壳与标题。 */
 
 .app {
   min-height: 100dvh;
@@ -10,18 +10,13 @@
 
 .bar {
   flex: none;
-  padding: clamp(28px, 6vh, 56px) var(--gap-lg) 0;
-  text-align: center;
-}
-
-.bar {
-  flex: none;
   padding: clamp(20px, 5vh, 48px) var(--gap-lg) 0;
   text-align: center;
 }
 
 .brand {
-  font-family: "ZCOOL KuaiLe", "Kaiti SC", "STKaiti", "KaiTi", serif;
+  font-family: "ZCOOL KuaiLe", "Kaiti SC", "STKaiti", "KaiTi",
+    serif;
   font-size: clamp(44px, 5.2vw, 72px);
   line-height: 1.1;
   font-weight: 400;
@@ -59,52 +54,4 @@
     var(--warm) 82%,
     transparent
   );
-}
-
-.shelf {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(3, var(--cover));
-  column-gap: clamp(24px, 4.7vw, 56px);
-  row-gap: clamp(16px, 3vw, 28px);
-  justify-content: center;
-  align-content: center;
-  padding: 0 var(--gap-lg);
-}
-
-.book {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.cover {
-  width: var(--cover);
-  aspect-ratio: 1;
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-}
-
-/* 还没有书：不摆占位框，只留一句提示。 */
-.shelf-empty {
-  grid-column: 1 / -1;
-  text-align: center;
-  font-size: var(--text-md);
-  color: var(--ink2);
-  letter-spacing: 0.12em;
-}
-
-.status {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-  font-size: var(--text-sm);
-  color: var(--ink2);
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--line);
 }

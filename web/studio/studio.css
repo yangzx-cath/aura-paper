@@ -1,0 +1,121 @@
+/* 创作台只多两样：加框的书架和上传区。 */
+
+/* 标题收小一档，把高度让给书架和上传区。 */
+.bar {
+  padding-top: clamp(12px, 3vh, 26px);
+}
+
+.brand {
+  font-size: clamp(32px, 4vw, 56px);
+}
+
+.shelf--framed {
+  /* 卡片按高度缩一档，给上传区留出位置。 */
+  --cover: min(17vw, 20vh, 200px);
+
+  margin: 0 var(--gap-lg);
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  align-content: safe center;
+  overflow: auto;
+}
+
+.upload {
+  flex: none;
+  padding: var(--gap-lg);
+}
+
+.drop {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 14px;
+  /* 底部多留一条，进度条出现时高度不变。 */
+  padding: 12px var(--gap-lg) 22px;
+  border: 2px dashed var(--line);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.drop.is-over {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* 上传中：边框变实线，拖放与按钮都不接受操作。 */
+.drop.is-busy {
+  border-style: solid;
+  border-color: var(--accent);
+}
+
+.drop.is-busy .drop-text {
+  color: var(--ink);
+}
+
+.progress {
+  position: absolute;
+  left: var(--gap-lg);
+  right: var(--gap-lg);
+  bottom: 9px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.progress-fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--title-b));
+  transition: width 0.15s linear;
+}
+
+.drop-text {
+  font-size: var(--text-md);
+  color: var(--ink2);
+}
+
+.pick {
+  min-height: var(--tap);
+  padding: 0 24px;
+  margin-left: 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent-deep);
+  color: #fff;
+  font-size: var(--text-md);
+}
+
+.pick:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.drop-note {
+  min-height: 17px;
+  font-size: 12px;
+  color: var(--ink2);
+  letter-spacing: 0.04em;
+}
+
+.drop-note.is-live {
+  color: var(--accent-deep);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.drop-note.is-done {
+  color: var(--accent-deep);
+}
+
+.drop-note.is-error {
+  color: var(--title-b);
+  font-weight: 600;
+  font-size: 13px;
+}

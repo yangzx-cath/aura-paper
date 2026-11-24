@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>灵动绘卷 · 创作台</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../static/shared/tokens.css">
+  <link rel="stylesheet" href="../static/shared/base.css">
+  <link rel="stylesheet" href="../static/shared/page.css">
+  <link rel="stylesheet" href="../static/shared/shelf.css">
+  <link rel="stylesheet" href="studio.css">
+</head>
+<body>
+  <div class="app">
+    <header class="bar">
+      <h1 class="brand"><span class="brand-text">灵动绘卷</span></h1>
+    </header>
+
+    <main class="shelf shelf--framed" id="shelf">
+      <p class="shelf-empty">还没有绘本，先上传一本</p>
+    </main>
+
+    <section class="upload">
+      <div class="drop" id="drop">
+        <p class="drop-text">把 PDF 拖到这里，或</p>
+        <button class="pick" id="pick" type="button">选择文件</button>
+        <p class="drop-note" id="note"></p>
+        <div class="progress" id="progress" hidden>
+          <div class="progress-fill" id="fill"></div>
+        </div>
+      </div>
+      <input id="file" type="file" accept="application/pdf" hidden>
+    </section>
+  </div>
+
+  <script src="studio.js"></script>
+</body>
+</html>

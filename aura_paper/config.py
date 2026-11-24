@@ -5,6 +5,7 @@ from pathlib import Path
 
 CACHE_DIR_ENV = "AURA_CACHE_DIR"
 OUT_DIR_ENV = "AURA_OUT_DIR"
+BOOKS_DIR_ENV = "AURA_BOOKS_DIR"
 APP_NAME = "aura-paper"
 
 
@@ -40,3 +41,12 @@ def out_root() -> Path:
         return Path(override).expanduser()
 
     return Path.cwd() / "out"
+
+
+def books_dir() -> Path:
+    """Return the book library root without creating it."""
+    override = os.environ.get(BOOKS_DIR_ENV)
+    if override:
+        return Path(override).expanduser()
+
+    return Path.cwd() / "data" / "books"
