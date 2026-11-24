@@ -3,7 +3,7 @@
 const STAGES = [
   { key: "ingest", name: "拆页", out: "ingest.json · pages/" },
   { key: "understand", name: "理解", out: "understand.json" },
-  { key: "panels", name: "切格", out: "panels.json · panels/" },
+  { key: "crop", name: "切图", out: "crop.json · panels/" },
   { key: "assets", name: "出图", out: "cast.json · locations.json · figures/" },
   { key: "identify", name: "认人", out: "identify.json" },
   { key: "storyboard", name: "分镜", out: "scenes.json · shots.json" },

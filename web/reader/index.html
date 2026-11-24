@@ -17,9 +17,17 @@
       <h1 class="brand"><span class="brand-text">灵动绘卷</span></h1>
     </header>
 
-    <main class="shelf">
+    <main class="shelf shelf--framed" id="shelf">
       <p class="shelf-empty">绘本书架还空着</p>
     </main>
+
+    <nav class="pager" id="pager" hidden>
+      <button class="page-btn" id="prev" type="button">上一页</button>
+      <span class="page-count" id="count"></span>
+      <button class="page-btn" id="next" type="button">下一页</button>
+    </nav>
   </div>
+
+  <script src="shelf.js"></script>
 </body>
 </html>

@@ -12,7 +12,7 @@ const PREV = document.getElementById("prev");
 const NEXT = document.getElementById("next");
 const COUNT = document.getElementById("count");
 
-// 一页 5 列 × 2 行，与 studio.css 的 grid 模板一致。
+// 一页 5 列 × 2 行，与 shelf.css 的 grid 模板一致。
 const PAGE_SIZE = 10;
 
 let books = [];

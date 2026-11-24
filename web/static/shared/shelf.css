@@ -20,6 +20,32 @@
   letter-spacing: 0.12em;
 }
 
+/* 加框书架：一页 5 列 × 2 行 = 10 本，与页面脚本的 PAGE_SIZE 一致。 */
+.shelf--framed {
+  --cover: min(13vw, 13vh, 190px);
+  /* 行高锁定为一张卡的全高：封面 + 书名 + 状态 + 两处间距。 */
+  --row: calc(var(--cover) * 1.5 + 56px);
+
+  /* 框不随页面伸缩，空位照样占住，书从左上一格一格排。 */
+  flex: none;
+  width: max-content;
+  /* 阅读端直接放进页面时要水平居中；创作台外面套了同宽的列，auto 不起作用。 */
+  margin: 0 auto;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  grid-template-columns: repeat(5, var(--cover));
+  grid-template-rows: repeat(2, var(--row));
+  align-content: start;
+}
+
+/* 空书架的文字占满两行、居中，不挤在左上角。 */
+.shelf--framed .shelf-empty {
+  grid-row: span 2;
+  align-self: center;
+}
+
 .book {
   display: flex;
   flex-direction: column;
@@ -95,4 +121,41 @@
 
 .status--failed .status-dot {
   background: var(--title-b);
+}
+
+/* 翻页栏与书架同宽居中，只有一页时整条收起。 */
+.pager {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-md);
+  padding: var(--gap-sm) 0 0;
+}
+
+/* display:flex 会盖掉浏览器给 [hidden] 的 display:none，这里补回来。 */
+.pager[hidden] {
+  display: none;
+}
+
+.page-btn {
+  min-height: var(--tap);
+  padding: 0 22px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-md);
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+}
+
+.page-count {
+  min-width: 8em;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--ink2);
+  letter-spacing: 0.04em;
 }
