@@ -85,6 +85,14 @@ def main() -> int:
     print("Generating the clips", flush=True)
 
     started = time.perf_counter()
+    # The record render.json keeps also holds shots this run never touched,
+    # so the summary counts the clips the callback hands back instead.
+    seen: list[ShotRender] = []
+
+    def on_shot(shot: ShotRender) -> None:
+        seen.append(shot)
+        _print_shot(shot)
+
     result = render(
         args.book,
         client=client,
@@ -92,18 +100,18 @@ def main() -> int:
         workers=args.workers,
         root=root,
         cache=cache,
-        on_shot=_print_shot,
+        on_shot=on_shot,
     )
     elapsed = time.perf_counter() - started
 
-    generated = [shot for shot in result.shots if not shot.cached]
-    failed = [shot for shot in result.shots if shot.error]
+    generated = [shot for shot in seen if not shot.cached]
+    failed = [shot for shot in seen if shot.error]
     print()
-    print(f"clips    {len(result.shots)}")
+    print(f"clips    {len(seen)} / {len(result.shots)}")
     print(f"new      {len(generated) - len(failed)}")
-    print(f"cached   {len(result.shots) - len(generated)}")
+    print(f"cached   {len(seen) - len(generated)}")
     print(f"failed   {len(failed)}")
-    print(f"seconds  {sum(shot.duration for shot in result.shots)}")
+    print(f"seconds  {sum(shot.duration for shot in seen)}")
     print()
     print(f"total    {elapsed:.1f}s")
     print(f"output   {root / args.book / 'render.json'}")
