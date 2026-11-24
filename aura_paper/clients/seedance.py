@@ -15,6 +15,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from http.client import HTTPException
 from pathlib import Path
 
 from ..media.image import data_url
@@ -34,6 +35,9 @@ DEFAULT_UPLOAD_TIMEOUT = 180.0
 
 # Waits before each retry of a finished download.
 RETRY_DELAYS = (2.0, 5.0, 10.0)
+
+# A poll that fails this many times in a row ends the wait.
+POLL_FAILURES = 3
 
 # Request limits from the video endpoint.
 _MAX_IMAGE_BYTES = 30 * 1024 * 1024
@@ -134,10 +138,24 @@ class SeedanceClient:
         return self._task_from(self._get(path, {}))
 
     def wait_task(self, task_id: str) -> VideoTask:
-        """Poll a task until it finishes or max_wait elapses."""
+        """Poll a task until it finishes or max_wait elapses.
+
+        A poll that fails is retried, because the service keeps working on
+        the task and a read cannot be charged twice.
+        """
         deadline = time.monotonic() + self.max_wait
+        failures = 0
         while True:
-            task = self.get_task(task_id)
+            try:
+                task = self.get_task(task_id)
+            except SeedanceError:
+                failures += 1
+                remaining = deadline - time.monotonic()
+                if failures >= POLL_FAILURES or remaining <= 0:
+                    raise
+                time.sleep(min(self.poll_interval, remaining))
+                continue
+            failures = 0
             if task.done:
                 return task
             remaining = deadline - time.monotonic()
@@ -169,7 +187,13 @@ class SeedanceClient:
                 with urllib.request.urlopen(
                     url, timeout=self.download_timeout
                 ) as response:
+                    expected = _declared_length(response)
                     shutil.copyfileobj(response, f)
+                    written = f.tell()
+            if expected is not None and written != expected:
+                raise SeedanceError(
+                    f"download stopped at {written} of {expected} bytes"
+                )
             os.replace(temp_name, target)
         except urllib.error.HTTPError as exc:
             raise SeedanceError(f"download HTTP {exc.code}") from exc
@@ -178,6 +202,8 @@ class SeedanceClient:
             raise SeedanceError(detail) from exc
         except TimeoutError as exc:
             raise SeedanceError("download timed out") from exc
+        except (HTTPException, OSError) as exc:
+            raise SeedanceError(f"download failed: {exc}") from exc
         finally:
             Path(temp_name).unlink(missing_ok=True)
         return target
@@ -305,6 +331,8 @@ class SeedanceClient:
             raise SeedanceError(detail) from exc
         except TimeoutError as exc:
             raise SeedanceError(f"{what} timed out after {timeout}s") from exc
+        except (HTTPException, OSError) as exc:
+            raise SeedanceError(f"{what} failed: {exc}") from exc
 
         try:
             data = json.loads(raw)
@@ -365,6 +393,17 @@ def _resolution(value: str) -> str:
     if result not in _RESOLUTIONS:
         raise ValueError(f"unsupported resolution: {value}")
     return result
+
+
+# Return the length the server promised, when it names one.
+def _declared_length(response) -> int | None:
+    raw = response.headers.get("Content-Length")
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
 
 
 # Audio suffixes the endpoint takes, and the MIME type each one needs.

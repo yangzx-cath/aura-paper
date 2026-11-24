@@ -18,11 +18,18 @@ def write_png(path: Path) -> Path:
 
 
 class FakeResponse:
-    def __init__(self, body: bytes) -> None:
+    def __init__(self, body: bytes, length: int | None = None) -> None:
         self.body = body
+        self.headers = {}
+        if length is not None:
+            self.headers["Content-Length"] = str(length)
 
-    def read(self) -> bytes:
-        return self.body
+    def read(self, size: int = -1) -> bytes:
+        if size is None or size < 0:
+            data, self.body = self.body, b""
+            return data
+        data, self.body = self.body[:size], self.body[size:]
+        return data
 
     def __enter__(self):
         return self
@@ -199,6 +206,43 @@ def test_wait_task_times_out(monkeypatch):
 
     assert not task.done
     assert "timed out" in task.error
+
+
+def test_wait_task_retries_a_failed_poll(monkeypatch):
+    client = SeedanceClient(api_key="key", poll_interval=0)
+    replies = [
+        SeedanceError("poll timed out"),
+        VideoTask("cgt-1", "succeeded"),
+    ]
+
+    def get_task(task_id):
+        reply = replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    monkeypatch.setattr(client, "get_task", get_task)
+
+    task = client.wait_task("cgt-1")
+
+    assert task.done
+    assert replies == []
+
+
+def test_wait_task_gives_up_after_three_failed_polls(monkeypatch):
+    client = SeedanceClient(api_key="key", poll_interval=0)
+    calls = []
+
+    def get_task(task_id):
+        calls.append(1)
+        raise SeedanceError("poll timed out")
+
+    monkeypatch.setattr(client, "get_task", get_task)
+
+    with pytest.raises(SeedanceError, match="poll timed out"):
+        client.wait_task("cgt-1")
+
+    assert len(calls) == 3
 
 
 def test_wait_task_returns_a_failed_task(monkeypatch):
@@ -449,7 +493,7 @@ def test_download_retries_a_stalled_transfer(monkeypatch, tmp_path):
         attempts.append(1)
         if len(attempts) == 1:
             raise TimeoutError("stalled")
-        return io.BytesIO(b"video")
+        return FakeResponse(b"video")
 
     monkeypatch.setattr(
         "aura_paper.clients.seedance.urllib.request.urlopen", fake_urlopen
@@ -462,3 +506,38 @@ def test_download_retries_a_stalled_transfer(monkeypatch, tmp_path):
     assert waits == [2.0]
     assert len(attempts) == 2
     assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_download_rejects_a_body_shorter_than_promised(monkeypatch, tmp_path):
+    client = SeedanceClient(api_key="key")
+    target = tmp_path / "clip.mp4"
+    monkeypatch.setattr("aura_paper.clients.seedance.RETRY_DELAYS", ())
+
+    def fake_urlopen(*args, **kwargs):
+        return FakeResponse(b"vide", length=10)
+
+    monkeypatch.setattr(
+        "aura_paper.clients.seedance.urllib.request.urlopen", fake_urlopen
+    )
+
+    with pytest.raises(SeedanceError, match="stopped at 4 of 10 bytes"):
+        client.download("http://x/clip.mp4", target)
+
+    assert not target.exists()
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_download_wraps_a_broken_stream(monkeypatch, tmp_path):
+    client = SeedanceClient(api_key="key")
+    target = tmp_path / "clip.mp4"
+    monkeypatch.setattr("aura_paper.clients.seedance.RETRY_DELAYS", ())
+
+    def fake_urlopen(*args, **kwargs):
+        raise ConnectionResetError("reset")
+
+    monkeypatch.setattr(
+        "aura_paper.clients.seedance.urllib.request.urlopen", fake_urlopen
+    )
+
+    with pytest.raises(SeedanceError, match="download failed"):
+        client.download("http://x/clip.mp4", target)
