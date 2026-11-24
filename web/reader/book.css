@@ -2,7 +2,7 @@
 
 .reader {
   --bar-h: 48px;
-  --sub-h: 44px;
+  --sub-h: 76px;
   --deck-h: 76px;
   overflow: hidden;
 }
@@ -68,7 +68,7 @@
   pointer-events: none;
 }
 
-/* 字幕独立成行，不随视频缩放。 */
+/* 字幕独立成行，不随视频缩放；一句太长时可以撑到两行。 */
 .subtitle {
   flex: none;
   height: var(--sub-h);
@@ -78,10 +78,20 @@
   background: var(--surface);
   border-top: 1px solid var(--line);
   color: var(--ink);
-  font-size: 22px;
-  white-space: nowrap;
+  font-size: 24px;
+  line-height: 1.35;
+  text-align: center;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+/* 旁白低一度，角色的台词用重一点的颜色，一眼分得清。 */
+.subtitle--narrator {
+  color: var(--ink2);
+}
+
+.subtitle--cast {
+  color: var(--accent-deep);
+  font-weight: 600;
 }
 
 /* 控件一行：播放、进度、语音与对话。 */

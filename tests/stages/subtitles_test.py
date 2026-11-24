@@ -129,7 +129,8 @@ def test_writes_one_cue_per_spoken_line(tmp_path):
     assert result.file == "subtitles.ass"
     assert result.cues == 2
     text = (tmp_path / "demo" / "subtitles.ass").read_text("utf-8")
-    assert "0:00:00.00,0:00:00.80,旁白" in text
+    # The narration stays on screen until the dialogue starts.
+    assert "0:00:00.00,0:00:01.00,旁白" in text
     assert "0:00:01.00,0:00:01.80,c1" in text
     # A sound effect is heard, not read.
     assert "哗啦" not in text

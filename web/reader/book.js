@@ -6,6 +6,7 @@ const MIC = document.getElementById("mic");
 const TRACK = document.getElementById("track");
 const FILL = document.getElementById("fill");
 const TOAST = document.getElementById("toast");
+const SUBTITLE = document.getElementById("subtitle");
 
 // 书号来自书库的链接，录音按书存放。
 const BOOK = new URLSearchParams(location.search).get("id") || "";
@@ -43,6 +44,10 @@ let sliceLen = 0;
 let recent = [];
 let firstAt = 0;
 let endAt = 0;
+
+// 发布清单里的字幕，和现在已经显示的那一条。
+let cues = [];
+let shown = -1;
 
 async function start() {
   if (starting || listening) {
@@ -352,6 +357,148 @@ function toast(text) {
   }, 2600);
 }
 
+// 书名、视频和字幕都从发布清单里读，路径由书 id 拼出来。
+async function load() {
+  if (!BOOK) {
+    SUBTITLE.textContent = "从书库选一本书";
+    return;
+  }
+  try {
+    const url = `/api/books/${encodeURIComponent(BOOK)}/publish`;
+    const reply = await fetch(url);
+    if (!reply.ok) {
+      SUBTITLE.textContent = "这本书还没有发布";
+      return;
+    }
+    const show = await reply.json();
+    if (!show.film) {
+      SUBTITLE.textContent = "发布清单里没有视频";
+      return;
+    }
+    if (show.title) {
+      document.title = show.title;
+    }
+    FILM.src = pub(show.film);
+    if (show.cover) {
+      FILM.poster = pub(show.cover);
+    }
+    cues = await subtitles(pub(show.vtt || "subtitles.vtt"));
+    shown = -1;
+  } catch (error) {
+    SUBTITLE.textContent = "读不到这本书";
+  }
+}
+
+// 发布目录里的一个文件。
+function pub(name) {
+  return `/api/books/${encodeURIComponent(BOOK)}/pub/${name}`;
+}
+
+// 读出字幕文件；读不到就当这本书没有字幕。
+async function subtitles(url) {
+  try {
+    const reply = await fetch(url);
+    if (!reply.ok) {
+      return [];
+    }
+    return parseVtt(await reply.text());
+  } catch (error) {
+    return [];
+  }
+}
+
+// WebVTT 拆成按时间排好的一条条，说话人从 voice span 里取。
+function parseVtt(text) {
+  const lines = String(text).replace(/\r/g, "").split("\n");
+  const list = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = /^(\S+)\s+-->\s+(\S+)/.exec(lines[index]);
+    if (!match) {
+      continue;
+    }
+    const body = [];
+    index += 1;
+    while (index < lines.length && lines[index].trim() !== "") {
+      body.push(lines[index]);
+      index += 1;
+    }
+    const said = voice(body.join(" "));
+    list.push({
+      start: seconds(match[1]),
+      end: seconds(match[2]),
+      who: said.who,
+      text: said.text,
+    });
+  }
+  return list;
+}
+
+// <v 旁白>这一句</v> 拆成说话人和正文，没有标记就整句都算正文。
+function voice(line) {
+  const match = /^<v\s+([^>]*)>([\s\S]*)<\/v>$/.exec(line.trim());
+  if (!match) {
+    return { who: "", text: plain(line) };
+  }
+  return { who: match[1].trim(), text: plain(match[2]) };
+}
+
+// 00:01:02.345 换成秒，顺手把转义过的符号改回来。
+function seconds(stamp) {
+  const parts = String(stamp).split(":");
+  const last = Number(parts.pop() || 0);
+  const minutes = Number(parts.pop() || 0);
+  const hours = Number(parts.pop() || 0);
+  return hours * 3600 + minutes * 60 + last;
+}
+
+// 一行里的换行折成空格，空格不留在标点前面。
+function plain(text) {
+  return String(text)
+    .replace(/\s*\n\s*/g, " ")
+    .replace(/([a-z)"'’])([.?!])([A-Z])/g, "$1$2 $3")
+    .replace(/ ([.,!?;:…，。、；：！？])/g, "$1")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .trim();
+}
+
+// 只在这一条换了的时候写字幕，否则每次 timeupdate 都要重排。
+function speak() {
+  const index = cueAt(FILM.currentTime);
+  if (index === shown) {
+    return;
+  }
+  shown = index;
+  if (index < 0) {
+    SUBTITLE.textContent = "";
+    SUBTITLE.className = "subtitle";
+    return;
+  }
+  const cue = cues[index];
+  SUBTITLE.textContent = cue.text;
+  const kind = cue.who === "旁白" ? "narrator" : "cast";
+  SUBTITLE.className = `subtitle subtitle--${kind}`;
+}
+
+// 字幕按时间排好且不重叠，用二分找当前这条。
+function cueAt(at) {
+  let low = 0;
+  let high = cues.length - 1;
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    const cue = cues[middle];
+    if (at < cue.start) {
+      high = middle - 1;
+    } else if (at >= cue.end) {
+      low = middle + 1;
+    } else {
+      return middle;
+    }
+  }
+  return -1;
+}
+
 function toggle() {
   if (FILM.paused) {
     FILM.play();
@@ -418,6 +565,11 @@ FILM.addEventListener("ended", sync);
 FILM.addEventListener("timeupdate", draw);
 FILM.addEventListener("loadedmetadata", draw);
 
+// 字幕跟着同一个时钟走，跳转后也要立刻对一次。
+FILM.addEventListener("timeupdate", speak);
+FILM.addEventListener("seeked", speak);
+FILM.addEventListener("loadedmetadata", speak);
+
 // 录音中亮起按钮，再按一次关掉；真正的采集后面接。
 MIC.addEventListener("click", () => {
   if (listening) {
@@ -426,3 +578,5 @@ MIC.addEventListener("click", () => {
   }
   start();
 });
+
+load();

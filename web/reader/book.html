@@ -18,13 +18,13 @@
     </header>
 
     <main class="stage" id="stage">
-      <!-- 成片先用 C01 的 film.mp4，接 publish.json 后改成按书读取。 -->
-      <video class="stage-film" id="film" src="/media/C01/shots/film.mp4"
+      <!-- 视频和字幕都由 book.js 从 /api/books/<id>/publish 读进来。 -->
+      <video class="stage-film" id="film"
              playsinline preload="metadata"></video>
       <p class="stage-note">AI 生成内容存在不确定性 · 语音图像已脱敏</p>
     </main>
 
-    <p class="subtitle" id="subtitle">字幕</p>
+    <p class="subtitle" id="subtitle"></p>
 
     <footer class="deck">
       <button class="deck-play" id="play" type="button" aria-label="播放">

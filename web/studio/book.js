@@ -137,6 +137,41 @@ function paint(ui, row, allowed) {
     ui.toggle.textContent = "展开";
     ui.replay = true;
   }
+
+  // 发布好了就把清单里的关键信息补上。
+  if (ui.facts && row.state === "done") {
+    facts(ui);
+  }
+}
+
+// 读一次发布清单，把时长、字幕数和角色数写在路径下面。
+async function facts(ui) {
+  if (ui.loaded || !BOOK) {
+    return;
+  }
+  ui.loaded = true;
+  try {
+    const url = `/api/books/${encodeURIComponent(BOOK)}/publish`;
+    const reply = await fetch(url);
+    if (!reply.ok) {
+      return;
+    }
+    const data = await reply.json();
+    ui.facts.textContent = summary(data);
+    ui.facts.hidden = false;
+  } catch (error) {
+    // 读不到清单时只留路径，不影响别的行。
+  }
+}
+
+// 把清单折成一句：2:20 · 24 条字幕 · 7 个角色。
+function summary(data) {
+  const seconds = Math.round(Number(data.seconds) || 0);
+  const rest = String(seconds % 60).padStart(2, "0");
+  const pieces = [`${Math.floor(seconds / 60)}:${rest}`];
+  pieces.push(`${data.cues || 0} 条字幕`);
+  pieces.push(`${(data.cast || []).length} 个角色`);
+  return pieces.join(" · ");
 }
 
 function row(stage) {
@@ -159,6 +194,15 @@ function row(stage) {
   out.className = "stage-out";
   out.textContent = stage.out;
   main.append(name, out);
+
+  // 发布这一行多留一条，跑完后填上清单里的时长和字幕数。
+  let factsLine = null;
+  if (stage.key === "publish") {
+    factsLine = document.createElement("p");
+    factsLine.className = "stage-out";
+    factsLine.hidden = true;
+    main.append(factsLine);
+  }
 
   const badge = document.createElement("span");
   badge.className = "badge";
@@ -201,6 +245,8 @@ function row(stage) {
     text,
     toggle,
     replay: false,
+    facts: factsLine,
+    loaded: false,
   };
 
   toggle.addEventListener("click", () => toggleLog(ui));

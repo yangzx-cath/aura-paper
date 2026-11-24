@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import re
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..media import ffmpeg
+from ..media import audio, ffmpeg
 from ..schema.compose import BookCompose, ComposedShot
 from ..schema.job import BookJobs, JobLine
 from ..schema.subtitles import BookSubtitles
@@ -45,6 +47,9 @@ SHADOW = 1
 MARGIN_VERTICAL = 40
 MARGIN_SIDE = 120
 OUTLINE_COLOUR = "101010"
+
+# Marks that never take a space in front of them.
+PUNCTUATION = "，。、；：！？…,.!?;:"
 
 
 @dataclass
@@ -88,7 +93,7 @@ def subtitles(
     takes = {shot.shot: shot for shot in book.shots}
     spoken = _read_spoken(directory)
     styles = _styles(jobs)
-    cues = _cues(jobs, takes, spoken)
+    cues = _cues(jobs, takes, spoken, directory)
     if not cues:
         result.error = "没有可以上字幕的台词"
         write_json(book_id, "subtitles", result.to_dict(), root)
@@ -145,12 +150,14 @@ def _cues(
     jobs: BookJobs,
     takes: dict[str, ComposedShot],
     spoken: dict[tuple[str, int], str],
+    directory: Path,
 ) -> list[Cue]:
     cues = []
     for job in jobs.shots:
         take = takes.get(job.shot)
         if take is None or not take.seconds:
             continue
+        first = len(cues)
         for line in job.lines:
             if line.kind not in SPOKEN:
                 continue
@@ -165,7 +172,44 @@ def _cues(
                 continue
             style = NARRATOR if line.kind == NARRATOR else line.cast
             cues.append(Cue(start, end, style, text))
+        _hold(cues, first, take, _heard(take, directory))
     return cues
+
+
+# Keep each line on screen until the next one starts, and the last line of
+# a shot until the take really stops speaking. The model lands up to two
+# seconds after the track it was sent.
+def _hold(
+    cues: list[Cue],
+    first: int,
+    take: ComposedShot,
+    said_end: float,
+) -> None:
+    if first >= len(cues):
+        return
+    stop = take.start + take.seconds
+    for index in range(first, len(cues) - 1):
+        following = cues[index + 1].start
+        cues[index].end = min(stop, max(cues[index].end, following))
+    last = cues[-1]
+    last.end = min(stop, max(last.end, said_end))
+
+
+# Find when the sound of one take stops, in film seconds. A take without
+# sound of its own reports nothing.
+def _heard(take: ComposedShot, directory: Path) -> float:
+    path = directory / take.file if take.file else None
+    if path is None or not path.is_file():
+        return 0.0
+    with tempfile.TemporaryDirectory() as folder:
+        heard = Path(folder) / "heard.wav"
+        try:
+            audio.extract(path, heard)
+            quiet = audio.silence_at_end(heard)
+        except ffmpeg.FFmpegError:
+            return 0.0
+    length = ffmpeg.probe(path).duration_ms / 1000
+    return take.start + max(0.0, length - quiet)
 
 
 # Read the words a line puts on screen.
@@ -258,14 +302,49 @@ def _vtt(cues: list[Cue]) -> str:
     parts = ["WEBVTT", ""]
     for cue in cues:
         parts.append(f"{_vtt_clock(cue.start)} --> {_vtt_clock(cue.end)}")
-        parts.append(f"<v {cue.style}>{_markup(cue.text)}</v>")
+        parts.append(f"<v {cue.style}>{_markup(_flat(cue.text))}</v>")
         parts.append("")
     return "\n".join(parts)
 
 
+# Join the printed line breaks into one line. A break between two Latin
+# words keeps a space, one beside punctuation or between two Chinese
+# characters keeps none.
+def _flat(text: str) -> str:
+    joined = " ".join(text.split())
+    joined = _sentence_space(joined)
+    kept = []
+    for index, char in enumerate(joined):
+        if char == " " and 0 < index < len(joined) - 1:
+            before = joined[index - 1]
+            after = joined[index + 1]
+            if after in PUNCTUATION:
+                continue
+            if _chinese(before) and _chinese(after):
+                continue
+        kept.append(char)
+    return "".join(kept)
+
+
+# Put a space back where a sentence mark ran straight into the next word.
+def _sentence_space(text: str) -> str:
+    return re.sub(r"(?<=[a-z)\"'’])([.?!])(?=[A-Z])", r"\1 ", text)
+
+
+# Tell whether one character is Chinese, punctuation included.
+def _chinese(char: str) -> bool:
+    return (
+        "\u3000" <= char <= "\u303f"
+        or "\u4e00" <= char <= "\u9fff"
+        or "\uff00" <= char <= "\uffef"
+    )
+
+
 # Turn the characters WebVTT reads as markup into plain text.
 def _markup(text: str) -> str:
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    text = text.replace("&", "&amp;")
+    text = text.replace("<", "&lt;")
+    return text.replace(">", "&gt;")
 
 
 # Write a time the way WebVTT reads it, to the thousandth of a second.
