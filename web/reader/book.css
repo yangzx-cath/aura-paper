@@ -183,6 +183,7 @@
 
 /* 麦克风是语音入口，与播放同尺寸，高光略弱一档。 */
 .deck-mic {
+  position: relative;
   display: grid;
   place-items: center;
   width: 56px;
@@ -205,4 +206,37 @@
   width: 24px;
   height: 24px;
   fill: currentColor;
+}
+
+/* 录音中：整体提亮，并向外扩一圈跟着呼吸的光环。 */
+.deck-mic.is-live {
+  background:
+    radial-gradient(100% 70% at 30% 0%, rgba(255, 255, 255, 0.6),
+      transparent 62%),
+    linear-gradient(180deg, #86d3b6, #5aa78f);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.12),
+    0 0 0 5px rgba(79, 156, 133, 0.25),
+    0 3px 12px rgba(71, 143, 121, 0.4);
+}
+
+.deck-mic.is-live::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border: 2px solid rgba(79, 156, 133, 0.5);
+  border-radius: 50%;
+  animation: breath 1.4s ease-out infinite;
+}
+
+@keyframes breath {
+  from {
+    opacity: 0.85;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.18);
+  }
 }

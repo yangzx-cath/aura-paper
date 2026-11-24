@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .books import router
+from .qa import router as qa_router
 from .stages import prepare_state
 from .stages import router as stages_router
 
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
     app.include_router(stages_router)
+    app.include_router(qa_router)
     app.mount(
         "/static/fonts",
         StaticFiles(directory=FONTS, check_dir=False),
