@@ -15,9 +15,6 @@ const STAGES = [
   { key: "show", name: "发布", out: "show.json" },
 ];
 
-// 书还没有页图，先摆 6 个占位框看版式。
-const PLACEHOLDERS = 6;
-
 const STATE_LABELS = {
   idle: ["未运行", "badge"],
   running: ["运行中", "badge badge--running"],
@@ -28,7 +25,7 @@ const STATE_LABELS = {
 let BOOK = "";
 
 const NAME = document.getElementById("name");
-const THUMBS = document.getElementById("thumbs");
+const COVER = document.getElementById("cover");
 const STAGES_BOX = document.getElementById("stages");
 
 // 阶段键 → 这一行的徽标、按钮与日志框。
@@ -37,14 +34,13 @@ const ROWS = new Map();
 async function start() {
   BOOK = new URLSearchParams(location.search).get("id") || "";
   NAME.textContent = BOOK || "未选择绘本";
-  await title(BOOK);
-  thumbs();
+  await details(BOOK);
   stages();
   await refresh();
 }
 
-// 书名沿用书库的规则：没检测出书名前显示带 .pdf 的文件名。
-async function title(id) {
+// 书名和封面都来自书库记录。
+async function details(id) {
   if (!id) {
     return;
   }
@@ -60,19 +56,27 @@ async function title(id) {
     }
     NAME.textContent =
       book.title_source === "filename" ? book.filename : book.title;
+    cover(book.cover);
   } catch (error) {
     // 读不到书库时保留编号，不影响看版式。
   }
 }
 
-function thumbs() {
-  THUMBS.replaceChildren();
-  for (let index = 0; index < PLACEHOLDERS; index += 1) {
-    const cell = document.createElement("div");
-    cell.className = "thumb";
-    cell.textContent = `第 ${index + 1} 页`;
-    THUMBS.append(cell);
+// 封面是刚生成的，加上时间戳避开浏览器的旧 404。
+function cover(src) {
+  COVER.replaceChildren();
+  if (!src) {
+    const blank = document.createElement("div");
+    blank.className = "cover-preview cover-preview--empty";
+    blank.textContent = "还没有封面";
+    COVER.append(blank);
+    return;
   }
+  const image = document.createElement("img");
+  image.className = "cover-preview";
+  image.src = `${src}?t=${Date.now()}`;
+  image.alt = "";
+  COVER.append(image);
 }
 
 function stages() {
@@ -299,8 +303,8 @@ function follow(stage, ui) {
     const ok = line === "退出码 0";
     ui.badge.className = ok ? "badge badge--done" : "badge badge--failed";
     ui.badge.textContent = ok ? "完成" : "失败";
-    // 跑完重拉一次：书名可能刚被理解阶段写回，下一个阶段也可能解锁了。
-    title(BOOK);
+    // 跑完重拉一次：书名与封面可能刚被写回，下一个阶段也可能解锁了。
+    details(BOOK);
     refresh();
   };
 

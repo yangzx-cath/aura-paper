@@ -43,24 +43,27 @@
 .pages {
   min-height: 0;
   overflow: auto;
+  display: flex;
+  justify-content: center;
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--surface) 60%, transparent);
 }
 
-.thumbs {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+.cover-preview {
+  width: 100%;
+  height: fit-content;
+  border-radius: var(--radius-md);
 }
 
-.thumb {
-  aspect-ratio: 2 / 3;
+/* 还没跑过 ingest 的书只有一块空白，用虚线框占位。 */
+.cover-preview--empty {
   display: grid;
   place-items: center;
-  border: 1px dashed var(--line);
-  border-radius: var(--radius-sm);
+  aspect-ratio: 2 / 3;
+  border: 2px dashed var(--line);
+  border-radius: var(--radius-md);
   color: var(--ink2);
   font-size: var(--text-sm);
 }
