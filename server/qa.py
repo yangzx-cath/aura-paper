@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from pathlib import Path
 from re import fullmatch
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from starlette.concurrency import run_in_threadpool
 
 from aura_paper.clients.asr import ASRClient, ASRError
@@ -34,6 +43,9 @@ HOTWORDS = ("暂停", "播放", "继续", "开始")
 BOOK_ID = r"[A-Z]\d{2,3}"
 
 router = APIRouter(prefix="/api", tags=["qa"])
+
+# The voice socket keeps its own router, so it escapes the /api prefix.
+socket_router = APIRouter()
 
 
 @router.post("/qa/audio")
@@ -75,6 +87,116 @@ async def _hear(pcm: bytes) -> str:
     except ASRError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return hearing.text
+
+
+@socket_router.websocket("/ws/qa")
+async def qa_socket(websocket: WebSocket) -> None:
+    """Stream one spoken phrase in and send the text back as it grows."""
+    await websocket.accept()
+    book = websocket.query_params.get("book", "")
+    if fullmatch(BOOK_ID, book) is None:
+        await websocket.close(code=1008)
+        return
+
+    client = ASRClient.from_env()
+    if client.missing_settings():
+        await _fail(websocket, "语音识别未配置")
+        return
+
+    queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+    parts: list[bytes] = []
+    reader = asyncio.create_task(_frames(websocket, queue, parts))
+    try:
+        hearing = await client.listen(
+            _drain(queue),
+            hotwords=HOTWORDS,
+            on_text=lambda text: asyncio.create_task(_tell(websocket, text)),
+        )
+    except ASRError as exc:
+        await _fail(websocket, str(exc))
+        return
+    except (WebSocketDisconnect, RuntimeError):
+        return
+    finally:
+        reader.cancel()
+
+    name = _save(book, b"".join(parts))
+    try:
+        await websocket.send_json(
+            {"type": "done", "text": hearing.text, "file": name}
+        )
+        await websocket.close()
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+
+
+# Turn the socket frames into the slices the endpoint expects.
+async def _frames(
+    websocket: WebSocket,
+    queue: asyncio.Queue[bytes | None],
+    parts: list[bytes],
+) -> None:
+    while True:
+        try:
+            message = await websocket.receive()
+        except (WebSocketDisconnect, RuntimeError):
+            break
+        if message["type"] == "websocket.disconnect":
+            break
+        chunk = message.get("bytes")
+        if chunk:
+            parts.append(chunk)
+            await queue.put(chunk)
+            continue
+        if _ended(message.get("text")):
+            break
+    await queue.put(None)
+
+
+# Hand the client a plain stream of slices, closed by one None.
+async def _drain(
+    queue: asyncio.Queue[bytes | None],
+) -> AsyncIterator[bytes]:
+    while True:
+        chunk = await queue.get()
+        if chunk is None:
+            return
+        yield chunk
+
+
+# The page says one word when the speaker stops.
+def _ended(text: str | None) -> bool:
+    if not text:
+        return False
+    try:
+        return json.loads(text).get("type") == "end"
+    except ValueError:
+        return False
+
+
+# Push the text so far; a socket the page already closed is not an error.
+async def _tell(websocket: WebSocket, text: str) -> None:
+    try:
+        await websocket.send_json({"type": "text", "text": text})
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+
+
+async def _fail(websocket: WebSocket, detail: str) -> None:
+    try:
+        await websocket.send_json({"type": "error", "detail": detail})
+        await websocket.close()
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+
+
+# Keep the phrase beside the other recordings of this book.
+def _save(book: str, pcm: bytes) -> str:
+    folder = ROOT / book
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{_stamp()}.pcm"
+    path.write_bytes(pcm)
+    return path.relative_to(ROOT).as_posix()
 
 
 # The mime type before any codec parameter decides the container.

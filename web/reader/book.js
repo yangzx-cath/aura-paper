@@ -15,9 +15,15 @@ const RATE = 16000;
 
 // 一句话的判定：能量高过门限开始收，静音够久收尾。
 const LEVEL = 0.015;
-const QUIET_MS = 600;
+const QUIET_MS = 350;
 const SHORTEST_MS = 300;
 const LONGEST_MS = 8000;
+
+// 起说前多带几块，第一个字才不会被削掉。
+const PRE_ROLL = 3;
+
+// 音频按 100 ms 一片送给端点，太碎的帧它不接受。
+const SLICE = 1600;
 
 let stream = null;
 let context = null;
@@ -27,10 +33,16 @@ let starting = false;
 let listening = false;
 
 let voiced = false;
-let parts = [];
 let quiet = 0;
 let spoken = 0;
 let timer = 0;
+let socket = null;
+let queued = [];
+let slice = [];
+let sliceLen = 0;
+let recent = [];
+let firstAt = 0;
+let endAt = 0;
 
 async function start() {
   if (starting || listening) {
@@ -80,6 +92,7 @@ async function start() {
 function stop() {
   listening = false;
   mark(false);
+  closeStream();
   processor.disconnect();
   source.disconnect();
   context.close();
@@ -93,7 +106,7 @@ function stop() {
   reset();
 }
 
-// 每块音频先进句缓冲，静音够久就把这句送去识别。
+// 每块音频在起说时开流，之后边收边送。
 function hear(event) {
   const block = event.inputBuffer.getChannelData(0);
   const pcm = resample(block, context.sampleRate);
@@ -101,17 +114,24 @@ function hear(event) {
   const ms = (pcm.length / RATE) * 1000;
 
   if (!voiced) {
+    keep(pcm);
     if (level < LEVEL) {
       return;
     }
     voiced = true;
-    parts = [pcm];
+    firstAt = 0;
+    endAt = 0;
+    openStream();
+    for (const earlier of recent) {
+      feed(earlier);
+    }
+    recent = [];
     quiet = 0;
     spoken = ms;
     return;
   }
 
-  parts.push(pcm);
+  feed(pcm);
   spoken += ms;
   quiet = level < LEVEL ? quiet + ms : 0;
   if (quiet >= QUIET_MS || spoken >= LONGEST_MS) {
@@ -119,44 +139,132 @@ function hear(event) {
   }
 }
 
-// 一句话说完就上送，太短的当噪声丢掉。
+// 起说前留几块，触发时一起送。
+function keep(pcm) {
+  recent.push(pcm);
+  if (recent.length > PRE_ROLL) {
+    recent.shift();
+  }
+}
+
+// 攒够一片再发，剩下的那半片收尾时补上。
+function feed(pcm) {
+  slice.push(pcm);
+  sliceLen += pcm.length;
+  if (sliceLen < SLICE) {
+    return;
+  }
+  const bytes = toPcm16(slice);
+  slice = [];
+  sliceLen = 0;
+  write(bytes);
+}
+
+// 流还没通时先攒着，连上后一起补齐。
+function write(bytes) {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(bytes);
+    return;
+  }
+  queued.push(bytes);
+}
+
+// 说完就通知端点收尾，太短的当噪声直接丢掉。
 function finish() {
   const speech = spoken - quiet;
   voiced = false;
-  if (speech < SHORTEST_MS) {
-    reset();
+  if (sliceLen > 0) {
+    write(toPcm16(slice));
+  }
+  slice = [];
+  sliceLen = 0;
+  recent = [];
+  quiet = 0;
+  spoken = 0;
+  endAt = performance.now();
+  if (speech < SHORTEST_MS || !socket) {
+    closeStream();
     return;
   }
-  const pcm = toPcm16(parts);
-  reset();
-  send(pcm);
+  if (socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ type: "end" }));
+  }
 }
 
-// 服务端只回文本，指令在这里匹配。
-async function send(pcm) {
-  const url = `/api/qa/audio?book=${encodeURIComponent(BOOK)}`;
-  toast("正在识别…");
-  const reply = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "audio/pcm" },
-    body: pcm,
+// 起说就建流，服务端从第一个字节就开始识别。
+function openStream() {
+  const scheme = location.protocol === "https:" ? "wss" : "ws";
+  const query = encodeURIComponent(BOOK);
+  const ws = new WebSocket(`${scheme}://${location.host}/ws/qa?book=${query}`);
+  socket = ws;
+  ws.addEventListener("open", () => {
+    for (const bytes of queued) {
+      ws.send(bytes);
+    }
+    queued = [];
   });
-  if (!reply.ok) {
-    toast("语音识别失败");
-    return;
-  }
-  const data = await reply.json();
-  obey(data.text);
+  ws.addEventListener("message", (event) => {
+    // 上一句的回包晚到时，别拿它去触发下一句的指令。
+    if (socket === ws) {
+      receive(event);
+    }
+  });
+  ws.addEventListener("close", () => {
+    if (socket === ws) {
+      socket = null;
+    }
+  });
 }
 
-// 取整句里的关键词，宁可不动也不误判。
-function obey(text) {
-  const said = String(text || "").replace(/[\s，。！？、,.!?]/g, "");
-  if (!said) {
-    toast("没听清，再说一次");
+function closeStream() {
+  if (socket) {
+    socket.close();
+    socket = null;
+  }
+  queued = [];
+}
+
+// 中间结果先显示，最终文本交给指令匹配。
+function receive(event) {
+  const data = JSON.parse(event.data);
+  if (data.type === "text") {
+    if (!firstAt) {
+      firstAt = performance.now();
+    }
+    toast(`听到：${data.text}`);
+    command(clean(data.text));
     return;
   }
-  toast(`听到：${said}`);
+  if (data.type === "done") {
+    obey(data.text);
+    return;
+  }
+  toast("语音识别失败");
+}
+
+// 说完到首字、到最终结果各用了多久。
+function stats() {
+  if (!endAt) {
+    return "";
+  }
+  const first = Math.max(0, firstAt - endAt) / 1000;
+  const last = (performance.now() - endAt) / 1000;
+  return `首字 ${first.toFixed(2)}s · 结果 ${last.toFixed(2)}s`;
+}
+
+// 最终文本先显示，再执行命中的指令。
+function obey(text) {
+  const said = clean(text);
+  if (!said) {
+    toast(`没听清，再说一次 · ${stats()}`);
+    return;
+  }
+  toast(`听到：${said} · ${stats()}`);
+  command(said);
+}
+
+// 中间结果和最终文本都走这里，宁可不动也不误判。
+function command(said) {
   if (said.includes("暂停") || said.includes("停")) {
     FILM.pause();
     return;
@@ -167,11 +275,17 @@ function obey(text) {
   }
 }
 
+function clean(text) {
+  return String(text || "").replace(/[\s，。！？、,.!?]/g, "");
+}
+
 function reset() {
   voiced = false;
-  parts = [];
   quiet = 0;
   spoken = 0;
+  slice = [];
+  sliceLen = 0;
+  recent = [];
 }
 
 // 音频上下文不一定能开到 16k，按比例线性插值。
