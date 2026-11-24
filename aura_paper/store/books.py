@@ -134,7 +134,7 @@ def read_meta(book_id: str, root: str | Path | None = None) -> BookMeta | None:
 def status_of(book_id: str, root: str | Path | None = None) -> str:
     """Return the one word the shelf shows under a book."""
     folder = book_folder(book_id, root)
-    if (folder / "run.json").is_file():
+    if _is_running(folder):
         return "running"
     if (folder / "pub" / "show.json").is_file():
         return "ready"
@@ -160,6 +160,17 @@ def book_folder(book_id: str, root: str | Path | None = None) -> Path:
     """Return the folder holding one book's source, state and release."""
     base = Path(root) if root is not None else books_dir()
     return base / book_id
+
+
+# run.json outlives a run, so only its state says the book is still running.
+def _is_running(folder: Path) -> bool:
+    path = folder / "run.json"
+    if not path.is_file():
+        return False
+    try:
+        return _read_json(path).get("state") == "running"
+    except ValueError:
+        return False
 
 
 # Copy one upload to disk, refusing anything that is not a real PDF.
