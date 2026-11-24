@@ -28,6 +28,10 @@ DEFAULT_RESOLUTION = "720p"
 # JSON reply does.
 DEFAULT_DOWNLOAD_TIMEOUT = 300.0
 
+# The create call carries the reference images inline, so its body is a few
+# megabytes and needs more time than a poll.
+DEFAULT_UPLOAD_TIMEOUT = 180.0
+
 # Waits before each retry of a finished download.
 RETRY_DELAYS = (2.0, 5.0, 10.0)
 
@@ -51,6 +55,7 @@ class SeedanceClient:
     model: str
     timeout: float
     download_timeout: float
+    upload_timeout: float
     poll_interval: float
     max_wait: float
 
@@ -61,6 +66,7 @@ class SeedanceClient:
         model: str = DEFAULT_MODEL,
         timeout: float = 60.0,
         download_timeout: float = DEFAULT_DOWNLOAD_TIMEOUT,
+        upload_timeout: float = DEFAULT_UPLOAD_TIMEOUT,
         poll_interval: float = 5.0,
         max_wait: float = 1200.0,
     ) -> None:
@@ -69,6 +75,7 @@ class SeedanceClient:
         self.model = model
         self.timeout = timeout
         self.download_timeout = download_timeout
+        self.upload_timeout = upload_timeout
         self.poll_interval = poll_interval
         self.max_wait = max_wait
 
@@ -92,6 +99,9 @@ class SeedanceClient:
             download_timeout=float(
                 os.environ.get("SEEDANCE_DOWNLOAD_TIMEOUT", "300")
             ),
+            upload_timeout=float(
+                os.environ.get("SEEDANCE_UPLOAD_TIMEOUT", "180")
+            ),
             poll_interval=float(os.environ.get("SEEDANCE_POLL_INTERVAL", "5")),
             max_wait=float(os.environ.get("SEEDANCE_MAX_WAIT", "1200")),
         )
@@ -105,7 +115,11 @@ class SeedanceClient:
     def create_task(self, request: VideoRequest) -> VideoTask:
         """Submit one generation task and return its first snapshot."""
         payload = self._payload(request)
-        data = self._post("/contents/generations/tasks", payload)
+        data = self._post(
+            "/contents/generations/tasks",
+            payload,
+            timeout=self.upload_timeout,
+        )
         task = self._task_from(data)
         if not task.task_id:
             raise SeedanceError("reply carries no task_id")
@@ -238,19 +252,33 @@ class SeedanceClient:
             if path.stat().st_size > _MAX_IMAGE_BYTES:
                 raise ValueError(f"image is larger than 30MB: {path}")
 
-    def _post(self, path: str, payload: dict) -> dict:
+    def _post(
+        self,
+        path: str,
+        payload: dict,
+        *,
+        timeout: float,
+    ) -> dict:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         if len(body) > _MAX_BODY_BYTES:
             raise ValueError("request body exceeds 64MB")
-        return self._send(path, body, "POST")
+        return self._send(path, body, "POST", timeout=timeout, what="create")
 
     def _get(self, path: str, params: dict) -> dict:
         query = urllib.parse.urlencode(params)
         if query:
             path = f"{path}?{query}"
-        return self._send(path, None, "GET")
+        return self._send(path, None, "GET", timeout=self.timeout, what="poll")
 
-    def _send(self, path: str, body: bytes | None, method: str) -> dict:
+    def _send(
+        self,
+        path: str,
+        body: bytes | None,
+        method: str,
+        *,
+        timeout: float,
+        what: str,
+    ) -> dict:
         if not self.api_key:
             raise SeedanceError("seedance endpoint is not configured")
 
@@ -266,9 +294,7 @@ class SeedanceClient:
         )
 
         try:
-            with urllib.request.urlopen(
-                request, timeout=self.timeout
-            ) as response:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
                 raw = response.read().decode("utf-8", errors="replace")
         except urllib.error.HTTPError as exc:
             raw = exc.read().decode("utf-8", errors="replace")
@@ -278,7 +304,7 @@ class SeedanceClient:
             detail = f"cannot reach {url}: {exc.reason}"
             raise SeedanceError(detail) from exc
         except TimeoutError as exc:
-            raise SeedanceError(f"timeout after {self.timeout}s") from exc
+            raise SeedanceError(f"{what} timed out after {timeout}s") from exc
 
         try:
             data = json.loads(raw)

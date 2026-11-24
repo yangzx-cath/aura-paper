@@ -105,9 +105,10 @@ def test_create_task_posts_payload(monkeypatch):
     client = SeedanceClient(api_key="key")
     seen = {}
 
-    def fake_post(path, payload):
+    def fake_post(path, payload, *, timeout):
         seen["path"] = path
         seen["payload"] = payload
+        seen["timeout"] = timeout
         return {"id": "cgt-1"}
 
     monkeypatch.setattr(client, "_post", fake_post)
@@ -122,7 +123,7 @@ def test_create_task_posts_payload(monkeypatch):
 
 def test_create_task_requires_task_id(monkeypatch):
     client = SeedanceClient(api_key="key")
-    monkeypatch.setattr(client, "_post", lambda path, payload: {})
+    monkeypatch.setattr(client, "_post", lambda path, payload, *, timeout: {})
 
     with pytest.raises(SeedanceError, match="no task_id"):
         client.create_task(VideoRequest(prompt="walk"))
@@ -245,7 +246,7 @@ def test_post_rejects_a_large_body(monkeypatch):
     client = SeedanceClient(api_key="key")
 
     with pytest.raises(ValueError, match="exceeds 64MB"):
-        client._post("/x", {"prompt": "a" * 100})
+        client._post("/x", {"prompt": "a" * 100}, timeout=client.timeout)
 
 
 def test_from_env_prefers_ark_api_key(monkeypatch):
@@ -362,7 +363,7 @@ def test_send_wraps_a_timeout(monkeypatch):
         "aura_paper.clients.seedance.urllib.request.urlopen", fake_urlopen
     )
 
-    with pytest.raises(SeedanceError, match="timeout after 3s"):
+    with pytest.raises(SeedanceError, match="poll timed out after 3s"):
         client._get("/x", {})
 
 
@@ -389,8 +390,10 @@ def test_send_rejects_a_non_object_reply(monkeypatch):
 
 
 def test_send_requires_an_api_key():
+    client = SeedanceClient()
+
     with pytest.raises(SeedanceError, match="not configured"):
-        SeedanceClient()._post("/x", {"prompt": "walk"})
+        client._post("/x", {"prompt": "walk"}, timeout=client.timeout)
 
 
 def test_task_from_rejects_a_malformed_reply():
