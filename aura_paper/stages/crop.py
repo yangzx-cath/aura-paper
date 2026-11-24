@@ -10,7 +10,7 @@ from PIL import Image
 
 from ..media.image import crop_box, load_image, save_jpeg
 from ..schema.content import BookContent, PageContent, Panel
-from ..schema.panels import BookPanels, PanelCrop
+from ..schema.crop import BookCrop, PanelCrop
 from ..store.output import write_json
 from .paths import book_dir, panel_name, panels_dir
 
@@ -18,18 +18,18 @@ from .paths import book_dir, panel_name, panels_dir
 PANEL_QUALITY = 95
 
 
-def panels(
+def crop(
     book_id: str,
     *,
     root: str | Path | None = None,
-) -> BookPanels:
-    """Cut every panel box to its own file and write panels.json."""
+) -> BookCrop:
+    """Cut every panel box to its own file and write crop.json."""
     directory = book_dir(book_id, root)
     content = _read_content(directory)
     out_dir = panels_dir(book_id, root)
     shutil.rmtree(out_dir, ignore_errors=True)
 
-    result = BookPanels(id=book_id)
+    result = BookCrop(id=book_id)
     pages_dir = directory / "pages"
     for page in content.pages:
         if not page.panels:
@@ -39,7 +39,7 @@ def panels(
             result.panels.append(_cut(image, page, panel, out_dir))
     if not result.panels:
         result.error = "understand.json holds no panel box"
-    write_json(book_id, "panels", result.to_dict(), root)
+    write_json(book_id, "crop", result.to_dict(), root)
     return result
 
 

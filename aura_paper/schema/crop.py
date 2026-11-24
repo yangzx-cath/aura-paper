@@ -37,7 +37,7 @@ class PanelCrop:
 
 
 @dataclass
-class BookPanels:
+class BookCrop:
     """Every panel of one book, in reading order."""
 
     id: str = ""
@@ -45,7 +45,7 @@ class BookPanels:
     error: str = ""
 
     def to_dict(self) -> dict:
-        """Return the external JSON shape of these panels."""
+        """Return the external JSON shape of these crops."""
         return {
             "id": self.id,
             "generated_at": now_iso(),
@@ -54,8 +54,8 @@ class BookPanels:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> BookPanels:
-        """Build the panels from their external JSON shape."""
+    def from_dict(cls, data: dict) -> BookCrop:
+        """Build the crops from their external JSON shape."""
         return cls(
             id=_text(data.get("id")),
             panels=_panel_list(data.get("panels")),

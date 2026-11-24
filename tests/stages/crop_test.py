@@ -4,7 +4,7 @@ from pathlib import Path
 from PIL import Image
 
 from aura_paper.schema.content import BookContent, PageContent, Panel
-from aura_paper.stages.panels import panels
+from aura_paper.stages.crop import crop
 from aura_paper.store.output import write_json
 
 
@@ -32,7 +32,7 @@ def test_cuts_one_file_per_panel(tmp_path):
     )
     make_book(tmp_path, [page])
 
-    result = panels("demo", root=tmp_path)
+    result = crop("demo", root=tmp_path)
 
     assert result.error == ""
     assert [panel.file for panel in result.panels] == [
@@ -41,7 +41,7 @@ def test_cuts_one_file_per_panel(tmp_path):
     ]
     assert (tmp_path / "demo" / "panels" / "p000_1.jpg").is_file()
     saved = json.loads(
-        (tmp_path / "demo" / "panels.json").read_text(encoding="utf-8")
+        (tmp_path / "demo" / "crop.json").read_text(encoding="utf-8")
     )
     assert saved["id"] == "demo"
     assert saved["panels"][0]["box"] == [0, 0, 500, 1000]
@@ -52,7 +52,7 @@ def test_reports_a_book_without_panels(tmp_path):
     page = PageContent(index=0, filename="p000.jpg", width=200, height=100)
     make_book(tmp_path, [page])
 
-    result = panels("demo", root=tmp_path)
+    result = crop("demo", root=tmp_path)
 
     assert result.panels == []
     assert result.error == "understand.json holds no panel box"

@@ -21,7 +21,7 @@ OUT = ROOT / "out"
 STAGE_FILES = {
     "ingest": ["ingest.json"],
     "understand": ["understand.json"],
-    "panels": ["panels.json"],
+    "crop": ["crop.json"],
     "assets": ["cast.json"],
     "identify": ["identify.json"],
     "storyboard": ["shots.json"],

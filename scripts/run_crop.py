@@ -1,11 +1,11 @@
-"""Run the panels stage from the command line.
+"""Run the crop stage from the command line.
 
 Reads out/<book>/understand.json and cuts every panel box out of its page
 image, so later stages crop nothing.
 
 Usage:
-    python scripts/run_panels.py C01
-    python scripts/run_panels.py C01 --root /tmp/out
+    python scripts/run_crop.py C01
+    python scripts/run_crop.py C01 --root /tmp/out
 """
 
 import argparse
@@ -14,13 +14,13 @@ import time
 from pathlib import Path
 
 from aura_paper.config import out_root
-from aura_paper.stages.panels import panels
+from aura_paper.stages.crop import crop
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run the panels stage.")
+    parser = argparse.ArgumentParser(description="Run the crop stage.")
     parser.add_argument("book", help="book id produced by run_understand.py")
     parser.add_argument(
         "--root",
@@ -41,7 +41,7 @@ def main() -> int:
     print()
 
     started = time.perf_counter()
-    result = panels(args.book, root=root)
+    result = crop(args.book, root=root)
     elapsed = time.perf_counter() - started
 
     print(f"panels  {len(result.panels)}")
@@ -50,7 +50,7 @@ def main() -> int:
         print(f"error   {result.error}", file=sys.stderr)
         return 1
 
-    print(f"output  {root / args.book / 'panels.json'}")
+    print(f"output  {root / args.book / 'crop.json'}")
     print(f"folder  {root / args.book / 'panels'}")
     return 0
 
