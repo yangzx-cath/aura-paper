@@ -35,7 +35,7 @@ def main() -> int:
     parser.add_argument(
         "--fonts",
         default="",
-        help="font folder, default is data/fonts",
+        help="font folder, default is resources/fonts",
     )
     parser.add_argument(
         "--no-burn",

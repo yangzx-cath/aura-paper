@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Download the two open fonts the film needs into data/fonts.
+# Download the two open fonts the film needs into resources/fonts.
 #
 #   NotoSerifSC-Regular.otf    思源宋体，正文语气，字幕的稳妥选择
 #   ZCOOLKuaiLe-Regular.ttf    站酷快乐体，圆润俏皮，配绘本画面
@@ -10,7 +10,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-target="$root/data/fonts"
+target="$root/resources/fonts"
 
 serif="https://github.com/notofonts/noto-cjk/raw/main/Serif/SubsetOTF/SC/NotoSerifSC-Regular.otf"
 playful="https://github.com/google/fonts/raw/main/ofl/zcoolkuaile/ZCOOLKuaiLe-Regular.ttf"

@@ -18,7 +18,7 @@ from .paths import book_dir, shots_dir
 ASS_SUFFIX = ".ass"
 BURN_SUFFIX = "-subs.mp4"
 
-# Font families, as the files in data/fonts name themselves.
+# Font families, as the files in resources/fonts name themselves.
 NARRATOR_FONT = "Noto Serif SC"
 CAST_FONT = "ZCOOL KuaiLe"
 
@@ -287,4 +287,4 @@ def _burn(
 
 # Where the font script puts the two families.
 def _default_fonts() -> Path:
-    return Path(__file__).resolve().parents[2] / "data" / "fonts"
+    return Path(__file__).resolve().parents[2] / "resources" / "fonts"

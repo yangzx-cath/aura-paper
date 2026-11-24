@@ -13,5 +13,8 @@ __pycache__/
 out/
 cache/
 
-# Local test books
+# Downloaded fonts
+resources/fonts/
+
+# Book library
 data/
