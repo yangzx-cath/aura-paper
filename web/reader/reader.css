@@ -1,0 +1,110 @@
+/* 书架：3×2 封面墙，一屏摆完六本。 */
+
+.app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.bar {
+  flex: none;
+  padding: clamp(28px, 6vh, 56px) var(--gap-lg) 0;
+  text-align: center;
+}
+
+.bar {
+  flex: none;
+  padding: clamp(20px, 5vh, 48px) var(--gap-lg) 0;
+  text-align: center;
+}
+
+.brand {
+  font-family: "ZCOOL KuaiLe", "Kaiti SC", "STKaiti", "KaiTi", serif;
+  font-size: clamp(44px, 5.2vw, 72px);
+  line-height: 1.1;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  /* 末字后的字距会把视觉中心推左，用一半字距补回。 */
+  text-indent: 0.05em;
+}
+
+/* 深青到深橙的渐变字，两端对底色的对比都在 3:1 以上。 */
+.brand-text {
+  color: var(--title-a);
+  background-image: linear-gradient(
+    100deg,
+    var(--title-a) 0%,
+    var(--accent) 45%,
+    var(--title-b) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 标题下的一小段渐变线，代替满页分割线。 */
+.brand::after {
+  content: "";
+  display: block;
+  width: clamp(180px, 24vw, 320px);
+  height: 4px;
+  margin: 18px auto 0;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent) 18%,
+    var(--warm) 82%,
+    transparent
+  );
+}
+
+.shelf {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, var(--cover));
+  column-gap: clamp(24px, 4.7vw, 56px);
+  row-gap: clamp(16px, 3vw, 28px);
+  justify-content: center;
+  align-content: center;
+  padding: 0 var(--gap-lg);
+}
+
+.book {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cover {
+  width: var(--cover);
+  aspect-ratio: 1;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+/* 还没有书：不摆占位框，只留一句提示。 */
+.shelf-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: var(--text-md);
+  color: var(--ink2);
+  letter-spacing: 0.12em;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  font-size: var(--text-sm);
+  color: var(--ink2);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line);
+}

@@ -1,0 +1,37 @@
+/* 薄荷晨露：全站共用的颜色、字号、间距与圆角。 */
+
+:root {
+  --bg: #e9f3ee;
+  --surface: #f9fdfb;
+  --ink: #2e3b35;
+  --ink2: #7b8c84;
+  --line: #d3e5db;
+  --accent: #4f9c85;
+  --accent-deep: #3c7a68;
+  --warm: #f0b583;
+  --stage: #18211d;
+  --stage2: #212d26;
+
+  /* 标题渐变的两端：深青与深橙，都过了大号文字 3:1 的底线。 */
+  --title-a: #2e7f6b;
+  --title-b: #cf6f34;
+
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 20px;
+  --text-xl: 26px;
+
+  --gap-sm: 8px;
+  --gap-md: 16px;
+  --gap-lg: 28px;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 22px;
+
+  /* 封面边长：同时受宽和高约束，横屏矮窗口里两行也摆得下。 */
+  --cover: min(17vw, 26vh, 200px);
+
+  /* 触控目标下限。 */
+  --tap: 44px;
+}

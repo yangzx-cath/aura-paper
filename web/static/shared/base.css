@@ -1,0 +1,44 @@
+/* 两页共用的字体与基础样式。 */
+
+/* 站酷快乐体，OFL 授权，由 scripts/get_fonts.sh 下载。 */
+@font-face {
+  font-family: "ZCOOL KuaiLe";
+  src: url("../fonts/ZCOOLKuaiLe-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, "PingFang SC", "Noto Sans SC", "Microsoft YaHei",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+  font-weight: inherit;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
