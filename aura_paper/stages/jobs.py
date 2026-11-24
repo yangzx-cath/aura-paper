@@ -123,7 +123,10 @@ def _reference(
     if not parts:
         return ""
     target = out_dir / f"{job.shot}{REFERENCE_SUFFIX}"
-    write_track(target, parts, job.duration)
+    # The track has to be as long as the clip, so it carries the same longer
+    # tail the model needs to finish its last line.
+    seconds = _seconds(job.audio_ms, REFERENCE_TAIL_MS)
+    write_track(target, parts, seconds)
     return f"jobs/{target.name}"
 
 
