@@ -102,22 +102,29 @@
   gap: var(--gap-sm);
 }
 
-/* 播放是全页唯一的主按钮，白图标压深青。 */
+/* 播放是全页唯一的主按钮：高光压在上方，底部留一层暗边。 */
 .deck-play {
   display: grid;
   place-items: center;
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--accent-deep);
+  background:
+    radial-gradient(100% 70% at 30% 0%, rgba(255, 255, 255, 0.4),
+      transparent 60%),
+    linear-gradient(180deg, #4f9c85, #356a5b);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.16),
+    0 3px 8px rgba(53, 106, 91, 0.3);
   color: #fff;
 }
 
 .deck-play svg {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   fill: currentColor;
 }
 
@@ -138,13 +145,30 @@
   display: block;
 }
 
-/* 进度占位：接入 show.json 后按页切成 N 段。 */
+/* 进度：8px 的视觉条，外圈留 44px 的命中区。 */
 .track {
   flex: 1;
   min-width: 0;
+  height: var(--tap);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.track-bar {
+  width: 100%;
   height: 8px;
   border-radius: 999px;
   background: var(--line);
+  overflow: hidden;
+}
+
+.track-fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
 }
 
 .deck-tool {
@@ -157,14 +181,28 @@
   font-size: var(--text-md);
 }
 
-/* 麦克风是语音入口，按文档占满控件行。 */
+/* 麦克风是语音入口，与播放同尺寸，高光略弱一档。 */
 .deck-mic {
-  width: 72px;
-  height: 72px;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--accent);
+  background:
+    radial-gradient(100% 70% at 30% 0%, rgba(255, 255, 255, 0.36),
+      transparent 60%),
+    linear-gradient(180deg, #64ad95, #478f79);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.14),
+    0 3px 8px rgba(71, 143, 121, 0.28);
   color: #fff;
-  font-size: var(--text-sm);
+}
+
+.deck-mic svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
 }
