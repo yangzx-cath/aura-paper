@@ -24,12 +24,14 @@ COVER_NAME = "cover.jpg"
 def publish(
     book_id: str,
     *,
+    as_id: str = "",
     root: str | Path | None = None,
     library: str | Path | None = None,
 ) -> BookPublish:
     """Copy the film, its subtitles and the book facts into the library."""
     directory = book_dir(book_id, root)
-    result = BookPublish(id=book_id)
+    target_id = as_id or book_id
+    result = BookPublish(id=target_id)
 
     takes = _read_compose(directory)
     film = directory / takes.film if takes.film else None
@@ -41,7 +43,7 @@ def publish(
         result.error = "还没有字幕，先跑 run_subtitles.py"
         return result
 
-    target = book_folder(book_id, library) / PUB_NAME
+    target = book_folder(target_id, library) / PUB_NAME
     target.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(film, target / FILM_NAME)
     shutil.copyfile(subtitles, target / VTT_NAME)
@@ -53,7 +55,7 @@ def publish(
 
     content = _read_content(directory)
     cast_book = _read_cast(directory)
-    meta = read_meta(book_id, library)
+    meta = read_meta(target_id, library)
     result.title = content.title or (meta.title if meta is not None else "")
     result.language = cast_book.language or _content_language(content)
     result.seconds = takes.seconds
@@ -68,7 +70,7 @@ def publish(
     # The studio reads the run from the out folder, the reader from the
     # library, so the manifest goes to both.
     write_json(book_id, "publish", result.to_dict(), root)
-    write_publish(book_id, result.to_dict(), library)
+    write_publish(target_id, result.to_dict(), library)
     return result
 
 

@@ -6,6 +6,7 @@ publish.json. The shelf shows the book 可观看 once publish.json is there.
 
 Usage:
     python scripts/run_publish.py B005
+    python scripts/run_publish.py C01 --as B001
     python scripts/run_publish.py B005 --library /tmp/library
 """
 
@@ -31,6 +32,13 @@ def main() -> int:
         help="output root, default is the out root",
     )
     parser.add_argument(
+        "--as",
+        default="",
+        dest="as_id",
+        metavar="BOOK",
+        help="library id to publish as, default is the book id",
+    )
+    parser.add_argument(
         "--library",
         default="",
         help="library root, default is data/books",
@@ -48,13 +56,15 @@ def main() -> int:
         return 2
 
     print(f"book     {args.book}")
+    if args.as_id:
+        print(f"as       {args.as_id}")
     print(f"root     {root}")
     print(f"library  {library}")
     print()
     print("Packing the release", flush=True)
 
     started = time.perf_counter()
-    result = publish(args.book, root=root, library=library)
+    result = publish(args.book, as_id=args.as_id, root=root, library=library)
     elapsed = time.perf_counter() - started
 
     print()
@@ -70,7 +80,7 @@ def main() -> int:
     print(f"cover    {result.cover or '（没有封面）'}")
     print(f"cast     {len(result.cast)}")
     print(f"total    {elapsed:.1f}s")
-    print(f"output   {library / args.book / 'pub' / 'publish.json'}")
+    print(f"output   {library / result.id / 'pub' / 'publish.json'}")
     return 0
 
 
