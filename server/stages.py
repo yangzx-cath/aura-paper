@@ -31,7 +31,7 @@ STAGE_FILES = {
     "render": ["render.json"],
     "compose": ["compose.json"],
     "subtitles": ["subtitles.json"],
-    "show": ["show.json"],
+    "publish": ["publish.json"],
 }
 
 # A stage is runnable once its script exists.

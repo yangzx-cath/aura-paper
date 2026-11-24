@@ -23,6 +23,10 @@ STATUS_UPLOADED = "uploaded"
 SOURCE_NAME = "source.pdf"
 BOOK_NAME = "book.json"
 
+# The folder a published book is read from, and the manifest it holds.
+PUB_NAME = "pub"
+PUBLISH_NAME = "publish.json"
+
 # Per-stage run records, written by the studio.
 RUNS_NAME = "stages.json"
 
@@ -157,12 +161,48 @@ def status_of(book_id: str, root: str | Path | None = None) -> str:
     folder = book_folder(book_id, root)
     if _is_running(folder):
         return "running"
-    if (folder / "pub" / "show.json").is_file():
+    if (folder / PUB_NAME / PUBLISH_NAME).is_file():
         return "ready"
     meta = read_meta(book_id, root)
     if meta is not None and meta.error:
         return "failed"
     return STATUS_UPLOADED
+
+
+def release_folder(
+    book_id: str,
+    root: str | Path | None = None,
+) -> Path:
+    """Return the folder a published book is read from."""
+    return book_folder(book_id, root) / PUB_NAME
+
+
+def read_publish(
+    book_id: str,
+    root: str | Path | None = None,
+) -> dict | None:
+    """Return the release manifest, or None when the book is unpublished."""
+    path = release_folder(book_id, root) / PUBLISH_NAME
+    if not path.is_file():
+        return None
+    try:
+        return _read_json(path)
+    except ValueError:
+        return None
+
+
+def write_publish(
+    book_id: str,
+    data: dict,
+    root: str | Path | None = None,
+) -> Path:
+    """Write the release manifest into the book's pub folder."""
+    folder = release_folder(book_id, root)
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / PUBLISH_NAME
+    payload = json.dumps(data, ensure_ascii=False, indent=2)
+    path.write_text(payload + "\n", encoding="utf-8")
+    return path
 
 
 def next_id(root: str | Path | None = None) -> str:

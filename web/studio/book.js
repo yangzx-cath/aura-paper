@@ -12,7 +12,7 @@ const STAGES = [
   { key: "render", name: "出镜", out: "render.json · clips/" },
   { key: "compose", name: "成片", out: "compose.json · shots/film.mp4" },
   { key: "subtitles", name: "字幕", out: "subtitles.json · subtitles.vtt" },
-  { key: "show", name: "发布", out: "show.json" },
+  { key: "publish", name: "发布", out: "pub/publish.json · film.mp4" },
 ];
 
 const STATE_LABELS = {
