@@ -9,7 +9,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .books import router
-from .stages import close_stale_runs
+from .stages import prepare_state
 from .stages import router as stages_router
 
 WEB = Path(__file__).resolve().parent.parent / "web"
@@ -20,7 +20,7 @@ def create_app() -> FastAPI:
     """Return the app with both pages and the API mounted."""
     app = FastAPI(title="灵动绘卷")
     app.middleware("http")(_revalidate)
-    close_stale_runs()
+    prepare_state()
 
     @app.get("/", include_in_schema=False)
     def root() -> RedirectResponse:

@@ -23,6 +23,9 @@ STATUS_UPLOADED = "uploaded"
 SOURCE_NAME = "source.pdf"
 BOOK_NAME = "book.json"
 
+# Per-stage run records, written by the studio.
+RUNS_NAME = "stages.json"
+
 # One upload is a picture book, so 200MB is already generous.
 MAX_BYTES = 200 * 1024 * 1024
 
@@ -162,15 +165,19 @@ def book_folder(book_id: str, root: str | Path | None = None) -> Path:
     return base / book_id
 
 
-# run.json outlives a run, so only its state says the book is still running.
+# The stage records outlive a run, so a running one means it is still going.
 def _is_running(folder: Path) -> bool:
-    path = folder / "run.json"
+    path = folder / RUNS_NAME
     if not path.is_file():
         return False
     try:
-        return _read_json(path).get("state") == "running"
+        data = _read_json(path)
     except ValueError:
         return False
+    for record in data.values():
+        if isinstance(record, dict) and record.get("state") == "running":
+            return True
+    return False
 
 
 # Copy one upload to disk, refusing anything that is not a real PDF.

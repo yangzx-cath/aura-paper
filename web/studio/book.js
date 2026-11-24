@@ -2,8 +2,9 @@
 
 const STAGES = [
   { key: "ingest", name: "拆页", out: "ingest.json · pages/" },
-  { key: "understand", name: "理解", out: "understand.json · figures/" },
-  { key: "assets", name: "出图", out: "cast.json · locations.json" },
+  { key: "understand", name: "理解", out: "understand.json" },
+  { key: "panels", name: "切格", out: "panels.json · panels/" },
+  { key: "assets", name: "出图", out: "cast.json · locations.json · figures/" },
   { key: "identify", name: "认人", out: "identify.json" },
   { key: "storyboard", name: "分镜", out: "scenes.json · shots.json" },
   { key: "voice", name: "配音", out: "voice.json · voice/" },
@@ -16,9 +17,6 @@ const STAGES = [
 
 // 书还没有页图，先摆 6 个占位框看版式。
 const PLACEHOLDERS = 6;
-
-// 目前只有 ingest 的脚本参数与服务端的约定一致。
-const RUNNABLE = new Set(["ingest"]);
 
 const STATE_LABELS = {
   idle: ["未运行", "badge"],
@@ -98,26 +96,38 @@ async function refresh() {
       return;
     }
     const data = await reply.json();
-    for (const row of data.stages) {
+    for (let index = 0; index < data.stages.length; index += 1) {
+      const row = data.stages[index];
       const ui = ROWS.get(row.stage);
-      if (ui) {
-        paint(ui, row);
+      if (!ui) {
+        continue;
       }
+      // 第一个阶段随时可跑，其余要等上一个阶段完成。
+      const before = index === 0 ? "done" : data.stages[index - 1].state;
+      paint(ui, row, before === "done");
     }
   } catch (error) {
     // 读不到状态时保持未运行，不影响看版式。
   }
 }
 
-function paint(ui, row) {
+function paint(ui, row, allowed) {
   const [label, className] = STATE_LABELS[row.state] || STATE_LABELS.idle;
   ui.badge.textContent = label;
   ui.badge.className = className;
-  ui.run.disabled = !RUNNABLE.has(ui.key);
+  ui.stamp.textContent = stampText(row);
+  ui.run.disabled = !row.runnable || !allowed;
+  if (!row.runnable) {
+    ui.run.title = "这个阶段还没有脚本";
+  } else if (!allowed) {
+    ui.run.title = "先完成上一个阶段";
+  } else {
+    ui.run.title = "";
+  }
 
   // 跑过的阶段留着上一次的输出，先收起来，展开时再读。
   const finished = row.state === "done" || row.state === "failed";
-  if (finished && row.log) {
+  if (finished && row.log && ui.text.textContent === "") {
     ui.log.hidden = false;
     ui.log.classList.add("is-closed");
     ui.toggle.textContent = "展开";
@@ -150,6 +160,9 @@ function row(stage) {
   badge.className = "badge";
   badge.textContent = "未运行";
 
+  const stamp = document.createElement("span");
+  stamp.className = "stamp";
+
   const run = document.createElement("button");
   run.className = "run";
   run.type = "button";
@@ -178,6 +191,7 @@ function row(stage) {
     item,
     key: stage.key,
     badge,
+    stamp,
     run,
     log,
     text,
@@ -190,16 +204,31 @@ function row(stage) {
   if (!BOOK) {
     run.disabled = true;
     run.title = "先选择一本绘本";
-  } else if (!RUNNABLE.has(stage.key)) {
-    run.disabled = true;
-    run.title = "这个阶段还没接入";
   } else {
     run.addEventListener("click", () => startStage(stage, ui));
   }
 
-  line.append(main, badge, run);
+  line.append(main, stamp, badge, run);
   item.append(line, log);
   return ui;
+}
+
+// 年月日加时分，后面跟上这次运行的耗时。
+function stampText(row) {
+  if (!row.ended_at) {
+    return "";
+  }
+  const date = new Date(row.ended_at);
+  const pad = (value) => String(value).padStart(2, "0");
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const clock = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const stamp = `${date.getFullYear()}-${month}-${day} ${clock}`;
+  const seconds = Number(row.seconds) || 0;
+  if (!seconds) {
+    return stamp;
+  }
+  return `${stamp} · ${seconds.toFixed(1)}s`;
 }
 
 // 收起的框第一次展开时，把上一次的输出读回来。
@@ -270,7 +299,8 @@ function follow(stage, ui) {
     const ok = line === "退出码 0";
     ui.badge.className = ok ? "badge badge--done" : "badge badge--failed";
     ui.badge.textContent = ok ? "完成" : "失败";
-    ui.run.disabled = false;
+    // 跑完重拉一次，下一个阶段的按钮就能用了。
+    refresh();
   };
 
   source.onerror = () => {

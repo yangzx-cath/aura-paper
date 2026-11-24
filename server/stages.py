@@ -17,13 +17,11 @@ ROOT = Path(__file__).resolve().parent.parent
 BOOKS = ROOT / "data" / "books"
 OUT = ROOT / "out"
 
-# Only stages whose script takes a PDF path are runnable so far.
-RUNNABLE = {"ingest"}
-
 # Page order, and the files that prove a stage has finished.
 STAGE_FILES = {
     "ingest": ["ingest.json"],
     "understand": ["understand.json"],
+    "panels": ["panels.json"],
     "assets": ["cast.json"],
     "identify": ["identify.json"],
     "storyboard": ["shots.json"],
@@ -35,8 +33,18 @@ STAGE_FILES = {
     "show": ["show.json"],
 }
 
+# A stage is runnable once its script exists.
+RUNNABLE = {
+    stage
+    for stage in STAGE_FILES
+    if (ROOT / "scripts" / f"run_{stage}.py").is_file()
+}
+
 # One run per book at a time, so two clicks cannot wipe the same pages.
 RUNNING: dict[str, str] = {}
+
+# Every stage keeps its last run here, so the page can show all of them.
+STAGES_NAME = "stages.json"
 
 router = APIRouter(prefix="/api", tags=["stages"])
 
@@ -53,15 +61,16 @@ async def run_stage(book_id: str, stage: str) -> dict:
         raise HTTPException(status_code=409, detail="这本书已经在运行")
 
     folder = OUT / book_id
+    previous = _previous_stage(stage)
+    if previous and _state(folder, previous, _stages(folder)) != "done":
+        raise HTTPException(status_code=412, detail=f"先完成 {previous}")
+
     log = folder / "logs" / f"{stage}.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     log.write_text("", encoding="utf-8")
-    (folder / "run.json").write_text(
-        json.dumps(
-            {"stage": stage, "state": "running", "started_at": now_iso()}
-        ),
-        encoding="utf-8",
-    )
+    stages = _stages(folder)
+    stages[stage] = {"state": "running", "started_at": now_iso()}
+    _write_stages(folder, stages)
 
     RUNNING[book_id] = stage
     argv = _command(stage, book_id, source)
@@ -73,15 +82,18 @@ async def run_stage(book_id: str, stage: str) -> dict:
 def stage_states(book_id: str) -> dict:
     """Return one state per stage, read from the files a run leaves."""
     folder = OUT / book_id
-    run = _last_run(folder)
+    stages = _stages(folder)
     rows = []
     for stage in STAGE_FILES:
         log = folder / "logs" / f"{stage}.log"
         rows.append(
             {
                 "stage": stage,
-                "state": _state(folder, stage, run),
+                "state": _state(folder, stage, stages),
                 "log": log.is_file(),
+                "runnable": stage in RUNNABLE,
+                "ended_at": _record(stages, stage).get("ended_at", ""),
+                "seconds": _record(stages, stage).get("seconds", 0),
             }
         )
     return {"stages": rows}
@@ -107,34 +119,40 @@ async def stage_events(book_id: str, stage: str) -> StreamingResponse:
     )
 
 
-# A run cut short by a server restart would otherwise stay running forever.
-def close_stale_runs() -> None:
-    """Mark runs left behind by a restart as failed."""
-    for path in OUT.glob("*/run.json"):
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+# Move old records and mark runs cut short by a restart as failed.
+def prepare_state() -> None:
+    """Bring the stored stage records in line with this process."""
+    for folder in OUT.glob("*/"):
+        if not folder.is_dir():
             continue
-        if data.get("state") != "running":
-            continue
-        data["state"] = "failed"
-        data["exit"] = -1
-        data["ended_at"] = now_iso()
-        path.write_text(json.dumps(data), encoding="utf-8")
+        _absorb_run_json(folder)
+        _close_stale(folder)
 
 
 # The book id picks the PDF, so a wrong id cannot touch another book.
 def _command(stage: str, book_id: str, source: Path) -> list[str]:
-    script = ROOT / "scripts" / f"run_{stage}.py"
-    return [
-        sys.executable,
-        str(script),
-        str(source),
-        "--id",
-        book_id,
-        "--root",
-        str(OUT),
-    ]
+    script = str(ROOT / "scripts" / f"run_{stage}.py")
+    root = str(OUT)
+    if stage == "ingest":
+        return [
+            sys.executable,
+            script,
+            str(source),
+            "--id",
+            book_id,
+            "--root",
+            root,
+        ]
+    return [sys.executable, script, book_id, "--root", root]
+
+
+# The stage before this one in page order, empty for the first.
+def _previous_stage(stage: str) -> str:
+    order = list(STAGE_FILES)
+    index = order.index(stage)
+    if index == 0:
+        return ""
+    return order[index - 1]
 
 
 # Copy the child's output into the log, then record how it ended.
@@ -191,7 +209,7 @@ async def _tail(log: Path):
         await asyncio.sleep(0.2)
 
 
-# run.json outlives the run, so it holds the last result and its times.
+# run.json 的旧记录并进 stages.json，每个阶段各留一条。
 def _record_run(
     folder: Path,
     stage: str,
@@ -199,36 +217,88 @@ def _record_run(
     started: str,
     began: float,
 ) -> None:
-    data = {
-        "stage": stage,
+    stages = _stages(folder)
+    stages[stage] = {
         "state": "done" if code == 0 else "failed",
         "exit": code,
         "started_at": started,
         "ended_at": now_iso(),
         "seconds": round(time.perf_counter() - began, 1),
     }
-    (folder / "run.json").write_text(json.dumps(data), encoding="utf-8")
+    _write_stages(folder, stages)
 
 
-# Read the last run record, or an empty dict when there is none.
-def _last_run(folder: Path) -> dict:
-    path = folder / "run.json"
+# Read every stage record of one book.
+def _stages(folder: Path) -> dict:
+    path = folder / STAGES_NAME
     if not path.is_file():
         return {}
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
+    if not isinstance(data, dict):
+        return {}
+    return data
 
 
-# 运行中照 run.json 的状态，跑完的以产物为准。
-def _state(folder: Path, stage: str, run: dict) -> str:
-    mine = run.get("stage") == stage
-    if mine and run.get("state") == "running":
+def _write_stages(folder: Path, stages: dict) -> None:
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / STAGES_NAME
+    path.write_text(json.dumps(stages, indent=2), encoding="utf-8")
+
+
+# One stage's record, empty when it never ran.
+def _record(stages: dict, stage: str) -> dict:
+    record = stages.get(stage)
+    if not isinstance(record, dict):
+        return {}
+    return record
+
+
+# 运行中看阶段记录，跑完的以产物为准。
+def _state(folder: Path, stage: str, stages: dict) -> str:
+    record = _record(stages, stage)
+    if record.get("state") == "running":
         return "running"
     for name in STAGE_FILES[stage]:
         if (folder / name).is_file():
             return "done"
-    if mine and run.get("state") == "failed":
+    if record.get("state") == "failed":
         return "failed"
     return "idle"
+
+
+# An older book still keeps its last run in run.json.
+def _absorb_run_json(folder: Path) -> None:
+    old = folder / "run.json"
+    if not old.is_file():
+        return
+    try:
+        record = json.loads(old.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        record = {}
+    stage = record.get("stage")
+    if isinstance(stage, str) and stage:
+        record.pop("stage", None)
+        stages = _stages(folder)
+        stages.setdefault(stage, record)
+        _write_stages(folder, stages)
+    old.unlink(missing_ok=True)
+
+
+# A record left as running cannot belong to this process any more.
+def _close_stale(folder: Path) -> None:
+    stages = _stages(folder)
+    changed = False
+    for record in stages.values():
+        if not isinstance(record, dict):
+            continue
+        if record.get("state") != "running":
+            continue
+        record["state"] = "failed"
+        record["exit"] = -1
+        record["ended_at"] = now_iso()
+        changed = True
+    if changed:
+        _write_stages(folder, stages)
