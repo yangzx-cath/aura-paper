@@ -12,6 +12,7 @@ Usage:
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 from aura_paper.config import load_env, out_root
@@ -83,6 +84,7 @@ def main() -> int:
     print()
     print("Building the jobs", flush=True)
 
+    started = time.perf_counter()
     result = jobs(
         args.book,
         ratio=args.ratio,
@@ -99,6 +101,8 @@ def main() -> int:
     print(f"seconds  {sum(job.duration for job in result.shots)}")
     print(f"images   {sum(len(job.images) for job in result.shots)}")
     print(f"lines    {sum(len(job.lines) for job in result.shots)}")
+    elapsed = time.perf_counter() - started
+    print(f"total    {elapsed:.1f}s")
     print(f"output   {root / args.book / 'jobs.json'}")
 
     if args.shot:

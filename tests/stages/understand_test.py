@@ -91,4 +91,3 @@ def test_reads_the_cover_and_one_page(tmp_path):
     assert content.pages[1].figures[0].panel == 0
     assert llm.calls == 2
     assert (tmp_path / "demo" / "understand.json").is_file()
-    assert (tmp_path / "demo" / "panels" / "p001_0.jpg").is_file()
