@@ -8,6 +8,12 @@ const FILL = document.getElementById("fill");
 const TOAST = document.getElementById("toast");
 const SUBTITLE = document.getElementById("subtitle");
 
+// 预先生成的固定话术，放在 resources/voice 下。
+const CLIPS = {
+  found: "/static/voice/found.wav",
+  unknown: "/static/voice/unknown.wav",
+};
+
 // 书号来自书库的链接，录音按书存放。
 const BOOK = new URLSearchParams(location.search).get("id") || "";
 
@@ -58,6 +64,7 @@ let recent = [];
 let firstAt = 0;
 let endAt = 0;
 let pages = [];
+let answering = null;
 
 // 发布清单里的字幕，和现在已经显示的那一条。
 let cues = [];
@@ -357,6 +364,7 @@ async function ask(text) {
   const reply = await post(text);
   if (!reply || reply.kind === "none") {
     toast(`没找到，再说一次 · ${stats()}`);
+    playClip("unknown");
     return;
   }
   const page = pageOf(reply.page);
@@ -368,13 +376,16 @@ async function ask(text) {
   }
   if (reply.kind === "answer") {
     toast(`${reply.answer} · ${stats()}`);
+    playAnswer(reply.audio);
     return;
   }
   if (!page) {
     toast(`没找到，再说一次 · ${stats()}`);
+    playClip("unknown");
     return;
   }
   toast(`找到第 ${page.page + 1} 页 · ${stats()}`);
+  playClip("found");
 }
 
 // 问一次服务端，网络或接口出错都当作没找到。
@@ -400,6 +411,42 @@ async function post(text) {
 
 function pageOf(number) {
   return pages.find((row) => row.page === number) || null;
+}
+
+// 回答或固定话术都用同一个播放器，播的时候把视频音量压低。
+function playAudio(url) {
+  if (!url) {
+    return;
+  }
+  if (answering) {
+    answering.pause();
+  }
+  const clip = new Audio(url);
+  answering = clip;
+  FILM.volume = 0.2;
+  clip.addEventListener("ended", () => endVoice(clip));
+  clip.addEventListener("error", () => endVoice(clip));
+  clip.play().catch(() => endVoice(clip));
+}
+
+// 模型给的答案带 base64 音频，单独包一层。
+function playAnswer(encoded) {
+  if (encoded) {
+    playAudio(`data:audio/wav;base64,${encoded}`);
+  }
+}
+
+// 固定话术：找到一段，答不上来另一段。
+function playClip(kind) {
+  playAudio(CLIPS[kind]);
+}
+
+function endVoice(clip) {
+  if (answering !== clip) {
+    return;
+  }
+  FILM.volume = 1;
+  answering = null;
 }
 
 // 台词短，命中比例够高才算找到。
@@ -437,6 +484,7 @@ function showLine(line, slot) {
   shown = -1;
   speak();
   toast(`找到台词：${line.text} · ${stats()}`);
+  playClip("found");
 }
 
 // 在原文里找到要标的位置，标点不参与比对。
@@ -464,6 +512,7 @@ function showPage(page) {
   marked = null;
   draw();
   toast(`找到第 ${page.page + 1} 页 · ${stats()}`);
+  playClip("found");
 }
 
 // 把“...的画面”“...的那一页”这类尾巴去掉，只留要找的东西。

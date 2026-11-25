@@ -20,6 +20,7 @@ from .stages import router as stages_router
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
 FONTS = ROOT / "resources" / "fonts"
+VOICE = ROOT / "resources" / "voice"
 OUT = ROOT / "out"
 
 
@@ -44,6 +45,11 @@ def create_app() -> FastAPI:
         "/static/fonts",
         StaticFiles(directory=FONTS, check_dir=False),
         name="fonts",
+    )
+    app.mount(
+        "/static/voice",
+        StaticFiles(directory=VOICE, check_dir=False),
+        name="voice",
     )
     app.mount(
         "/static",

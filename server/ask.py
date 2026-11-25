@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from base64 import b64encode
 from re import fullmatch
 
 from fastapi import APIRouter, HTTPException
@@ -10,6 +11,8 @@ from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from aura_paper.clients.llm import LLMClient, LLMError
+from aura_paper.clients.tts import TTSClient, TTSError
+from aura_paper.schema.voice import narrator_for
 from aura_paper.store.books import read_publish
 
 # 页面表里每页取多少字，防止个别页把提示词撑大。
@@ -55,7 +58,24 @@ async def ask(body: Ask) -> dict:
         reply = await run_in_threadpool(client.chat, prompt, max_tokens=300)
     except LLMError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    return _result(reply, len(pages))
+
+    result = _result(reply, len(pages))
+    if result.get("kind") == "answer":
+        result["audio"] = await _speak(result["answer"], release)
+    return result
+
+
+# 回答转成一段 WAV 交给页面播放；合不出来就只回文字。
+async def _speak(text: str, release: dict) -> str:
+    client = TTSClient.from_env()
+    if client.missing_settings():
+        return ""
+    voice = narrator_for(str(release.get("language") or "zh"))
+    try:
+        speech = await run_in_threadpool(client.synthesize, text, voice=voice)
+    except TTSError:
+        return ""
+    return b64encode(speech.data).decode("ascii")
 
 
 # 把整本书压成一份页面表，让模型自己判断问题落在哪一页。
