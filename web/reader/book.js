@@ -5,7 +5,6 @@ const PLAY = document.getElementById("play");
 const MIC = document.getElementById("mic");
 const TRACK = document.getElementById("track");
 const FILL = document.getElementById("fill");
-const TOAST = document.getElementById("toast");
 const SUBTITLE = document.getElementById("subtitle");
 
 // 预先生成的固定话术，放在 resources/voice 下。
@@ -24,8 +23,8 @@ const RATE = 16000;
 // 一句话的判定：能量高过门限开始收，静音够久收尾。
 const LEVEL = 0.015;
 const QUIET_MS = 350;
-// 快念的命令词只有两三百毫秒，门槛压到 150 ms 才不会整句丢掉。
-const SHORTEST_MS = 150;
+// 完整的单字（“停”）约 400 ms，短于 250 ms 的声响多是碰撞。
+const SHORTEST_MS = 250;
 const LONGEST_MS = 8000;
 
 // 起说前多带几块，第一个字才不会被削掉。
@@ -55,15 +54,12 @@ let quiet = 0;
 let spoken = 0;
 let loudest = 0;
 let holdUntil = 0;
-let timer = 0;
 let socket = null;
 let busy = false;
 let queued = [];
 let slice = [];
 let sliceLen = 0;
 let recent = [];
-let firstAt = 0;
-let endAt = 0;
 let pages = [];
 let answering = null;
 
@@ -77,7 +73,7 @@ async function start() {
     return;
   }
   if (!navigator.mediaDevices) {
-    toast("语音需要 HTTPS 访问");
+    console.warn("语音需要 HTTPS 访问");
     return;
   }
   starting = true;
@@ -92,7 +88,7 @@ async function start() {
       },
     });
   } catch (error) {
-    toast("没有拿到麦克风权限");
+    console.warn("没有拿到麦克风权限");
     return;
   } finally {
     starting = false;
@@ -114,7 +110,6 @@ async function start() {
   reset();
   listening = true;
   mark(true);
-  toast("语音已打开，说“暂停”或“播放”");
 }
 
 function stop() {
@@ -153,8 +148,6 @@ function hear(event) {
     }
     voiced = true;
     loudest = level;
-    firstAt = 0;
-    endAt = 0;
     openStream();
     for (const earlier of recent) {
       feed(earlier);
@@ -216,8 +209,7 @@ function finish() {
   recent = [];
   quiet = 0;
   spoken = 0;
-  endAt = performance.now();
-  holdUntil = endAt + COOLDOWN_MS;
+  holdUntil = performance.now() + COOLDOWN_MS;
   if (speech < SHORTEST_MS || loudest < PEAK_MIN || !socket) {
     closeStream();
     loudest = 0;
@@ -267,14 +259,10 @@ function closeStream() {
   queued = [];
 }
 
-// 中间结果先显示，最终文本交给指令匹配。
+// 中间结果先交给指令匹配，最终文本再走一遍完整流程。
 function receive(event) {
   const data = JSON.parse(event.data);
   if (data.type === "text") {
-    if (!firstAt) {
-      firstAt = performance.now();
-    }
-    toast(`听到：${data.text}`);
     command(clean(data.text));
     return;
   }
@@ -284,29 +272,16 @@ function receive(event) {
     return;
   }
   busy = false;
-  toast("语音识别失败");
 }
 
-// 说完到首字、到最终结果各用了多久。
-function stats() {
-  if (!endAt) {
-    return "";
-  }
-  const first = Math.max(0, firstAt - endAt) / 1000;
-  const last = (performance.now() - endAt) / 1000;
-  return `首字 ${first.toFixed(2)}s · 结果 ${last.toFixed(2)}s`;
-}
-
-// 最终文本先显示，再依次试命令、本地检索、模型问答。
+// 最终文本先试命令，再试本地检索，最后交给模型。
 async function obey(text) {
   const said = clean(text);
   if (!said) {
-    toast(`没听清，再说一次 · ${stats()}`);
     playClip("unheard");
     return;
   }
   const heard = tidy(text);
-  toast(`听到：${heard} · ${stats()}`);
   if (command(said)) {
     return;
   }
@@ -351,7 +326,6 @@ function find(said) {
   const head = said.slice(at);
   const slot = trimSlot(head.replace(/^(找到|查找|搜索|帮我找|找找|高亮)/, ""));
   if (!slot) {
-    toast(`没听清，再说一次 · ${stats()}`);
     playClip("unheard");
     return true;
   }
@@ -375,10 +349,8 @@ function find(said) {
 
 // 本地定不了的，把整本书的页面表交给模型去选或回答。
 async function ask(text) {
-  toast(`正在查找… · ${stats()}`);
   const reply = await post(text);
   if (!reply || reply.kind === "none") {
-    toast(`没找到，再说一次 · ${stats()}`);
     playClip("unknown");
     return;
   }
@@ -390,16 +362,13 @@ async function ask(text) {
     draw();
   }
   if (reply.kind === "answer") {
-    toast(`${reply.answer} · ${stats()}`);
     playAnswer(reply.audio);
     return;
   }
   if (!page) {
-    toast(`没找到，再说一次 · ${stats()}`);
     playClip("unknown");
     return;
   }
-  toast(`找到第 ${page.page + 1} 页 · ${stats()}`);
   playClip("found");
 }
 
@@ -499,7 +468,6 @@ function showLine(line, slot) {
   marked = spot ? { index, from: spot.from, to: spot.to } : null;
   shown = -1;
   speak();
-  toast(`找到台词：${line.text} · ${stats()}`);
   playClip("found");
 }
 
@@ -527,7 +495,6 @@ function showPage(page) {
   FILM.currentTime = page.start;
   marked = null;
   draw();
-  toast(`找到第 ${page.page + 1} 页 · ${stats()}`);
   playClip("found");
 }
 
@@ -707,16 +674,6 @@ function mark(live) {
   MIC.classList.toggle("is-live", live);
   MIC.setAttribute("aria-pressed", String(live));
   MIC.setAttribute("aria-label", live ? "关闭语音" : "语音助手");
-}
-
-// 识别结果用浮框提示，2.6 秒后自己收起。
-function toast(text) {
-  TOAST.textContent = text;
-  TOAST.classList.add("is-shown");
-  clearTimeout(timer);
-  timer = setTimeout(() => {
-    TOAST.classList.remove("is-shown");
-  }, 2600);
 }
 
 // 书名、视频和字幕都从发布清单里读，路径由书 id 拼出来。
