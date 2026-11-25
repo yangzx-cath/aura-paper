@@ -6,6 +6,11 @@ const MIC = document.getElementById("mic");
 const TRACK = document.getElementById("track");
 const FILL = document.getElementById("fill");
 const SUBTITLE = document.getElementById("subtitle");
+const META = document.getElementById("meta");
+
+// 年龄分级按书的语言给，书名以外的信息都写在这一行里。
+const AGES = { zh: "4–8 岁", en: "6–10 岁" };
+const LANGUAGES = { zh: "中文", en: "英文" };
 
 // 预先生成的固定话术，放在 resources/voice 下。
 const CLIPS = {
@@ -704,9 +709,37 @@ async function load() {
     pages = show.pages || [];
     cues = await subtitles(pub(show.vtt || "subtitles.vtt"));
     shown = -1;
+    label(show);
   } catch (error) {
     SUBTITLE.textContent = "读不到这本书";
   }
+}
+
+// 顶部那一行：4–8 岁 · 2:20 · 中文，缺哪个就少写哪个。
+function label(show) {
+  const language = String(show.language || "").trim();
+  const pieces = [];
+  if (AGES[language]) {
+    pieces.push(AGES[language]);
+  }
+  if (show.seconds) {
+    pieces.push(clock(show.seconds));
+  }
+  if (LANGUAGES[language]) {
+    pieces.push(LANGUAGES[language]);
+  }
+  if (!pieces.length) {
+    return;
+  }
+  META.textContent = pieces.join(" · ");
+  META.hidden = false;
+}
+
+// 秒换成 m:ss。
+function clock(seconds) {
+  const total = Math.round(Number(seconds) || 0);
+  const rest = String(total % 60).padStart(2, "0");
+  return `${Math.floor(total / 60)}:${rest}`;
 }
 
 // 发布目录里的一个文件。
@@ -897,7 +930,6 @@ TRACK.addEventListener("pointercancel", () => {
 });
 
 PLAY.addEventListener("click", toggle);
-FILM.addEventListener("click", toggle);
 FILM.addEventListener("play", sync);
 FILM.addEventListener("pause", sync);
 FILM.addEventListener("ended", sync);
