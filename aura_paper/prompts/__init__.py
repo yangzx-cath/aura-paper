@@ -11,6 +11,7 @@ from .location_prompt import location_prompt
 from .page_prompt import page_prompt
 from .spoken_prompt import spoken_prompt
 from .storyboard_prompt import storyboard_prompt
+from .topic_prompt import topic_prompt
 
 __all__ = [
     "cast_prompt",
@@ -23,4 +24,5 @@ __all__ = [
     "page_prompt",
     "spoken_prompt",
     "storyboard_prompt",
+    "topic_prompt",
 ]

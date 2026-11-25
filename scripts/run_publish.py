@@ -15,8 +15,10 @@ import sys
 import time
 from pathlib import Path
 
-from aura_paper.config import books_dir, load_env, out_root
+from aura_paper.clients.llm import LLMClient
+from aura_paper.config import books_dir, cache_root, load_env, out_root
 from aura_paper.stages.publish import publish
+from aura_paper.store.cache import Cache
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -43,12 +45,28 @@ def main() -> int:
         default="",
         help="library root, default is data/books",
     )
+    parser.add_argument(
+        "--effort",
+        default="",
+        help="reasoning effort, default is LLM_REASONING_EFFORT",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="name the topics again instead of reusing the answer",
+    )
     args = parser.parse_args()
 
     load_env(ROOT / ".env")
 
     root = Path(args.root).expanduser() if args.root else out_root()
     library = Path(args.library).expanduser() if args.library else books_dir()
+    llm = LLMClient.from_env(args.effort)
+    missing = llm.missing_settings()
+    if missing:
+        print("missing config: " + ", ".join(missing), file=sys.stderr)
+        return 2
+    cache = Cache(cache_root(), enabled=not args.no_cache)
     compose_path = root / args.book / "compose.json"
     if not compose_path.is_file():
         print(f"missing {compose_path}", file=sys.stderr)
@@ -60,11 +78,20 @@ def main() -> int:
         print(f"as       {args.as_id}")
     print(f"root     {root}")
     print(f"library  {library}")
+    print(f"model    {llm.model}  effort={llm.reasoning_effort or '-'}")
+    print(f"cache    {cache.root}  enabled={cache.enabled}")
     print()
     print("Packing the release", flush=True)
 
     started = time.perf_counter()
-    result = publish(args.book, as_id=args.as_id, root=root, library=library)
+    result = publish(
+        args.book,
+        as_id=args.as_id,
+        root=root,
+        library=library,
+        llm=llm,
+        cache=cache,
+    )
     elapsed = time.perf_counter() - started
 
     print()
@@ -79,6 +106,11 @@ def main() -> int:
     print(f"vtt      {result.vtt}")
     print(f"cover    {result.cover or '（没有封面）'}")
     print(f"cast     {len(result.cast)}")
+    print(f"pages    {len(result.pages)}")
+    print(f"shots    {len(result.shots)}")
+    print(f"topics   {len(result.topics)}")
+    for topic in result.topics:
+        print(f"  {topic.id}  {topic.name}  {topic.kind}  {topic.pages}")
     print(f"total    {elapsed:.1f}s")
     print(f"output   {library / result.id / 'pub' / 'publish.json'}")
     return 0

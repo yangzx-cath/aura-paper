@@ -1,0 +1,9 @@
+/* 阅读端没有上传区，把书架与翻页留在页面中央。 */
+
+.shelf--framed {
+  margin-block: auto 0;
+}
+
+.pager {
+  margin-block: 0 auto;
+}
