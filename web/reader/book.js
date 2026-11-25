@@ -22,6 +22,7 @@ const CLIPS = {
   found: "/static/voice/found.wav",
   unknown: "/static/voice/unknown.wav",
   unheard: "/static/voice/unheard.wav",
+  think: "/static/voice/think.wav",
 };
 
 // 书号来自书库的链接，录音按书存放。
@@ -58,6 +59,9 @@ const TAP_MS = 400;
 
 // 说明卡停多久自动收起。
 const SPOT_MS = 9000;
+
+// 识别最多等这么久，超时就当没认出来，免得一次卡住后面都点不动。
+const SPOT_WAIT = 8000;
 
 let stream = null;
 let context = null;
@@ -321,11 +325,13 @@ function command(said) {
   const text = said.toLowerCase();
   const pause = ["暂停", "停", "pause", "stop"];
   if (pause.some((word) => text.includes(word))) {
+    dismissSpot();
     FILM.pause();
     return true;
   }
   const play = ["播放", "继续", "开始", "play", "resume", "continue"];
   if (play.some((word) => text.includes(word))) {
+    dismissSpot();
     FILM.play();
     return true;
   }
@@ -379,6 +385,7 @@ async function ask(text) {
     playClip("unknown");
     return;
   }
+  dismissSpot();
   const page = pageOf(reply.page);
   if (page) {
     FILM.pause();
@@ -485,6 +492,7 @@ function bestLine(slot) {
 
 // 跳到那一句，并把命中的片段标出来。
 function showLine(line, slot) {
+  dismissSpot();
   FILM.pause();
   FILM.currentTime = line.start;
   draw();
@@ -516,6 +524,7 @@ function locate(text, slot) {
 }
 
 function showPage(page) {
+  dismissSpot();
   FILM.pause();
   FILM.currentTime = page.start;
   marked = null;
@@ -974,6 +983,10 @@ FILM.addEventListener("timeupdate", speak);
 FILM.addEventListener("seeked", speak);
 FILM.addEventListener("loadedmetadata", speak);
 
+// 视频一真的继续播、或者位置一换，卡片就不再对应这一帧了，收起来。
+FILM.addEventListener("playing", dismissSpot);
+FILM.addEventListener("seeked", dismissSpot);
+
 // 点画面就是触控：截下这一帧，标出点的位置，交给服务端认。
 STAGE.addEventListener("pointerdown", (event) => {
   if (event.button !== 0) {
@@ -1021,12 +1034,17 @@ async function tap(event) {
   FILM.pause();
   const at = FILM.currentTime;
   const image = frameImage(point);
-  openSpot(point, "让我看看……");
+  // 认的过程只出声，不占画面；结果回来再弹卡片。
+  awaitSpot(point);
+  playClip("think");
 
   try {
+    const gate = new AbortController();
+    const timer = setTimeout(() => gate.abort(), SPOT_WAIT);
     const reply = await fetch("/api/touch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: gate.signal,
       body: JSON.stringify({
         book: BOOK,
         time: at,
@@ -1035,24 +1053,25 @@ async function tap(event) {
         image,
       }),
     });
+    clearTimeout(timer);
     if (!spotPoint) {
       return;
     }
     if (!reply.ok) {
-      fillSpot("", "没有认出来，再点一次试试");
+      showSpot("", "没有认出来，再点一次试试");
       return;
     }
     const found = await reply.json();
     if (!found.topic) {
-      fillSpot("", found.note || "这里没有特别要说的事情");
+      showSpot("", found.note || "这里没有特别要说的事情");
       return;
     }
-    fillSpot(found.topic.name, found.topic.intro);
     spotBox = found.box || [];
+    showSpot(found.topic.name, found.topic.intro);
     paintSpot(point);
   } catch (error) {
     if (spotPoint) {
-      fillSpot("", "没有连上识别服务");
+      showSpot("", "没有连上识别服务");
     }
   } finally {
     spotBusy = false;
@@ -1111,37 +1130,54 @@ function frameImage(point) {
   return canvas.toDataURL("image/jpeg", 0.85);
 }
 
-function openSpot(point, text) {
+function awaitSpot(point) {
   spotPoint = point;
   spotBox = [];
   SPOT_BOX.hidden = true;
-  SPOT_CARD.hidden = false;
-  fillSpot("", text);
+  SPOT_CARD.hidden = true;
   armSpot();
 }
 
-function fillSpot(name, intro) {
+// 结果回来才亮卡片，名称与介绍一起写进去再定位。
+function showSpot(name, intro) {
+  if (!spotPoint) {
+    return;
+  }
+  SPOT_CARD.hidden = false;
   SPOT_NAME.textContent = name || "";
   SPOT_NAME.hidden = !name;
   SPOT_INTRO.textContent = intro || "";
-  if (spotPoint && !SPOT_CARD.hidden) {
-    placeSpot(spotPoint);
-  }
+  placeSpot();
+  armSpot();
 }
 
-// 卡片先放点的右下方，出界就翻到另一边。
-function placeSpot(point) {
+// 卡片贴外框的右边，放不下就翻到左边；没有外框时贴点击点。
+function spotAnchor() {
+  if (!spotBox.length) {
+    return { left: spotPoint.left, top: spotPoint.top, width: 0, height: 0 };
+  }
+  return {
+    left: spotPoint.left + spotBox[0] * spotPoint.width,
+    top: spotPoint.top + spotBox[1] * spotPoint.height,
+    width: (spotBox[2] - spotBox[0]) * spotPoint.width,
+    height: (spotBox[3] - spotBox[1]) * spotPoint.height,
+  };
+}
+
+// 卡片先放物体右边，越界就翻到另一边。
+function placeSpot() {
   const stage = STAGE.getBoundingClientRect();
   const card = SPOT_CARD.getBoundingClientRect();
-  const gap = 16;
+  const spot = spotAnchor();
+  const gap = 14;
   const margin = 12;
-  let left = point.left + gap;
+  let left = spot.left + spot.width + gap;
   if (left + card.width > stage.width - margin) {
-    left = point.left - card.width - gap;
+    left = spot.left - card.width - gap;
   }
-  let top = point.top + gap;
+  let top = spot.top;
   if (top + card.height > stage.height - margin) {
-    top = point.top - card.height - gap;
+    top = spot.top + spot.height - card.height;
   }
   const maxLeft = stage.width - card.width - margin;
   const maxTop = stage.height - card.height - margin;
@@ -1168,13 +1204,13 @@ function paintSpot(point) {
   SPOT_BOX.hidden = false;
 }
 
-function closeSpot() {
+function closeSpot(resume = true) {
   clearTimeout(spotTimer);
   SPOT_CARD.hidden = true;
   SPOT_BOX.hidden = true;
   spotBox = [];
   spotPoint = null;
-  if (spotPlaying && FILM.paused) {
+  if (resume && spotPlaying && FILM.paused) {
     FILM.play();
   }
   spotPlaying = false;
@@ -1183,6 +1219,13 @@ function closeSpot() {
 function armSpot() {
   clearTimeout(spotTimer);
   spotTimer = setTimeout(closeSpot, SPOT_MS);
+}
+
+// 语音接管时收起卡片，但不顺手把视频播起来。
+function dismissSpot() {
+  if (spotPoint) {
+    closeSpot(false);
+  }
 }
 
 // 录音中亮起按钮，再按一次关掉；真正的采集后面接。
