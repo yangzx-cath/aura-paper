@@ -27,6 +27,12 @@ const PRE_ROLL = 8;
 // 句尾补一段静音，ASR 对孤立的短词才容易切出来。
 const PAD_MS = 200;
 
+// 一整句里最响的一块低于这个值，就当噪声，不上传也不计费。
+const PEAK_MIN = 0.04;
+
+// 一句结束后先静一静，避免余音连着再触发。
+const COOLDOWN_MS = 800;
+
 // 音频按 100 ms 一片送给端点，太碎的帧它不接受。
 const SLICE = 1600;
 
@@ -40,6 +46,8 @@ let listening = false;
 let voiced = false;
 let quiet = 0;
 let spoken = 0;
+let loudest = 0;
+let holdUntil = 0;
 let timer = 0;
 let socket = null;
 let busy = false;
@@ -127,10 +135,11 @@ function hear(event) {
 
   if (!voiced) {
     keep(pcm);
-    if (level < LEVEL || busy) {
+    if (level < LEVEL || busy || performance.now() < holdUntil) {
       return;
     }
     voiced = true;
+    loudest = level;
     firstAt = 0;
     endAt = 0;
     openStream();
@@ -145,6 +154,7 @@ function hear(event) {
 
   feed(pcm);
   spoken += ms;
+  loudest = Math.max(loudest, level);
   quiet = level < LEVEL ? quiet + ms : 0;
   if (quiet >= QUIET_MS || spoken >= LONGEST_MS) {
     finish();
@@ -194,8 +204,10 @@ function finish() {
   quiet = 0;
   spoken = 0;
   endAt = performance.now();
-  if (speech < SHORTEST_MS || !socket) {
+  holdUntil = endAt + COOLDOWN_MS;
+  if (speech < SHORTEST_MS || loudest < PEAK_MIN || !socket) {
     closeStream();
+    loudest = 0;
     return;
   }
   write(new Int16Array((RATE * PAD_MS) / 1000));
@@ -272,18 +284,21 @@ function stats() {
   return `首字 ${first.toFixed(2)}s · 结果 ${last.toFixed(2)}s`;
 }
 
-// 最终文本先显示，再执行命中的指令。
-function obey(text) {
+// 最终文本先显示，再依次试命令、本地检索、模型问答。
+async function obey(text) {
   const said = clean(text);
   if (!said) {
     toast(`没听清，再说一次 · ${stats()}`);
     return;
   }
   toast(`听到：${said} · ${stats()}`);
+  if (command(said)) {
+    return;
+  }
   if (find(said)) {
     return;
   }
-  command(said);
+  await ask(said);
 }
 
 // 中间结果和最终文本都走这里，宁可不动也不误判。
@@ -292,12 +307,14 @@ function command(said) {
   const pause = ["暂停", "停", "pause", "stop"];
   if (pause.some((word) => text.includes(word))) {
     FILM.pause();
-    return;
+    return true;
   }
   const play = ["播放", "继续", "开始", "play", "resume", "continue"];
   if (play.some((word) => text.includes(word))) {
     FILM.play();
+    return true;
   }
+  return false;
 }
 
 function clean(text) {
@@ -331,8 +348,58 @@ function find(said) {
     showLine(line, slot);
     return true;
   }
-  toast(`没找到，再说一次 · ${stats()}`);
-  return true;
+  return false;
+}
+
+// 本地定不了的，把整本书的页面表交给模型去选或回答。
+async function ask(text) {
+  toast(`正在查找… · ${stats()}`);
+  const reply = await post(text);
+  if (!reply || reply.kind === "none") {
+    toast(`没找到，再说一次 · ${stats()}`);
+    return;
+  }
+  const page = pageOf(reply.page);
+  if (page) {
+    FILM.pause();
+    FILM.currentTime = page.start;
+    marked = null;
+    draw();
+  }
+  if (reply.kind === "answer") {
+    toast(`${reply.answer} · ${stats()}`);
+    return;
+  }
+  if (!page) {
+    toast(`没找到，再说一次 · ${stats()}`);
+    return;
+  }
+  toast(`找到第 ${page.page + 1} 页 · ${stats()}`);
+}
+
+// 问一次服务端，网络或接口出错都当作没找到。
+async function post(text) {
+  try {
+    const reply = await fetch("/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        book: BOOK,
+        query: text,
+        page: currentPage(),
+      }),
+    });
+    if (!reply.ok) {
+      return null;
+    }
+    return await reply.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+function pageOf(number) {
+  return pages.find((row) => row.page === number) || null;
 }
 
 // 台词短，命中比例够高才算找到。
@@ -519,6 +586,7 @@ function reset() {
   voiced = false;
   quiet = 0;
   spoken = 0;
+  loudest = 0;
   slice = [];
   sliceLen = 0;
   recent = [];

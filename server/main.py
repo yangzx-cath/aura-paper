@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from aura_paper.config import load_env
 
+from .ask import router as ask_router
 from .books import router
 from .qa import router as qa_router
 from .qa import socket_router
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
     app.include_router(router)
     app.include_router(stages_router)
     app.include_router(qa_router)
+    app.include_router(ask_router)
     app.include_router(socket_router)
     app.mount(
         "/static/fonts",
