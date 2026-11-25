@@ -17,6 +17,7 @@ from aura_paper.store.books import (
     release_folder,
     status_of,
 )
+from aura_paper.store.history import clear as clear_history
 from aura_paper.store.history import read as read_history
 
 OUT = Path(__file__).resolve().parent.parent / "out"
@@ -61,6 +62,15 @@ def history(book_id: str) -> dict:
     if not ID_PATTERN.match(book_id):
         raise HTTPException(status_code=404, detail="没有这本书")
     return {"history": read_history(book_id)}
+
+
+@router.delete("/books/{book_id}/history")
+def drop_history(book_id: str) -> dict:
+    """Forget every exchange recorded for this book."""
+    if not ID_PATTERN.match(book_id):
+        raise HTTPException(status_code=404, detail="没有这本书")
+    clear_history(book_id)
+    return {"history": []}
 
 
 @router.get("/books/{book_id}/publish")

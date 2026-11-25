@@ -17,6 +17,7 @@ const TALK = document.getElementById("talk");
 const HISTORY = document.getElementById("history");
 const HISTORY_LIST = document.getElementById("history-list");
 const HISTORY_CLOSE = document.getElementById("history-close");
+const HISTORY_CLEAR = document.getElementById("history-clear");
 
 // 年龄分级按书的语言给，书名以外的信息都写在这一行里。
 const AGES = { zh: "4–8 岁", en: "6–10 岁" };
@@ -1263,6 +1264,25 @@ async function loadHistory() {
   drawHistory(rows);
 }
 
+// 清除就把这本书的记录从服务端删掉，画面同时变回空列表。
+async function clearHistory() {
+  if (!BOOK) {
+    return;
+  }
+  const url = `/api/books/${encodeURIComponent(BOOK)}/history`;
+  try {
+    const reply = await fetch(url, { method: "DELETE" });
+    if (!reply.ok) {
+      toast("清除失败，再试一次");
+      return;
+    }
+  } catch (error) {
+    toast("清除失败，再试一次");
+    return;
+  }
+  drawHistory([]);
+}
+
 // 抽屉开着时，新的一问一点立刻补进去。
 function refreshHistory() {
   if (!HISTORY.hidden) {
@@ -1357,6 +1377,7 @@ function historyClock(row) {
 
 TALK.addEventListener("click", openHistory);
 HISTORY_CLOSE.addEventListener("click", closeHistory);
+HISTORY_CLEAR.addEventListener("click", clearHistory);
 
 // 录音中亮起按钮，再按一次关掉；真正的采集后面接。
 MIC.addEventListener("click", () => {

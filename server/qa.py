@@ -20,7 +20,13 @@ from fastapi import (
 from starlette.concurrency import run_in_threadpool
 from websockets.exceptions import WebSocketException
 
-from aura_paper.clients.asr import ASRClient, ASRError, Hearing
+from aura_paper.clients.asr import (
+    BYTES_PER_SAMPLE,
+    RATE,
+    ASRClient,
+    ASRError,
+    Hearing,
+)
 
 ROOT = Path(__file__).resolve().parent.parent / "data" / "recordings"
 OUT = Path(__file__).resolve().parent.parent / "out"
@@ -114,24 +120,31 @@ async def qa_socket(websocket: WebSocket) -> None:
 
     queue: asyncio.Queue[bytes | None] = asyncio.Queue()
     parts: list[bytes] = []
+    said: list[str] = []
     reader = asyncio.create_task(_frames(websocket, queue, parts))
     try:
         hearing = await client.listen(
             _drain(queue),
             hotwords=_hotwords(book),
-            on_text=lambda text: asyncio.create_task(_tell(websocket, text)),
+            on_text=lambda text: _told(websocket, said, text),
         )
     except ASRError as exc:
         await _fail(websocket, str(exc))
         return
     except (OSError, WebSocketException):
-        # 端点偶尔在握手时被重置，用已经收到的音频再试一次。
-        if not parts:
+        # 端点偶尔会重置连接。已经报过文字就拿来收尾，重放只会答两遍。
+        if said:
+            hearing = Hearing(
+                text=said[-1],
+                duration_ms=_spoken_ms(parts),
+            )
+        elif not parts:
             await _fail(websocket, "语音识别连接中断")
             return
-        hearing = await _retry(client, websocket, book, parts)
-        if hearing is None:
-            return
+        else:
+            hearing = await _retry(client, websocket, book, parts)
+            if hearing is None:
+                return
     except (WebSocketDisconnect, RuntimeError):
         return
     finally:
@@ -227,6 +240,18 @@ async def _tell(websocket: WebSocket, text: str) -> None:
         await websocket.send_json({"type": "text", "text": text})
     except (WebSocketDisconnect, RuntimeError):
         pass
+
+
+# Report the text, keeping a copy so a broken stream can still finish.
+def _told(websocket: WebSocket, said: list[str], text: str) -> None:
+    said.append(text)
+    asyncio.create_task(_tell(websocket, text))
+
+
+# How long the audio already received would play for, for the log line.
+def _spoken_ms(parts: list[bytes]) -> int:
+    total = sum(len(part) for part in parts)
+    return int(total / (RATE * BYTES_PER_SAMPLE) * 1000)
 
 
 async def _fail(websocket: WebSocket, detail: str) -> None:

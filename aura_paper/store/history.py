@@ -71,3 +71,10 @@ def read(
 def _path(book_id: str, root: str | Path | None) -> Path:
     base = Path(root) if root is not None else books_dir()
     return base / book_id / HISTORY_NAME
+
+
+def clear(book_id: str, root: str | Path | None = None) -> None:
+    """Drop every recorded exchange of one book."""
+    path = _path(book_id, root)
+    if path.is_file():
+        path.unlink()
