@@ -298,14 +298,15 @@ async function obey(text) {
     toast(`没听清，再说一次 · ${stats()}`);
     return;
   }
-  toast(`听到：${said} · ${stats()}`);
+  const heard = tidy(text);
+  toast(`听到：${heard} · ${stats()}`);
   if (command(said)) {
     return;
   }
   if (find(said)) {
     return;
   }
-  await ask(said);
+  await ask(heard);
 }
 
 // 中间结果和最终文本都走这里，宁可不动也不误判。
@@ -324,8 +325,14 @@ function command(said) {
   return false;
 }
 
+// 比对用：去掉空格和标点，中文和英文命令落到同一种写法。
 function clean(text) {
   return String(text || "").replace(/[\s，。！？、,.!?]/g, "");
+}
+
+// 展示和提问用：只收掉多余空白，英文单词之间的空格要留着。
+function tidy(text) {
+  return String(text || "").replace(/\s+/g, " ").trim();
 }
 
 // 找画面或台词：先看问的是哪一种，命中就跳过去。

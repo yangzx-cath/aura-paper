@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from base64 import b64encode
 from re import fullmatch
 
@@ -21,6 +22,8 @@ TEXT_LIMIT = 40
 
 # Book ids are assigned by the library: B001, C01 and so on.
 BOOK_ID = r"[A-Z]\d{2,3}"
+
+logger = logging.getLogger("uvicorn.error")
 
 router = APIRouter(prefix="/api", tags=["ask"])
 
@@ -60,22 +63,41 @@ async def ask(body: Ask) -> dict:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     result = _result(reply, len(pages))
+    logger.info(
+        "ask %s '%s' -> %s %s",
+        body.book,
+        query,
+        result.get("kind"),
+        result.get("page", ""),
+    )
     if result.get("kind") == "answer":
-        result["audio"] = await _speak(result["answer"], release)
+        result["audio"] = await _speak(result["answer"])
+        logger.info("say %s", result["answer"])
     return result
 
 
 # 回答转成一段 WAV 交给页面播放；合不出来就只回文字。
-async def _speak(text: str, release: dict) -> str:
+async def _speak(text: str) -> str:
     client = TTSClient.from_env()
     if client.missing_settings():
         return ""
-    voice = narrator_for(str(release.get("language") or "zh"))
+    voice = _voice_for(text)
     try:
         speech = await run_in_threadpool(client.synthesize, text, voice=voice)
     except TTSError:
         return ""
     return b64encode(speech.data).decode("ascii")
+
+
+# 英文字母过半就当作英文，问题和答案共用这一条判断。
+def _language(text: str) -> str:
+    letters = sum(1 for ch in text if ch.isascii() and ch.isalpha())
+    return "en" if letters > len(text) * 0.5 else "zh"
+
+
+# 答案以英文为主就配英文音色，否则用中文。
+def _voice_for(text: str) -> str:
+    return narrator_for(_language(text))
 
 
 # 把整本书压成一份页面表，让模型自己判断问题落在哪一页。
@@ -88,6 +110,8 @@ def _prompt(
     lines = ["你是一名儿童绘本讲解助手。"]
     title = release.get("title") or "这本绘本"
     lines.append(f"书名：{title}")
+    spoken = "英文" if _language(query) == "en" else "中文"
+    lines.append(f"提问语言：{spoken}")
     names = [
         str(member.get("name") or "") for member in release.get("cast") or []
     ]
@@ -111,6 +135,7 @@ def _prompt(
             "- 用户在问发生了什么或为什么时，返回 "
             '{"kind":"answer","answer":"1-2 句","page":页码}。',
             "- answer 只能依据上面的内容，不能编造。",
+            f"- answer 用{spoken}写，不要换成别的语言。",
             '- 都回答不了就返回 {"kind":"none"}。',
             "- 只输出 JSON，页码是 1 起的数字。",
         ]
