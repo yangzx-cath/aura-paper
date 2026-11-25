@@ -19,6 +19,7 @@ from aura_paper.prompts import touch_prompt
 from aura_paper.schema.publish import PublishTopic
 from aura_paper.store.books import read_publish
 from aura_paper.store.cache import Cache, file_fingerprint, fingerprint
+from aura_paper.store.history import record
 
 # Book ids are assigned by the library: B001, C01 and so on.
 BOOK_ID = r"[A-Z]\d{2,3}"
@@ -88,7 +89,17 @@ async def touch(body: Touch) -> dict:
         body.y,
         answer.get("id") or "none",
     )
-    return _result(answer, candidates)
+    result = _result(answer, candidates)
+    if result["topic"]:
+        record(
+            body.book,
+            kind="touch",
+            page=page,
+            time=body.time,
+            name=result["topic"]["name"],
+            text=result["topic"]["intro"],
+        )
+    return result
 
 
 # Write the frame to a temp file, ask the model, and reuse an earlier answer.

@@ -59,9 +59,18 @@
                   stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
         </button>
-        <button class="deck-tool" type="button">对话</button>
+        <button class="deck-tool" id="talk" type="button">对话</button>
       </div>
     </footer>
+
+    <aside class="history" id="history" hidden>
+      <header class="history-head">
+        <p class="history-title">互动记录</p>
+        <button class="history-close" id="history-close" type="button"
+                aria-label="关闭">×</button>
+      </header>
+      <ol class="history-list" id="history-list"></ol>
+    </aside>
   </div>
 
   <script src="book.js"></script>

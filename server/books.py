@@ -17,6 +17,7 @@ from aura_paper.store.books import (
     release_folder,
     status_of,
 )
+from aura_paper.store.history import read as read_history
 
 OUT = Path(__file__).resolve().parent.parent / "out"
 
@@ -52,6 +53,14 @@ async def upload(file: UploadFile = File(...)) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return _row(meta)
+
+
+@router.get("/books/{book_id}/history")
+def history(book_id: str) -> dict:
+    """Return what the reader said and tapped in this book, newest first."""
+    if not ID_PATTERN.match(book_id):
+        raise HTTPException(status_code=404, detail="没有这本书")
+    return {"history": read_history(book_id)}
 
 
 @router.get("/books/{book_id}/publish")

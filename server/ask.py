@@ -15,6 +15,7 @@ from aura_paper.clients.llm import LLMClient, LLMError
 from aura_paper.clients.tts import TTSClient, TTSError
 from aura_paper.schema.voice import narrator_for
 from aura_paper.store.books import read_publish
+from aura_paper.store.history import record
 
 # 页面表里每页取多少字，防止个别页把提示词撑大。
 DESC_LIMIT = 80
@@ -70,6 +71,15 @@ async def ask(body: Ask) -> dict:
         result.get("kind"),
         result.get("page", ""),
     )
+    if result.get("kind") in ("find", "answer"):
+        note = result.get("answer") or result.get("why") or ""
+        record(
+            body.book,
+            kind="ask",
+            page=int(result.get("page") or 0),
+            text=query,
+            answer=str(note),
+        )
     if result.get("kind") == "answer":
         result["audio"] = await _speak(result["answer"])
         logger.info("say %s", result["answer"])

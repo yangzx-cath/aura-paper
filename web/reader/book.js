@@ -13,6 +13,10 @@ const SPOT_PIN = document.getElementById("spot-pin");
 const SPOT_CARD = document.getElementById("spot-card");
 const SPOT_NAME = document.getElementById("spot-name");
 const SPOT_INTRO = document.getElementById("spot-intro");
+const TALK = document.getElementById("talk");
+const HISTORY = document.getElementById("history");
+const HISTORY_LIST = document.getElementById("history-list");
+const HISTORY_CLOSE = document.getElementById("history-close");
 
 // 年龄分级按书的语言给，书名以外的信息都写在这一行里。
 const AGES = { zh: "4–8 岁", en: "6–10 岁" };
@@ -391,6 +395,7 @@ async function ask(text) {
     return;
   }
   dismissSpot();
+  refreshHistory();
   const page = pageOf(reply.page);
   if (page) {
     FILM.pause();
@@ -1081,6 +1086,7 @@ async function tap(event) {
   } finally {
     spotBusy = false;
     armSpot();
+    refreshHistory();
   }
 }
 
@@ -1241,6 +1247,116 @@ function dismissSpot() {
     closeSpot(false);
   }
 }
+
+// 对话按钮打开互动记录，每次都重新读服务端。
+async function openHistory() {
+  HISTORY.hidden = false;
+  await loadHistory();
+}
+
+function closeHistory() {
+  HISTORY.hidden = true;
+}
+
+async function loadHistory() {
+  const rows = await readHistory();
+  drawHistory(rows);
+}
+
+// 抽屉开着时，新的一问一点立刻补进去。
+function refreshHistory() {
+  if (!HISTORY.hidden) {
+    loadHistory();
+  }
+}
+
+// 取这本书最近的对话和触摸，取不到就当作还没有记录。
+async function readHistory() {
+  if (!BOOK) {
+    return [];
+  }
+  const url = `/api/books/${encodeURIComponent(BOOK)}/history`;
+  try {
+    const reply = await fetch(url);
+    if (!reply.ok) {
+      return [];
+    }
+    const data = await reply.json();
+    if (!Array.isArray(data.history)) {
+      return [];
+    }
+    return data.history;
+  } catch (error) {
+    return [];
+  }
+}
+
+function drawHistory(rows) {
+  HISTORY_LIST.textContent = "";
+  if (!rows.length) {
+    const empty = document.createElement("li");
+    empty.className = "history-empty";
+    empty.textContent = "还没有对话和触摸";
+    HISTORY_LIST.append(empty);
+    return;
+  }
+  for (const row of rows) {
+    HISTORY_LIST.append(historyRow(row));
+  }
+}
+
+// 一条记录分三层：钟点、做了什么、说了什么。
+function historyRow(row) {
+  const item = document.createElement("li");
+  item.className = `history-row history-${row.kind || "other"}`;
+
+  const when = document.createElement("p");
+  when.className = "history-when";
+  when.textContent = historyClock(row);
+  item.append(when);
+
+  const what = document.createElement("p");
+  what.className = "history-what";
+  if (row.kind === "touch") {
+    what.textContent = `点了一下 · ${row.name || "某个东西"}`;
+  } else {
+    what.textContent = `问：${row.text || ""}`;
+  }
+  item.append(what);
+
+  const say = document.createElement("p");
+  say.className = "history-say";
+  // 触摸记的是讲解，追问记的是回答，找到页时没有回答。
+  if (row.kind === "touch") {
+    say.textContent = row.text || "";
+  } else {
+    say.textContent = row.answer || "";
+  }
+  if (say.textContent) {
+    item.append(say);
+  }
+  return item;
+}
+
+// 时间按本地钟点显示，只到分钟；页码按书上的数法从 1 起。
+function historyClock(row) {
+  const at = new Date(row.at || "");
+  if (Number.isNaN(at.getTime())) {
+    return "";
+  }
+  const clock = at.toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const page = Number(row.page);
+  if (!Number.isInteger(page)) {
+    return clock;
+  }
+  return `${clock} · 第 ${page + 1} 页`;
+}
+
+TALK.addEventListener("click", openHistory);
+HISTORY_CLOSE.addEventListener("click", closeHistory);
 
 // 录音中亮起按钮，再按一次关掉；真正的采集后面接。
 MIC.addEventListener("click", () => {
