@@ -101,7 +101,9 @@ def _ask(client: LLMClient, prompt: str, data: bytes, book: str) -> dict:
         key = fingerprint(file_fingerprint(path), prompt, client.model)
         entry = cache.load_json(CACHE_NS, book, key)
         if entry is None:
-            entry = extract_json(client.chat(prompt, images=[path]))
+            entry = extract_json(
+                client.chat(prompt, images=[path], max_tokens=160)
+            )
             cache.save_json(CACHE_NS, book, key, entry)
     return entry
 

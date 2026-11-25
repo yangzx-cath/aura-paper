@@ -289,6 +289,47 @@
   box-shadow: 0 12px 28px rgba(16, 22, 19, 0.28);
 }
 
+/* 查询中：在点击处画一圈亮环，外圈再转一道弧，表示正在查。 */
+.spot-pin {
+  position: absolute;
+  width: 76px;
+  height: 76px;
+  margin: -38px 0 0 -38px;
+  border-radius: 50%;
+  background: rgba(16, 22, 19, 0.35);
+  border: 3px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 6px rgba(240, 181, 131, 0.45),
+    0 8px 20px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  animation: spot-pulse 1.2s ease-in-out infinite;
+}
+
+.spot-pin::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: var(--warm);
+  border-right-color: var(--warm);
+  animation: spot-spin 0.9s linear infinite;
+}
+
+@keyframes spot-pulse {
+  from {
+    transform: scale(0.94);
+  }
+  to {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes spot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .spot-name {
   font-size: var(--text-md);
   font-weight: 600;

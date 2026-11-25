@@ -9,6 +9,7 @@ const SUBTITLE = document.getElementById("subtitle");
 const META = document.getElementById("meta");
 const STAGE = document.getElementById("stage");
 const SPOT_BOX = document.getElementById("spot-box");
+const SPOT_PIN = document.getElementById("spot-pin");
 const SPOT_CARD = document.getElementById("spot-card");
 const SPOT_NAME = document.getElementById("spot-name");
 const SPOT_INTRO = document.getElementById("spot-intro");
@@ -61,7 +62,11 @@ const TAP_MS = 400;
 const SPOT_MS = 9000;
 
 // 识别最多等这么久，超时就当没认出来，免得一次卡住后面都点不动。
-const SPOT_WAIT = 8000;
+// 视觉模型的慢速调用可以到十秒以上，留足余量。
+const SPOT_WAIT = 15000;
+
+// 送去识别的帧宽度：原片 1280 宽，缩到 896 后体积减半，模型看细节仍够。
+const FRAME_WIDTH = 896;
 
 let stream = null;
 let context = null;
@@ -1108,16 +1113,19 @@ function framePoint(event) {
 
 // 截下当前这一帧，在点的位置画一个圆圈，让模型看见手指在哪。
 function frameImage(point) {
+  const scale = Math.min(1, FRAME_WIDTH / FILM.videoWidth);
+  const width = Math.round(FILM.videoWidth * scale);
+  const height = Math.round(FILM.videoHeight * scale);
   const canvas = document.createElement("canvas");
-  canvas.width = FILM.videoWidth;
-  canvas.height = FILM.videoHeight;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext("2d");
-  ctx.drawImage(FILM, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(FILM, 0, 0, width, height);
 
-  const cx = point.x * canvas.width;
-  const cy = point.y * canvas.height;
-  const ring = canvas.width * 0.02;
-  const line = Math.max(3, canvas.width * 0.004);
+  const cx = point.x * width;
+  const cy = point.y * height;
+  const ring = width * 0.022;
+  const line = Math.max(3, width * 0.004);
   ctx.lineWidth = line;
   ctx.strokeStyle = "rgba(16, 22, 19, 0.55)";
   ctx.beginPath();
@@ -1127,7 +1135,7 @@ function frameImage(point) {
   ctx.beginPath();
   ctx.arc(cx, cy, ring, 0, Math.PI * 2);
   ctx.stroke();
-  return canvas.toDataURL("image/jpeg", 0.85);
+  return canvas.toDataURL("image/jpeg", 0.8);
 }
 
 function awaitSpot(point) {
@@ -1135,6 +1143,10 @@ function awaitSpot(point) {
   spotBox = [];
   SPOT_BOX.hidden = true;
   SPOT_CARD.hidden = true;
+  // point.left 是视频左上角，圆圈要画在点的位置。
+  SPOT_PIN.style.left = `${point.left + point.x * point.width}px`;
+  SPOT_PIN.style.top = `${point.top + point.y * point.height}px`;
+  SPOT_PIN.hidden = false;
   armSpot();
 }
 
@@ -1143,6 +1155,7 @@ function showSpot(name, intro) {
   if (!spotPoint) {
     return;
   }
+  SPOT_PIN.hidden = true;
   SPOT_CARD.hidden = false;
   SPOT_NAME.textContent = name || "";
   SPOT_NAME.hidden = !name;
@@ -1208,6 +1221,7 @@ function closeSpot(resume = true) {
   clearTimeout(spotTimer);
   SPOT_CARD.hidden = true;
   SPOT_BOX.hidden = true;
+  SPOT_PIN.hidden = true;
   spotBox = [];
   spotPoint = null;
   if (resume && spotPlaying && FILM.paused) {
