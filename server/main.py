@@ -16,6 +16,7 @@ from .qa import router as qa_router
 from .qa import socket_router
 from .stages import prepare_state
 from .stages import router as stages_router
+from .touch import router as touch_router
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
         return RedirectResponse("/reader/")
 
     app.include_router(router)
+    app.include_router(touch_router)
     app.include_router(stages_router)
     app.include_router(qa_router)
     app.include_router(ask_router)

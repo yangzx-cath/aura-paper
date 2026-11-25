@@ -7,6 +7,11 @@ const TRACK = document.getElementById("track");
 const FILL = document.getElementById("fill");
 const SUBTITLE = document.getElementById("subtitle");
 const META = document.getElementById("meta");
+const STAGE = document.getElementById("stage");
+const SPOT_BOX = document.getElementById("spot-box");
+const SPOT_CARD = document.getElementById("spot-card");
+const SPOT_NAME = document.getElementById("spot-name");
+const SPOT_INTRO = document.getElementById("spot-intro");
 
 // 年龄分级按书的语言给，书名以外的信息都写在这一行里。
 const AGES = { zh: "4–8 岁", en: "6–10 岁" };
@@ -47,6 +52,13 @@ const COOLDOWN_MS = 800;
 // 音频按 100 ms 一片送给端点，太碎的帧它不接受。
 const SLICE = 1600;
 
+// 点一下和拖动分开：位移小于 10px、时长小于 400ms 才算点。
+const TAP_MOVE = 10;
+const TAP_MS = 400;
+
+// 说明卡停多久自动收起。
+const SPOT_MS = 9000;
+
 let stream = null;
 let context = null;
 let source = null;
@@ -72,6 +84,14 @@ let answering = null;
 let cues = [];
 let shown = -1;
 let marked = null;
+
+// 触控：按下时的位置，和已经打开的那张卡。
+let tapStart = null;
+let spotBusy = false;
+let spotPlaying = false;
+let spotPoint = null;
+let spotBox = [];
+let spotTimer = 0;
 
 async function start() {
   if (starting || listening) {
@@ -953,6 +973,217 @@ document.addEventListener("keydown", (event) => {
 FILM.addEventListener("timeupdate", speak);
 FILM.addEventListener("seeked", speak);
 FILM.addEventListener("loadedmetadata", speak);
+
+// 点画面就是触控：截下这一帧，标出点的位置，交给服务端认。
+STAGE.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) {
+    return;
+  }
+  tapStart = {
+    x: event.clientX,
+    y: event.clientY,
+    at: performance.now(),
+  };
+});
+
+STAGE.addEventListener("pointerup", (event) => {
+  if (!tapStart) {
+    return;
+  }
+  const moved = Math.hypot(
+    event.clientX - tapStart.x,
+    event.clientY - tapStart.y
+  );
+  const held = performance.now() - tapStart.at;
+  tapStart = null;
+  if (moved > TAP_MOVE || held > TAP_MS) {
+    return;
+  }
+  tap(event);
+});
+
+async function tap(event) {
+  // 卡片开着时，再点一下先收起来，不急着认新的东西。
+  if (!SPOT_CARD.hidden) {
+    closeSpot();
+    return;
+  }
+  if (spotBusy || !FILM.videoWidth) {
+    return;
+  }
+  const point = framePoint(event);
+  if (!point) {
+    return;
+  }
+
+  spotBusy = true;
+  spotPlaying = !FILM.paused;
+  FILM.pause();
+  const at = FILM.currentTime;
+  const image = frameImage(point);
+  openSpot(point, "让我看看……");
+
+  try {
+    const reply = await fetch("/api/touch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        book: BOOK,
+        time: at,
+        x: point.x,
+        y: point.y,
+        image,
+      }),
+    });
+    if (!spotPoint) {
+      return;
+    }
+    if (!reply.ok) {
+      fillSpot("", "没有认出来，再点一次试试");
+      return;
+    }
+    const found = await reply.json();
+    if (!found.topic) {
+      fillSpot("", found.note || "这里没有特别要说的事情");
+      return;
+    }
+    fillSpot(found.topic.name, found.topic.intro);
+    spotBox = found.box || [];
+    paintSpot(point);
+  } catch (error) {
+    if (spotPoint) {
+      fillSpot("", "没有连上识别服务");
+    }
+  } finally {
+    spotBusy = false;
+    armSpot();
+  }
+}
+
+// 屏幕坐标换成画面里的比例；落在黑边上就当没点。
+function framePoint(event) {
+  const box = FILM.getBoundingClientRect();
+  const scale = Math.min(
+    box.width / FILM.videoWidth,
+    box.height / FILM.videoHeight
+  );
+  const width = FILM.videoWidth * scale;
+  const height = FILM.videoHeight * scale;
+  const left = box.left + (box.width - width) / 2;
+  const top = box.top + (box.height - height) / 2;
+  const x = (event.clientX - left) / width;
+  const y = (event.clientY - top) / height;
+  if (x < 0 || x > 1 || y < 0 || y > 1) {
+    return null;
+  }
+  const stage = STAGE.getBoundingClientRect();
+  return {
+    x,
+    y,
+    width,
+    height,
+    left: left - stage.left,
+    top: top - stage.top,
+  };
+}
+
+// 截下当前这一帧，在点的位置画一个圆圈，让模型看见手指在哪。
+function frameImage(point) {
+  const canvas = document.createElement("canvas");
+  canvas.width = FILM.videoWidth;
+  canvas.height = FILM.videoHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(FILM, 0, 0, canvas.width, canvas.height);
+
+  const cx = point.x * canvas.width;
+  const cy = point.y * canvas.height;
+  const ring = canvas.width * 0.02;
+  const line = Math.max(3, canvas.width * 0.004);
+  ctx.lineWidth = line;
+  ctx.strokeStyle = "rgba(16, 22, 19, 0.55)";
+  ctx.beginPath();
+  ctx.arc(cx, cy, ring + line, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(cx, cy, ring, 0, Math.PI * 2);
+  ctx.stroke();
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+
+function openSpot(point, text) {
+  spotPoint = point;
+  spotBox = [];
+  SPOT_BOX.hidden = true;
+  SPOT_CARD.hidden = false;
+  fillSpot("", text);
+  armSpot();
+}
+
+function fillSpot(name, intro) {
+  SPOT_NAME.textContent = name || "";
+  SPOT_NAME.hidden = !name;
+  SPOT_INTRO.textContent = intro || "";
+  if (spotPoint && !SPOT_CARD.hidden) {
+    placeSpot(spotPoint);
+  }
+}
+
+// 卡片先放点的右下方，出界就翻到另一边。
+function placeSpot(point) {
+  const stage = STAGE.getBoundingClientRect();
+  const card = SPOT_CARD.getBoundingClientRect();
+  const gap = 16;
+  const margin = 12;
+  let left = point.left + gap;
+  if (left + card.width > stage.width - margin) {
+    left = point.left - card.width - gap;
+  }
+  let top = point.top + gap;
+  if (top + card.height > stage.height - margin) {
+    top = point.top - card.height - gap;
+  }
+  const maxLeft = stage.width - card.width - margin;
+  const maxTop = stage.height - card.height - margin;
+  SPOT_CARD.style.left = `${clamp(left, margin, maxLeft)}px`;
+  SPOT_CARD.style.top = `${clamp(top, margin, maxTop)}px`;
+}
+
+function clamp(value, low, high) {
+  return Math.max(low, Math.min(value, Math.max(low, high)));
+}
+
+// 外框按归一化坐标画到画面上，跟着播放器的实际显示区域走。
+function paintSpot(point) {
+  if (!spotBox.length) {
+    SPOT_BOX.hidden = true;
+    return;
+  }
+  const left = spotBox[0] * point.width;
+  const top = spotBox[1] * point.height;
+  SPOT_BOX.style.left = `${point.left + left}px`;
+  SPOT_BOX.style.top = `${point.top + top}px`;
+  SPOT_BOX.style.width = `${(spotBox[2] - spotBox[0]) * point.width}px`;
+  SPOT_BOX.style.height = `${(spotBox[3] - spotBox[1]) * point.height}px`;
+  SPOT_BOX.hidden = false;
+}
+
+function closeSpot() {
+  clearTimeout(spotTimer);
+  SPOT_CARD.hidden = true;
+  SPOT_BOX.hidden = true;
+  spotBox = [];
+  spotPoint = null;
+  if (spotPlaying && FILM.paused) {
+    FILM.play();
+  }
+  spotPlaying = false;
+}
+
+function armSpot() {
+  clearTimeout(spotTimer);
+  spotTimer = setTimeout(closeSpot, SPOT_MS);
+}
 
 // 录音中亮起按钮，再按一次关掉；真正的采集后面接。
 MIC.addEventListener("click", () => {
