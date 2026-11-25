@@ -10,10 +10,11 @@ from aura_paper.schema.voice import narrator_for
 ROOT = Path(__file__).resolve().parent.parent
 TARGET = ROOT / "resources" / "voice"
 
-# 页内、台词、答不上来三种固定场合，各配一句现成的话。
+# 找到、答不上来、没听清三种固定场合，各配一句现成的话。
 PHRASES = {
     "found": "哦，找到啦！",
     "unknown": "嗯，这个，我也不知道……",
+    "unheard": "对不起，没有听清……",
 }
 
 

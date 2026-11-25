@@ -12,6 +12,7 @@ const SUBTITLE = document.getElementById("subtitle");
 const CLIPS = {
   found: "/static/voice/found.wav",
   unknown: "/static/voice/unknown.wav",
+  unheard: "/static/voice/unheard.wav",
 };
 
 // 书号来自书库的链接，录音按书存放。
@@ -140,9 +141,14 @@ function hear(event) {
   const level = rms(pcm);
   const ms = (pcm.length / RATE) * 1000;
 
+  // 自己正在说话时清空预录，免得把话术尾巴当成开场白。
   if (!voiced) {
+    if (busy || answering || performance.now() < holdUntil) {
+      recent = [];
+      return;
+    }
     keep(pcm);
-    if (level < LEVEL || busy || performance.now() < holdUntil) {
+    if (level < LEVEL) {
       return;
     }
     voiced = true;
@@ -296,6 +302,7 @@ async function obey(text) {
   const said = clean(text);
   if (!said) {
     toast(`没听清，再说一次 · ${stats()}`);
+    playClip("unheard");
     return;
   }
   const heard = tidy(text);
@@ -344,7 +351,8 @@ function find(said) {
   const head = said.slice(at);
   const slot = trimSlot(head.replace(/^(找到|查找|搜索|帮我找|找找|高亮)/, ""));
   if (!slot) {
-    toast(`没找到，再说一次 · ${stats()}`);
+    toast(`没听清，再说一次 · ${stats()}`);
+    playClip("unheard");
     return true;
   }
   const lineFirst = /高亮|查找|搜索|这句/.test(said);
@@ -454,6 +462,7 @@ function endVoice(clip) {
   }
   FILM.volume = 1;
   answering = null;
+  holdUntil = performance.now() + COOLDOWN_MS;
 }
 
 // 台词短，命中比例够高才算找到。
