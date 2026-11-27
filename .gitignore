@@ -3,19 +3,15 @@
 __pycache__/
 .pytest_cache/
 
-# Local secrets
-.env
-
 # Editor settings
 .vscode/
 
-# Generated files
-out/
-cache/
+# Local secrets
+.env
+
+# Runtime storage
+storage/
 
 # Downloaded fonts
 resources/fonts/
 web/studio/fonts/
-
-# Book library
-data/
