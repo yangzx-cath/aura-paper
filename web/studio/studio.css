@@ -9,6 +9,7 @@
 
 :root {
   --ink: #2e3b35;
+  --ink2: #7b8c84;
   --accent: #4f9c85;
   --warm: #f0b583;
   /* Both ends of the brand gradient. */
@@ -85,4 +86,14 @@ h1 {
     var(--warm) 82%,
     transparent
   );
+}
+
+/* Stands under the rule so the brand keeps the eye. */
+.brand-role {
+  margin-top: 14px;
+  color: var(--ink2);
+  font-size: clamp(18px, 1.9vw, 24px);
+  letter-spacing: 0.4em;
+  /* Trailing tracking shifts the label left, so add it back. */
+  text-indent: 0.4em;
 }
