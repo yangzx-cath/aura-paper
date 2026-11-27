@@ -16,13 +16,27 @@
     <p class="brand-role">创作台</p>
   </header>
 
-  <main class="shelf" id="shelf"></main>
+  <main class="board">
+    <section class="shelf" id="shelf"></section>
 
-  <nav class="pager" id="pager" hidden>
-    <button class="page-btn" id="prev" type="button">上一页</button>
-    <span class="page-count" id="count"></span>
-    <button class="page-btn" id="next" type="button">下一页</button>
-  </nav>
+    <nav class="pager" id="pager" hidden>
+      <button class="page-btn" id="prev" type="button">上一页</button>
+      <span class="page-count" id="count"></span>
+      <button class="page-btn" id="next" type="button">下一页</button>
+    </nav>
+
+    <section class="upload">
+      <div class="drop" id="drop">
+        <p class="drop-text">把 PDF 文件拖到这里，或</p>
+        <button class="pick" id="pick" type="button">选择文件</button>
+        <p class="drop-note" id="note"></p>
+        <div class="progress" id="progress" hidden>
+          <div class="progress-fill" id="fill"></div>
+        </div>
+      </div>
+      <input id="file" type="file" accept="application/pdf" hidden>
+    </section>
+  </main>
 
   <script src="home.js"></script>
 </body>
