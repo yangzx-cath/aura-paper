@@ -1,9 +1,8 @@
 import json
 
-from PIL import Image
-
 from aura_paper.clients.llm import LLMClient
 from aura_paper.stages.ingest import ingest
+from PIL import Image
 
 
 class FakeLLM(LLMClient):

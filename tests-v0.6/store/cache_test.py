@@ -4,7 +4,6 @@ from pathlib import Path
 from threading import Thread
 
 import pytest
-
 from aura_paper.store.cache import Cache, file_fingerprint, fingerprint
 
 

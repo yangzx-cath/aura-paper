@@ -2,8 +2,6 @@ import base64
 import random
 
 import pytest
-from PIL import Image, ImageDraw
-
 from aura_paper.media.image import (
     crop_box,
     data_url,
@@ -11,6 +9,7 @@ from aura_paper.media.image import (
     save_jpeg,
     stitch_side_by_side,
 )
+from PIL import Image, ImageDraw
 
 
 def test_jpeg_prefix_and_payload(sample_jpeg):

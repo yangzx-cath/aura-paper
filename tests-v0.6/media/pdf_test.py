@@ -1,8 +1,7 @@
 from pathlib import Path
 
-from PIL import Image
-
 from aura_paper.media.pdf import render_pdf
+from PIL import Image
 
 
 # Pillow writes one point per pixel, so 200x300 pt scales by dpi/72.

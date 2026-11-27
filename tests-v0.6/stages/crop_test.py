@@ -1,11 +1,10 @@
 import json
 from pathlib import Path
 
-from PIL import Image
-
 from aura_paper.schema.content import BookContent, Figure, PageContent, Panel
 from aura_paper.stages.crop import crop
 from aura_paper.store.output import write_json
+from PIL import Image
 
 
 # Write an understand record and the page images it points at.

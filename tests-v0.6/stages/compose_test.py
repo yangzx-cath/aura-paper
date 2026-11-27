@@ -3,7 +3,6 @@ import struct
 import wave
 
 import pytest
-
 from aura_paper.media import ffmpeg
 from aura_paper.schema.job import BookJobs
 from aura_paper.stages.compose import compose

@@ -1,5 +1,4 @@
 import pytest
-
 from aura_paper.clients.minimax import MiniMaxClient
 from aura_paper.clients.providers import make_video_client
 from aura_paper.clients.seedance import SeedanceClient

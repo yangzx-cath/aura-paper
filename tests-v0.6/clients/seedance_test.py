@@ -3,7 +3,6 @@ import urllib.error
 from pathlib import Path
 
 import pytest
-
 from aura_paper.clients.seedance import (
     DEFAULT_MODEL,
     SeedanceClient,

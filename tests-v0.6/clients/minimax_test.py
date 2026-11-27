@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from aura_paper.clients.minimax import (
     MiniMaxClient,
     MiniMaxError,

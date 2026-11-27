@@ -11,10 +11,9 @@ from email.message import Message
 from pathlib import Path
 
 import pytest
-from PIL import Image
-
 from aura_paper.clients.llm import RETRIES, LLMClient, LLMError
 from aura_paper.media.image import data_url
+from PIL import Image
 
 REPLY = {"choices": [{"message": {"content": "{}"}}]}
 

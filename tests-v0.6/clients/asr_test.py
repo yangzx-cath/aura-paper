@@ -3,7 +3,6 @@ import gzip
 import json
 
 import pytest
-
 from aura_paper.clients import asr
 from aura_paper.clients.asr import (
     FLAG_LAST,

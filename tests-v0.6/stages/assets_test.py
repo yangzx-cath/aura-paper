@@ -1,13 +1,12 @@
 import json
 
-from PIL import Image
-
 from aura_paper.clients.llm import LLMClient, LLMError
 from aura_paper.schema.content import BookContent
 from aura_paper.stages.assets import assets
 from aura_paper.stages.crop import crop
 from aura_paper.store.cache import Cache
 from aura_paper.store.output import write_json
+from PIL import Image
 
 CAST = {
     "cast": [

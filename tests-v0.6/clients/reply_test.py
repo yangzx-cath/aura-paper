@@ -1,5 +1,4 @@
 import pytest
-
 from aura_paper.clients.reply import extract_json
 
 

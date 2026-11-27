@@ -6,7 +6,6 @@ import time
 import urllib.error
 
 import pytest
-
 from aura_paper.clients.tts import RETRIES, TTSClient, TTSError
 
 # 24000 bytes of 16-bit mono at 24000 Hz is exactly half a second.
