@@ -220,6 +220,7 @@ function setBusy(value) {
   PICK.disabled = value;
   FILE.disabled = value;
   DROP.classList.toggle("is-busy", value);
+  SHELF.classList.toggle("is-busy", value);
   PROGRESS.hidden = !value;
   if (!value) {
     fill(0);
@@ -280,6 +281,23 @@ document.addEventListener("drop", (event) => {
     return;
   }
   upload(event.dataTransfer.files[0]);
+});
+
+// A click on a book would cancel the upload, so it waits until it ends.
+SHELF.addEventListener("click", (event) => {
+  if (!busy) {
+    return;
+  }
+  event.preventDefault();
+  note("上传中，请稍候", "is-live");
+});
+
+// Reloading or closing the page cancels an upload the same way.
+window.addEventListener("beforeunload", (event) => {
+  if (!busy) {
+    return;
+  }
+  event.preventDefault();
 });
 
 start();

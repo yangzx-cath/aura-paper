@@ -158,6 +158,12 @@ p {
   outline-offset: 4px;
 }
 
+/* A busy shelf dims its cards and ignores clicks. */
+.shelf.is-busy .book {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 /* Until a book has a cover, the label sits in a dashed box of the same size. */
 .cover {
   width: var(--cover);
