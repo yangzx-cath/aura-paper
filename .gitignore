@@ -15,6 +15,7 @@ cache/
 
 # Downloaded fonts
 resources/fonts/
+web/studio/fonts/
 
 # Book library
 data/

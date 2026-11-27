@@ -10,7 +10,6 @@ from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
-FONTS = ROOT / "resources" / "fonts"
 
 app = FastAPI(title="灵动绘卷")
 
@@ -21,11 +20,6 @@ def root() -> RedirectResponse:
     return RedirectResponse("/studio/")
 
 
-app.mount(
-    "/static/fonts",
-    StaticFiles(directory=FONTS, check_dir=False),
-    name="fonts",
-)
 app.mount(
     "/studio",
     StaticFiles(directory=WEB / "studio", html=True),

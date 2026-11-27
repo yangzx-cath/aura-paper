@@ -1,9 +1,9 @@
-/* Studio home: white page, one title and the rule under it. */
+/* Styles for the studio home page. */
 
-/* Brand face, fetched by scripts/get_fonts.sh into resources/fonts. */
+/* The brand face is cut by scripts/get_fonts.sh. */
 @font-face {
   font-family: "ZCOOL KuaiLe";
-  src: url("/static/fonts/ZCOOLKuaiLe-Regular.ttf") format("truetype");
+  src: url("fonts/ZCOOLKuaiLe-brand.ttf") format("truetype");
   font-display: swap;
 }
 
@@ -11,9 +11,9 @@
   --ink: #2e3b35;
   --accent: #4f9c85;
   --warm: #f0b583;
-  /* Both ends of the title gradient. */
-  --title-a: #2e7f6b;
-  --title-b: #cf6f34;
+  /* Both ends of the brand gradient. */
+  --brand-a: #2e7f6b;
+  --brand-b: #cf6f34;
 }
 
 * {
@@ -39,7 +39,7 @@ h1 {
   font-weight: inherit;
 }
 
-/* The title sits near the top. Its top padding follows the window height. */
+/* The brand sits near the top. Its top padding follows the window height. */
 .bar {
   padding: clamp(20px, 5vh, 48px) 28px 0;
   text-align: center;
@@ -58,19 +58,19 @@ h1 {
 
 /* Deep teal to deep orange, both past 3:1 on white at this size. */
 .brand-text {
-  color: var(--title-a);
+  color: var(--brand-a);
   background-image: linear-gradient(
     100deg,
-    var(--title-a) 0%,
+    var(--brand-a) 0%,
     var(--accent) 45%,
-    var(--title-b) 100%
+    var(--brand-b) 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-/* One gradient rule under the title, fading out at both ends. */
+/* One gradient rule under the brand, fading out at both ends. */
 .brand::after {
   content: "";
   display: block;

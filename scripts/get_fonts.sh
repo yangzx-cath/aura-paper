@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Download the two open fonts the film needs into resources/fonts.
+# Download the open fonts the film needs into resources/fonts. Web pages get
+# subsets of the same files.
 #
 #   NotoSerifSC-Regular.otf    思源宋体，正文语气，字幕的稳妥选择
 #   ZCOOLKuaiLe-Regular.ttf    站酷快乐体，圆润俏皮，配绘本画面
@@ -38,6 +39,19 @@ fetch() {
 
 fetch "$serif" NotoSerifSC-Regular.otf
 fetch "$playful" ZCOOLKuaiLe-Regular.ttf
+
+# Subset for the brand.
+python="$root/.venv/bin/python"
+brand_font="$root/web/studio/fonts/ZCOOLKuaiLe-brand.ttf"
+if [[ -x "$python" ]]; then
+    mkdir -p "$(dirname "$brand_font")"
+    "$python" -m fontTools.subset "$target/ZCOOLKuaiLe-Regular.ttf" \
+        --text="灵动绘卷" --layout-features="" --no-hinting \
+        --output-file="$brand_font"
+    ls -l "$brand_font"
+else
+    echo "no .venv python, skipped $brand_font" >&2
+fi
 
 ls -l "$target"
 
