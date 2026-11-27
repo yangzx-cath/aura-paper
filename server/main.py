@@ -8,11 +8,14 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from aura_paper.config import load_env, output_root
+
 from .books import router as books_router
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
-OUT = ROOT / "out"
+
+load_env(ROOT / ".env")
 
 app = FastAPI(title="灵动绘卷")
 
@@ -31,6 +34,6 @@ app.mount(
 )
 app.mount(
     "/media",
-    StaticFiles(directory=OUT, check_dir=False),
+    StaticFiles(directory=output_root(), check_dir=False),
     name="media",
 )

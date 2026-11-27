@@ -2,21 +2,19 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
+from aura_paper.config import output_root
 from aura_paper.store.books import (
     ID_PATTERN,
+    TITLE_FROM_FILENAME,
     BookMeta,
     import_pdf,
     list_books,
     read_meta,
     status_of,
 )
-
-OUT = Path(__file__).resolve().parent.parent / "out"
 
 router = APIRouter(prefix="/api", tags=["books"])
 
@@ -52,6 +50,11 @@ async def upload(file: UploadFile = File(...)) -> dict:
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"写入书库失败 {exc.strerror or exc}",
+        ) from exc
     return _row(meta)
 
 
@@ -66,13 +69,13 @@ def _row(meta: BookMeta) -> dict:
 
 # Until the title is read from the pages, the file name stands in for it.
 def _label(meta: BookMeta) -> str:
-    if meta.title_source == "filename":
+    if meta.title_source == TITLE_FROM_FILENAME:
         return meta.filename or meta.title
     return meta.title or meta.filename
 
 
 # The cover URL, empty until a cover file exists.
 def _cover(book_id: str) -> str:
-    if (OUT / book_id / "cover.jpg").is_file():
+    if (output_root() / book_id / "cover.jpg").is_file():
         return f"/media/{book_id}/cover.jpg"
     return ""
