@@ -30,25 +30,29 @@ class Cache:
         self._stats = {"hit": 0, "miss": 0}
         self._lock = Lock()
 
-    def path(self, ns: str, name: str, key: str) -> Path:
+    def path(self, namespace: str, name: str, key: str) -> Path:
         """Return the file that would hold this entry."""
-        return self.root / ns / f"{name}-{key}.json"
+        return self.root / namespace / f"{name}-{key}.json"
 
-    def file_path(self, ns: str, key: str, suffix: str) -> Path:
+    def file_path(self, namespace: str, key: str, suffix: str) -> Path:
         """Return the file that would hold an entry that is not JSON."""
-        return self.root / ns / f"{key}{suffix}"
+        return self.root / namespace / f"{key}{suffix}"
 
-    def has(self, ns: str, name: str, key: str) -> bool:
+    def has(self, namespace: str, name: str, key: str) -> bool:
         """Return True when the entry exists on disk."""
-        return self.enabled and self.path(ns, name, key).is_file()
+        if not self.enabled:
+            return False
+        path = self.path(namespace, name, key)
+        return path.is_file()
 
-    def load_json(self, ns: str, name: str, key: str) -> dict | None:
+    def load_json(self, namespace: str, name: str, key: str) -> dict | None:
         """Return the stored entry, or None when it is missing or broken."""
         if not self.enabled:
             return None
 
+        path = self.path(namespace, name, key)
         try:
-            text = self.path(ns, name, key).read_text(encoding="utf-8")
+            text = path.read_text(encoding="utf-8")
             data = json.loads(text)
         except (OSError, json.JSONDecodeError):
             self._count("miss")
@@ -66,9 +70,16 @@ class Cache:
         with self._lock:
             self._stats[key] += 1
 
-    def save_json(self, ns: str, name: str, key: str, data: dict) -> Path:
-        """Write the entry and return its path."""
-        path = self.path(ns, name, key)
+    def save_json(
+        self,
+        namespace: str,
+        name: str,
+        key: str,
+        data: dict,
+    ) -> Path:
+        """Write the entry and return its path. Nothing is written when the
+        cache is off."""
+        path = self.path(namespace, name, key)
         if not self.enabled:
             return path
 
@@ -83,13 +94,13 @@ class Cache:
             Path(temp_name).unlink(missing_ok=True)
         return path
 
-    def clear(self, ns: str | None = None) -> int:
+    def clear(self, namespace: str | None = None) -> int:
         """Remove a namespace or the whole cache, returning file count."""
-        target = self.root if ns is None else self.root / ns
+        target = self.root if namespace is None else self.root / namespace
         if not target.is_dir():
             return 0
 
-        count = sum(1 for p in target.rglob("*") if p.is_file())
+        count = sum(1 for path in target.rglob("*") if path.is_file())
         shutil.rmtree(target)
         return count
 
