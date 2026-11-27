@@ -8,12 +8,22 @@
   <link rel="icon" href="data:,">
   <link rel="preload" href="fonts/ZCOOLKuaiLe-brand.ttf"
         as="font" type="font/ttf" crossorigin>
-  <link rel="stylesheet" href="studio.css">
+  <link rel="stylesheet" href="home.css">
 </head>
 <body>
   <header class="bar">
     <h1 class="brand"><span class="brand-text">灵动绘卷</span></h1>
     <p class="brand-role">创作台</p>
   </header>
+
+  <main class="shelf" id="shelf"></main>
+
+  <nav class="pager" id="pager" hidden>
+    <button class="page-btn" id="prev" type="button">上一页</button>
+    <span class="page-count" id="count"></span>
+    <button class="page-btn" id="next" type="button">下一页</button>
+  </nav>
+
+  <script src="home.js"></script>
 </body>
 </html>

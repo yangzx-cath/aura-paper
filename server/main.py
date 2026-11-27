@@ -8,6 +8,8 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from .books import router as books_router
+
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
 
@@ -20,6 +22,7 @@ def root() -> RedirectResponse:
     return RedirectResponse("/studio/")
 
 
+app.include_router(books_router)
 app.mount(
     "/studio",
     StaticFiles(directory=WEB / "studio", html=True),
