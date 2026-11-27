@@ -40,7 +40,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1 {
+h1,
+h3,
+p {
   margin: 0;
   font-weight: inherit;
 }
@@ -115,8 +117,8 @@ h1 {
 /* One page of the shelf is five columns by two rows inside a frame. */
 .shelf {
   --cover: clamp(120px, 11vw, 168px);
-  /* A card is the cover plus the title line, the status line and gaps. */
-  --row: calc(var(--cover) * 1.5 + 56px);
+  /* A card is the cover plus the title, the status line and the gaps. */
+  --row: calc(var(--cover) * 1.5 + 64px);
 
   width: max-content;
   padding: 24px;
@@ -145,6 +147,8 @@ h1 {
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+  /* Keeps its own height, so the fixed row cannot squeeze the lines. */
+  align-self: start;
 }
 
 /* Until a book has a cover, the title holds the space of one. */

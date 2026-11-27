@@ -64,7 +64,7 @@ function render() {
 
 // One book as the shelf shows it, with a placeholder when it has no cover.
 function card(book) {
-  const shown = book.title || book.filename;
+  const shown = labelOf(book);
 
   const item = document.createElement("article");
   item.className = "book";
@@ -89,6 +89,14 @@ function card(book) {
 
   item.append(cover, title, status);
   return item;
+}
+
+// Until the title is read from the pages, the file name stands in for it.
+function labelOf(book) {
+  if (book.title_source === "filename") {
+    return book.filename || book.title;
+  }
+  return book.title || book.filename;
 }
 
 // The pager follows the book count, and hides while one page is enough.
@@ -146,24 +154,28 @@ function upload(file) {
     if (!event.lengthComputable) {
       return;
     }
-    const percent = Math.round((event.loaded / event.total) * 100);
-    fill(percent);
-    if (percent >= 100) {
+    // The last bytes may still be on their way, so the bar stops short of
+    // full until the server answers.
+    const sent = Math.round((event.loaded / event.total) * 100);
+    fill(Math.min(95, sent));
+    if (event.loaded >= event.total) {
       wait();
       return;
     }
-    note(`上传中 ${percent}%`, "is-live");
+    note(`上传中 ${sent}%`, "is-live");
   });
 
   request.addEventListener("load", () => {
     stopWait();
-    setBusy(false);
     if (request.status >= 200 && request.status < 300) {
       const book = JSON.parse(request.responseText);
+      fill(100);
+      setBusy(false);
       note(`已上传 ${book.filename}`, "is-done");
       refresh();
       return;
     }
+    setBusy(false);
     note(readError(request), "is-error");
   });
 
@@ -182,14 +194,14 @@ function upload(file) {
   request.send(form);
 }
 
-// The bytes are through, but the server is still storing the file.
+// The browser has sent every byte, but the server has not answered yet.
 function wait() {
   let seconds = 0;
   clearInterval(ticker);
-  note("正在存入书库… 0s", "is-live");
+  note("等待服务器写入… 0s", "is-live");
   ticker = setInterval(() => {
     seconds += 1;
-    note(`正在存入书库… ${seconds}s`, "is-live");
+    note(`等待服务器写入… ${seconds}s`, "is-live");
   }, 1000);
 }
 
