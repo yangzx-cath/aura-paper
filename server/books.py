@@ -24,7 +24,8 @@ def books() -> dict:
     """Return every book in the library."""
     rows = []
     for meta in list_books():
-        rows.append(_row(meta))
+        row = _row(meta)
+        rows.append(row)
     return {"books": rows}
 
 
