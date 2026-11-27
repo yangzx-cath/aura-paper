@@ -1,4 +1,4 @@
-/* The shelf and the PDF drop box on the studio home page. */
+/* The studio home page. */
 
 const SHELF = document.getElementById("shelf");
 const PAGER = document.getElementById("pager");
@@ -64,21 +64,13 @@ function render() {
 
 // One book as the shelf shows it, with a placeholder when it has no cover.
 function card(book) {
-  const shown = labelOf(book);
-
-  const item = document.createElement("article");
+  const item = document.createElement("a");
   item.className = "book";
-
-  const cover = document.createElement("div");
-  cover.className = "cover";
-  const name = document.createElement("span");
-  name.className = "cover-name";
-  name.textContent = shown;
-  cover.append(name);
+  item.href = `book.html?id=${encodeURIComponent(book.id)}`;
 
   const title = document.createElement("h3");
   title.className = "book-title";
-  title.textContent = shown;
+  title.textContent = book.label;
 
   const [label, tone] = STATUS_LABELS[book.status] || [book.status, "waiting"];
   const status = document.createElement("p");
@@ -87,16 +79,28 @@ function card(book) {
   dot.className = "status-dot";
   status.append(dot, document.createTextNode(`${label} · ${book.id}`));
 
-  item.append(cover, title, status);
+  item.append(coverOf(book), title, status);
   return item;
 }
 
-// Until the title is read from the pages, the file name stands in for it.
-function labelOf(book) {
-  if (book.title_source === "filename") {
-    return book.filename || book.title;
+// The cover image, or the label in a dashed box when there is none.
+function coverOf(book) {
+  const box = document.createElement("div");
+  if (book.cover) {
+    box.className = "cover";
+    const image = document.createElement("img");
+    image.className = "cover-img";
+    image.src = book.cover;
+    image.alt = "";
+    box.append(image);
+    return box;
   }
-  return book.title || book.filename;
+  box.className = "cover cover--empty";
+  const name = document.createElement("span");
+  name.className = "cover-name";
+  name.textContent = book.label;
+  box.append(name);
+  return box;
 }
 
 // The pager follows the book count, and hides while one page is enough.

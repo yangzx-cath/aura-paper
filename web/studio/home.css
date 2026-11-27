@@ -147,19 +147,36 @@ p {
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+  color: inherit;
+  text-decoration: none;
   /* Keeps its own height, so the fixed row cannot squeeze the lines. */
   align-self: start;
 }
 
-/* Until a book has a cover, the title holds the space of one. */
+.book:focus-visible {
+  outline: 2px solid var(--accent-deep);
+  outline-offset: 4px;
+}
+
+/* Until a book has a cover, the label sits in a dashed box of the same size. */
 .cover {
   width: var(--cover);
   aspect-ratio: 2 / 3;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.cover--empty {
   display: grid;
   place-items: center;
   padding: 18px;
   border: 2px dashed var(--line);
-  border-radius: 18px;
+}
+
+.cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .cover-name {

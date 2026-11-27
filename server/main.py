@@ -12,6 +12,7 @@ from .books import router as books_router
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
+OUT = ROOT / "out"
 
 app = FastAPI(title="灵动绘卷")
 
@@ -27,4 +28,9 @@ app.mount(
     "/studio",
     StaticFiles(directory=WEB / "studio", html=True),
     name="studio",
+)
+app.mount(
+    "/media",
+    StaticFiles(directory=OUT, check_dir=False),
+    name="media",
 )
