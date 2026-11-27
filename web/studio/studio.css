@@ -11,6 +11,9 @@
   --ink: #2e3b35;
   --accent: #4f9c85;
   --warm: #f0b583;
+  /* Both ends of the title gradient. */
+  --title-a: #2e7f6b;
+  --title-b: #cf6f34;
 }
 
 * {
@@ -51,6 +54,20 @@ h1 {
   /* Tracking after the last glyph pushes the optical centre left.
      Half a tracking space puts it back. */
   text-indent: 0.05em;
+}
+
+/* Deep teal to deep orange, both past 3:1 on white at this size. */
+.brand-text {
+  color: var(--title-a);
+  background-image: linear-gradient(
+    100deg,
+    var(--title-a) 0%,
+    var(--accent) 45%,
+    var(--title-b) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* One gradient rule under the title, fading out at both ends. */
