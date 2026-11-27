@@ -100,6 +100,15 @@ def release_file(book_id: str, name: str) -> FileResponse:
 def _row(meta: BookMeta) -> dict:
     row = meta.to_dict()
     row["status"] = status_of(meta.id)
-    cover = OUT / meta.id / "cover.jpg"
-    row["cover"] = f"/media/{meta.id}/cover.jpg" if cover.is_file() else ""
+    row["cover"] = _cover(meta.id)
     return row
+
+
+# A book being processed keeps its cover in out, a published one in pub, so
+# a library restored from a backup still shows the pictures.
+def _cover(book_id: str) -> str:
+    if (OUT / book_id / "cover.jpg").is_file():
+        return f"/media/{book_id}/cover.jpg"
+    if (release_folder(book_id) / "cover.jpg").is_file():
+        return f"/api/books/{book_id}/pub/cover.jpg"
+    return ""
