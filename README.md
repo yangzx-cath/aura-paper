@@ -107,7 +107,16 @@ python scripts/run_jobs.py B005 --resolution 1080p --ratio 4:3
   `/api/books/<id>/pub/<film.mp4|subtitles.vtt|cover.jpg>`
 
 阶段的可用性在导入时算一次，改了 `scripts/` 下的文件要重启服务。
-页面与静态文件带 `Cache-Control: no-cache`，改动后普通刷新即可。
+
+开发时改了页面先看浏览器缓存。静态文件只带 `ETag` 和 `Last-Modified`，
+服务器不设 `Cache-Control`，缓存多久由浏览器自己估；改完 CSS/JS 没变化，
+通常不是没生效，而是旧文件还在缓存里。`<meta http-equiv="cache-control">`
+管不到 CSS/JS 这类子资源，别指望它。两种做法：
+
+- DevTools → Network 勾上 **Disable cache**，面板开着期间一直生效；
+- 或者 `Ctrl+Shift+R` 硬刷新，绕过缓存重新拿一次。
+
+要上线时才处理缓存，做法是在引用处带版本号，或者在部署时给文件名加 hash。
 
 ## 测试与风格
 

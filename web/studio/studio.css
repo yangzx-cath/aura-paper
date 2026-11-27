@@ -1,5 +1,12 @@
 /* Studio home: white page, one title and the rule under it. */
 
+/* Brand face, fetched by scripts/get_fonts.sh into resources/fonts. */
+@font-face {
+  font-family: "ZCOOL KuaiLe";
+  src: url("/static/fonts/ZCOOLKuaiLe-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+
 :root {
   --ink: #2e3b35;
   --accent: #4f9c85;
