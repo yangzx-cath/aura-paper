@@ -68,8 +68,8 @@ p {
 /* One row for the pages, sized by itself rather than by the window. */
 .pages {
   flex: none;
-  height: clamp(280px, 55vh, 640px);
-  margin: 24px 28px;
+  height: clamp(150px, 26vh, 320px);
+  margin: 20px 28px;
   display: grid;
   place-items: center;
   border: 2px solid var(--line2);
@@ -85,4 +85,110 @@ p {
 .stages {
   flex: none;
   padding: 0 28px 24px;
+}
+
+/* One thread of stages, joined by a vertical line. */
+.stage-list {
+  position: relative;
+  margin: 0;
+  padding: 0 0 0 30px;
+  list-style: none;
+}
+
+.stage-list::before {
+  content: "";
+  position: absolute;
+  top: 17px;
+  bottom: 17px;
+  left: 7px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--line2);
+}
+
+.stage {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.stage::before {
+  content: "";
+  position: absolute;
+  top: 11px;
+  left: -27px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--line2);
+}
+
+/* One color per stage, warm at the book end and green at the finish. */
+.stage[data-key="ingest"]::before {
+  background: #c08459;
+}
+
+.stage[data-key="read"]::before {
+  background: #c06559;
+}
+
+.stage[data-key="crop"]::before {
+  background: #c0596c;
+}
+
+.stage[data-key="cast"]::before {
+  background: #c0598b;
+}
+
+.stage[data-key="scout"]::before {
+  background: #c059aa;
+}
+
+.stage[data-key="identify"]::before {
+  background: #b759c0;
+}
+
+.stage[data-key="direct"]::before {
+  background: #9859c0;
+}
+
+.stage[data-key="record"]::before {
+  background: #7959c0;
+}
+
+.stage[data-key="prepare"]::before {
+  background: #5a59c0;
+}
+
+.stage[data-key="render"]::before {
+  background: #5976c0;
+}
+
+.stage[data-key="mix"]::before {
+  background: #5995c0;
+}
+
+.stage[data-key="audit"]::before {
+  background: #59b4c0;
+}
+
+.stage[data-key="assemble"]::before {
+  background: #59c0ad;
+}
+
+.stage[data-key="subtitle"]::before {
+  background: #59c08e;
+}
+
+.stage-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.stage-key {
+  color: var(--ink2);
+  font-size: 12px;
+  letter-spacing: 0.04em;
 }

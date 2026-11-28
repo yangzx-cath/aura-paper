@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from aura_paper.config import load_env, output_root
 
 from .books import router as books_router
+from .stages import router as stages_router
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
@@ -27,6 +28,7 @@ def root() -> RedirectResponse:
 
 
 app.include_router(books_router)
+app.include_router(stages_router)
 app.mount(
     "/studio",
     StaticFiles(directory=WEB / "studio", html=True),
