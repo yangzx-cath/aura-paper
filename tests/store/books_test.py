@@ -4,10 +4,10 @@ import json
 import pytest
 
 from aura_paper.store.books import (
-    RUNS_NAME,
+    STAGE_RUNS_NAME,
     TITLE_FROM_USER,
     import_pdf,
-    read_meta,
+    read_book_meta,
     set_title,
     status_of,
 )
@@ -45,7 +45,7 @@ def test_set_title_keeps_a_title_typed_in_by_hand(tmp_path):
     set_title(meta.id, "手工名", source=TITLE_FROM_USER, root=tmp_path)
 
     kept = set_title(meta.id, "自动名", root=tmp_path)
-    after = read_meta(meta.id, tmp_path)
+    after = read_book_meta(meta.id, tmp_path)
 
     assert kept is False
     assert after.title == "手工名"
@@ -53,7 +53,7 @@ def test_set_title_keeps_a_title_typed_in_by_hand(tmp_path):
 
 def test_status_of_prefers_a_running_stage(tmp_path):
     meta = import_pdf(io.BytesIO(PDF), "a.pdf", root=tmp_path)
-    runs = tmp_path / meta.id / RUNS_NAME
+    runs = tmp_path / meta.id / STAGE_RUNS_NAME
     runs.write_text(
         json.dumps({"crop": {"state": "running"}}), encoding="utf-8"
     )

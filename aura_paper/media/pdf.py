@@ -7,13 +7,13 @@ import pypdfium2 as pdfium
 
 # 200 dpi keeps printed text sharp.
 DEFAULT_DPI = 200
-DEFAULT_QUALITY = 92
+DEFAULT_JPEG_QUALITY = 92
 
 # One point is one pixel at 72 dpi, so a lower value drops detail.
 MIN_DPI = 72
 
 # Source pages are numbered from one, the way the PDF counts them.
-SOURCE_TEMPLATE = "source{index:03d}.jpg"
+SOURCE_PAGE_TEMPLATE = "source{index:03d}.jpg"
 
 
 class PdfError(Exception):
@@ -36,7 +36,7 @@ def render_pdf(
     output_dir: str | Path,
     *,
     dpi: int = DEFAULT_DPI,
-    quality: int = DEFAULT_QUALITY,
+    quality: int = DEFAULT_JPEG_QUALITY,
 ) -> list[SourcePage]:
     """Render every page into output_dir and return one record per page."""
     if dpi < MIN_DPI:
@@ -70,7 +70,7 @@ def _render_page(
     quality: int,
 ) -> SourcePage:
     number = index + 1
-    name = SOURCE_TEMPLATE.format(index=number)
+    name = SOURCE_PAGE_TEMPLATE.format(index=number)
     page = document[index]
     try:
         # PDF user units are points, 72 to an inch, so this scale turns

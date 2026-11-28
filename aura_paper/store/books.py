@@ -13,27 +13,27 @@ from ..config import books_dir
 from .artifacts import read_json, write_json
 
 # Books are numbered in import order.
-ID_PATTERN = re.compile(r"^B(\d{3,})$")
+BOOK_ID_PATTERN = re.compile(r"^B(\d{3,})$")
 
 # The status of a book that is stored but not analyzed yet.
 STATUS_UPLOADED = "uploaded"
 
 # Where a book's title came from.
 TITLE_FROM_FILENAME = "filename"
-TITLE_FROM_BREAKDOWN = "breakdown"
+TITLE_FROM_READ = "read"
 TITLE_FROM_USER = "user"
 
 # The uploaded PDF, kept beside the record.
-SOURCE_NAME = "source.pdf"
+SOURCE_PDF_NAME = "source.pdf"
 
 # The record the library keeps for one book.
-BOOK_NAME = "book.json"
+BOOK_RECORD_NAME = "book.json"
 
 # The latest run of each stage.
-RUNS_NAME = "runs.json"
+STAGE_RUNS_NAME = "runs.json"
 
 # One upload is a picture book, so 200MB is already generous.
-MAX_BYTES = 200 * 1024 * 1024
+MAX_UPLOAD_BYTES = 200 * 1024 * 1024
 
 # The bytes that mark a file as a PDF.
 PDF_HEADER = b"%PDF-"
@@ -90,7 +90,7 @@ def import_pdf(
     folder.mkdir(parents=True)
 
     try:
-        size = _copy(stream, folder / SOURCE_NAME)
+        size = _copy(stream, folder / SOURCE_PDF_NAME)
         if not size:
             raise ValueError("文件是空的")
         meta = BookMeta(
@@ -112,7 +112,7 @@ def _next_id(root: str | Path | None = None) -> str:
     highest = 0
     if base.is_dir():
         for path in base.iterdir():
-            match = ID_PATTERN.match(path.name)
+            match = BOOK_ID_PATTERN.match(path.name)
             if match:
                 highest = max(highest, int(match.group(1)))
     return f"B{highest + 1:03d}"
@@ -140,8 +140,8 @@ def _copy(stream: BinaryIO, target: Path) -> int:
             if not chunk:
                 break
             size += len(chunk)
-            if size > MAX_BYTES:
-                limit = MAX_BYTES // (1024 * 1024)
+            if size > MAX_UPLOAD_BYTES:
+                limit = MAX_UPLOAD_BYTES // (1024 * 1024)
                 raise ValueError(f"文件超过 {limit}MB")
             out.write(chunk)
     return size
@@ -157,16 +157,18 @@ def list_books(root: str | Path | None = None) -> list[BookMeta]:
     for path in base.iterdir():
         if not path.is_dir():
             continue
-        meta = read_meta(path.name, root)
+        meta = read_book_meta(path.name, root)
         if meta is not None:
             books.append(meta)
     books.sort(key=lambda book: (book.imported_at, book.id))
     return books
 
 
-def read_meta(book_id: str, root: str | Path | None = None) -> BookMeta | None:
+def read_book_meta(
+    book_id: str, root: str | Path | None = None
+) -> BookMeta | None:
     """Return the stored book, or None when it cannot be read."""
-    path = _book_folder(book_id, root) / BOOK_NAME
+    path = _book_folder(book_id, root) / BOOK_RECORD_NAME
     try:
         data = read_json(path)
     except ValueError:
@@ -177,11 +179,11 @@ def read_meta(book_id: str, root: str | Path | None = None) -> BookMeta | None:
 def set_title(
     book_id: str,
     title: str,
-    source: str = TITLE_FROM_BREAKDOWN,
+    source: str = TITLE_FROM_READ,
     root: str | Path | None = None,
 ) -> bool:
     """Store a detected title unless someone typed one in by hand."""
-    meta = read_meta(book_id, root)
+    meta = read_book_meta(book_id, root)
     if meta is None or not title:
         return False
     if meta.title_source == TITLE_FROM_USER:
@@ -197,7 +199,7 @@ def status_of(book_id: str, root: str | Path | None = None) -> str:
     folder = _book_folder(book_id, root)
     if _is_running(folder):
         return "running"
-    meta = read_meta(book_id, root)
+    meta = read_book_meta(book_id, root)
     if meta is not None and meta.error:
         return "failed"
     return STATUS_UPLOADED
@@ -206,7 +208,7 @@ def status_of(book_id: str, root: str | Path | None = None) -> str:
 # A record left as running means that stage is still going.
 def _is_running(folder: Path) -> bool:
     try:
-        data = read_json(folder / RUNS_NAME)
+        data = read_json(folder / STAGE_RUNS_NAME)
     except ValueError:
         return False
     for record in data.values():

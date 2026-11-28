@@ -7,12 +7,12 @@ from starlette.concurrency import run_in_threadpool
 
 from aura_paper.config import output_root
 from aura_paper.store.books import (
-    ID_PATTERN,
+    BOOK_ID_PATTERN,
     TITLE_FROM_FILENAME,
     BookMeta,
     import_pdf,
     list_books,
-    read_meta,
+    read_book_meta,
     status_of,
 )
 
@@ -32,9 +32,9 @@ def books() -> dict:
 @router.get("/books/{book_id}")
 def book(book_id: str) -> dict:
     """Return one book, or 404 when the library has no such id."""
-    if not ID_PATTERN.match(book_id):
+    if not BOOK_ID_PATTERN.match(book_id):
         raise HTTPException(status_code=404, detail="没有这本书")
-    meta = read_meta(book_id)
+    meta = read_book_meta(book_id)
     if meta is None:
         raise HTTPException(status_code=404, detail="没有这本书")
     return _row(meta)
