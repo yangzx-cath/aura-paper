@@ -9,6 +9,9 @@ import pypdfium2 as pdfium
 DEFAULT_DPI = 200
 DEFAULT_QUALITY = 92
 
+# One point is one pixel at 72 dpi, so a lower value drops detail.
+MIN_DPI = 72
+
 # Source pages are numbered from one, the way the PDF counts them.
 SOURCE_TEMPLATE = "source{index:03d}.jpg"
 
@@ -36,6 +39,9 @@ def render_pdf(
     quality: int = DEFAULT_QUALITY,
 ) -> list[SourcePage]:
     """Render every page into output_dir and return one record per page."""
+    if dpi < MIN_DPI:
+        raise ValueError(f"dpi must be at least {MIN_DPI}")
+
     source = Path(pdf_path).expanduser()
     output_dir = Path(output_dir).expanduser()
     output_dir.mkdir(parents=True, exist_ok=True)
