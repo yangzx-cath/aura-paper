@@ -54,6 +54,8 @@ python -m venv .venv
 
 `out/` 可以随时删，`pub/` 是唯一需要长期保留的东西。
 
+每个概念的英文名与中文名见 `docs/glossary.md`，代码、JSON 字段和文件名都用那里的词。
+
 ## 跑一本书
 
 命令行要在**仓库根目录**运行，脚本按当前目录找 `out/` 和 `data/books/`。
