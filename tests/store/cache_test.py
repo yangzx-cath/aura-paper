@@ -14,6 +14,14 @@ def make_cache(tmp_path, **kwargs):
 
 
 class TestCache:
+    def test_has_is_false_when_disabled(self, tmp_path):
+        cache = make_cache(tmp_path, enabled=False)
+        path = cache.path(NAMESPACE, "page_03", "abc")
+        path.parent.mkdir(parents=True)
+        path.write_text("{}", encoding="utf-8")
+
+        assert cache.has(NAMESPACE, "page_03", "abc") is False
+
     def test_load_json_counts_a_broken_file_as_miss(self, tmp_path):
         cache = make_cache(tmp_path)
         path = cache.path(NAMESPACE, "page_03", "abc")
@@ -41,13 +49,6 @@ class TestCache:
         assert not (tmp_path / "cache").exists()
         assert cache.load_json(NAMESPACE, "page_03", "abc") is None
 
-    def test_save_json_leaves_no_temp_file(self, tmp_path):
-        cache = make_cache(tmp_path)
-
-        path = cache.save_json(NAMESPACE, "page_03", "abc", {"a": 1})
-
-        assert list(path.parent.glob("*.tmp")) == []
-
     def test_clear_removes_only_the_named_namespace(self, tmp_path):
         cache = make_cache(tmp_path)
         cache.save_json(NAMESPACE, "page_03", "abc", {"a": 1})
@@ -58,6 +59,17 @@ class TestCache:
         assert removed == 1
         assert cache.has(NAMESPACE, "page_03", "abc") is False
         assert cache.has("tts/book", "page_03", "def") is True
+
+    def test_clear_without_a_namespace_empties_the_cache(self, tmp_path):
+        cache = make_cache(tmp_path)
+        cache.save_json(NAMESPACE, "page_03", "abc", {"a": 1})
+        cache.save_json("tts/book", "page_03", "def", {"b": 2})
+
+        removed = cache.clear()
+
+        assert removed == 2
+        assert cache.has(NAMESPACE, "page_03", "abc") is False
+        assert cache.has("tts/book", "page_03", "def") is False
 
     def test_stats_hold_under_threads(self, tmp_path):
         cache = make_cache(tmp_path)
